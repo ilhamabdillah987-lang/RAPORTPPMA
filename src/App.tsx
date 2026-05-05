@@ -772,6 +772,7 @@ export default function App() {
                <section className="page">
                  <Header logoUrl={logoUrl} />
                  <StudentInfo student={selectedStudent} />
+                 <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block mt-4">A. NILAI TULIS & LISAN</h3>
                  <table className="table-raport w-full text-center mt-2">
                    <thead>
                      <tr>
@@ -928,7 +929,7 @@ export default function App() {
                  </table>
                </section>
 
-               {/* EKSTRA & ABSENSI */}
+               {/* EKSTRAKURIKULER & ABSENSI */}
                <section className="page border-t-2 mt-8 print:border-none print:mt-0">
                  <Header logoUrl={logoUrl} />
                  <StudentInfo student={selectedStudent} />
@@ -981,7 +982,7 @@ export default function App() {
                          selectedStudent.class === '9' || selectedStudent.class === '12' 
                            ? 'LULUS / TIDAK LULUS' 
                            : 'NAIK KELAS / TIDAK NAIK KELAS'
-                       ) : 'TETAP SEMANGAT BELAJAR'}
+                       ) : null}
                      </motion.div>
                    </div>
                  </div>
