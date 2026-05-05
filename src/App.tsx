@@ -93,6 +93,12 @@ const StudentInfo = ({ student }: { student: Student }) => (
 export default function App() {
   const [selectedClass, setSelectedClass] = useState<string | null>(localStorage.getItem('selected_class'));
   const [studentsList, setStudentsList] = useState<Student[]>([]);
+  const [globalWaliKelas, setGlobalWaliKelas] = useState<string>(() => {
+    return localStorage.getItem(`wali_kelas_${selectedClass}`) || '';
+  });
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkData, setBulkData] = useState('');
+  const [bulkResults, setBulkResults] = useState<{success: number, total: number} | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -228,7 +234,69 @@ export default function App() {
   const handleSelectClass = (className: string) => {
     setSelectedClass(className);
     localStorage.setItem('selected_class', className);
+    setGlobalWaliKelas(localStorage.getItem(`wali_kelas_${className}`) || '');
     setCurrentIndex(0);
+  };
+
+  const handleUpdateGlobalWaliKelas = (val: string) => {
+    setGlobalWaliKelas(val);
+    if (selectedClass) {
+      localStorage.setItem(`wali_kelas_${selectedClass}`, val);
+    }
+  };
+
+  const handleBulkImport = () => {
+    const lines = bulkData.trim().split('\n');
+    let successCount = 0;
+    const allStudents = getStoredStudents();
+    
+    lines.forEach(line => {
+      const columns = line.split('\t'); // Excel uses tabs
+      if (columns.length < 2) return;
+
+      const identifier = columns[0].trim().toUpperCase(); // Could be Name or ID
+      const grades = columns.slice(1);
+
+      // Find student by ID or Name
+      const studentIdx = allStudents.findIndex(s => 
+        s.nomorInduk.toUpperCase() === identifier || 
+        s.name.toUpperCase() === identifier
+      );
+
+      if (studentIdx !== -1) {
+        const student = allStudents[studentIdx];
+        const newSubjects = [...student.subjects];
+        
+        // Map grades to subjects in order
+        grades.forEach((gradeStr, idx) => {
+          if (idx < newSubjects.length) {
+            const val = parseInt(gradeStr) || 0;
+            // Simply update both Tulis and Lisan with same value for simplicity if only one column per subject
+            // Or assume 2 columns per subject. Let's assume one column = Tulis, and we default Lisan to 0 or same.
+            // Professional preference: one column per input.
+            newSubjects[idx] = {
+              ...newSubjects[idx],
+              tulis: { nilai: val, huruf: getHuruf(val) },
+              lisan: { ...newSubjects[idx].lisan, nilai: val, huruf: getHuruf(val) }
+            };
+          }
+        });
+
+        allStudents[studentIdx] = { ...student, subjects: newSubjects };
+        successCount++;
+      }
+    });
+
+    if (successCount > 0) {
+      saveStoredStudents(allStudents);
+      if (selectedClass) fetchStudents(selectedClass);
+      setBulkResults({ success: successCount, total: lines.length });
+      setTimeout(() => {
+        setIsBulkModalOpen(false);
+        setBulkResults(null);
+        setBulkData('');
+      }, 2000);
+    }
   };
 
   const handleClearClass = () => {
@@ -557,6 +625,18 @@ export default function App() {
         <div className="mt-8 px-2 space-y-4">
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
             <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
+              <UserCircle size={12} /> WALI KELAS
+            </h3>
+            <input 
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
+              placeholder="NAMA WALI KELAS..."
+              value={globalWaliKelas}
+              onChange={e => handleUpdateGlobalWaliKelas(e.target.value)}
+            />
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
+            <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
               <Settings size={12} /> LOGO PESANTREN
             </h3>
             <div className="flex flex-col gap-2">
@@ -584,7 +664,14 @@ export default function App() {
           </div>
         </div>
 
-        <div className="pb-6 pt-4 border-t border-slate-100">
+        <div className="pb-6 pt-4 border-t border-slate-100 flex flex-col gap-3">
+          <button 
+            onClick={() => setIsBulkModalOpen(true)}
+            disabled={filteredStudents.length === 0}
+            className="w-full bg-slate-800 hover:bg-slate-900 text-white p-3 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all shadow-lg shadow-slate-100"
+          >
+            <LayoutDashboard size={14} /> INPUT NILAI MASSAL (EXCEL)
+          </button>
           <button 
             onClick={handlePrint} 
             disabled={filteredStudents.length === 0}
@@ -597,6 +684,75 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto">
+        {isBulkModalOpen && (
+          <AnimatePresence>
+            <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
+              <div className="flex min-h-full items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
+                />
+                
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden p-8"
+                >
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">INPUT NILAI MASSAL</h2>
+                    <button onClick={() => setIsBulkModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
+                  </div>
+                  
+                  <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 mb-6">
+                    <p className="text-sm font-bold text-blue-800 mb-2">Instruksi:</p>
+                    <ul className="text-xs text-blue-700/80 space-y-2 list-disc pl-4 font-medium">
+                      <li>Copy data dari Excel dengan kolom: <span className="font-black">Nomor Induk / Nama</span> + <span className="font-black">Nilai-Nilai</span></li>
+                      <li>Data akan otomatis ter-update pada Santri yang sesuai (Nama/ID)</li>
+                      <li>Nilai akan masuk ke kolom Tulis & Lisan secara bersamaan</li>
+                    </ul>
+                  </div>
+
+                  <textarea 
+                    className="w-full h-64 p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-mono text-xs transition-all"
+                    placeholder="Paste data Excel Anda di sini..."
+                    value={bulkData}
+                    onChange={e => setBulkData(e.target.value)}
+                  />
+
+                  {bulkResults && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-6 p-4 bg-emerald-50 text-emerald-700 rounded-xl flex items-center gap-3 font-bold text-sm border border-emerald-100"
+                    >
+                      <Save size={18} /> Berhasil mengupdate {bulkResults.success} data santri dari {bulkResults.total} baris.
+                    </motion.div>
+                  )}
+
+                  <div className="mt-8 flex gap-4">
+                    <button 
+                      onClick={handleBulkImport}
+                      disabled={!bulkData.trim()}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white py-4 rounded-2xl font-black tracking-widest transition-all shadow-xl shadow-blue-100"
+                    >
+                      PROSES DATA EXCEL
+                    </button>
+                    <button 
+                      onClick={() => setIsBulkModalOpen(false)}
+                      className="px-8 bg-slate-100 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 transition-colors"
+                    >
+                      BATAL
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </AnimatePresence>
+        )}
+
         {isModalOpen && editingStudent && (
           <AnimatePresence>
             <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
@@ -653,17 +809,13 @@ export default function App() {
                             <UserCircle size={14} /> IDENTITAS DASAR
                           </h3>
                           <div className="space-y-4">
-                            <div className="form-group">
+                            <div className="form-group col-span-2">
                               <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Lengkap</label>
                               <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
                             </div>
-                            <div className="form-group">
+                            <div className="form-group col-span-2">
                               <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nomor Induk</label>
                               <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
-                            </div>
-                            <div className="form-group">
-                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Wali Kelas</label>
-                              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.waliKelas || ''} onChange={e => setEditingStudent({...editingStudent, waliKelas: e.target.value})} />
                             </div>
                           </div>
                         </div>
@@ -778,6 +930,7 @@ export default function App() {
                    <p className="font-black uppercase text-xl underline underline-offset-8 decoration-2 tracking-[0.2em] text-slate-900">SEMESTER {selectedStudent.semester}</p>
                    <p className="font-extrabold uppercase text-lg tracking-[0.15em] text-slate-500">TAHUN PELAJARAN {selectedStudent.tahunPelajaran}</p>
                  </div>
+                 <div className="page-number">Halaman 1</div>
                </section>
 
                {/* PAGE 2-5 same content but with selectedStudent */}
@@ -887,9 +1040,9 @@ export default function App() {
                      <p>Tangerang, 20 Desember 2025</p>
                      <p>Wali Kelas,</p>
                      <div className="h-28 uppercase font-bold text-[8pt] pt-10 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
-                     <div className="font-bold border-b-2 border-black inline-block min-w-[192px] text-lg uppercase h-8">
-                       {selectedStudent.waliKelas || ''}
-                     </div>
+                      <div className="font-bold border-b-2 border-black inline-block min-w-[192px] text-lg uppercase h-8">
+                        {globalWaliKelas || ''}
+                      </div>
                    </div>
                  </div>
                </section>
@@ -941,6 +1094,7 @@ export default function App() {
                      </tr>
                    </tbody>
                  </table>
+                 <div className="page-number">Halaman 3</div>
                </section>
 
                {/* EKSTRAKURIKULER & ABSENSI */}
@@ -996,10 +1150,11 @@ export default function App() {
                       <p>Wali Kelas,</p>
                       <div className="h-28 uppercase font-bold text-[8pt] pt-10 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
                       <div className="font-bold border-b-2 border-black inline-block min-w-[192px] text-lg uppercase h-8">
-                        {selectedStudent.waliKelas || ''}
+                        {globalWaliKelas || ''}
                       </div>
                     </div>
                   </div>
+                  <div className="page-number">Halaman 4</div>
                 </section>
 
                {/* LEDGER */}

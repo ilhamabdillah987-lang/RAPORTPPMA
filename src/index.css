@@ -29,9 +29,15 @@
 
 /* Report Styles - Only for Print/Display of the actual Raport */
 .report-container {
-  width: 210mm;
-  background: white;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 1000px;
+  background: #f1f5f9; /* Slate 100 background for the wrapper */
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  min-height: 100%;
 }
 
 .page {
@@ -47,6 +53,20 @@
   line-height: 1.25;
   font-family: var(--font-serif);
   font-size: 10pt;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.page-number {
+  position: absolute;
+  bottom: 15mm;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 8pt;
+  color: #64748b;
+  font-family: var(--font-sans);
+  font-weight: 500;
 }
 
 .table-header {

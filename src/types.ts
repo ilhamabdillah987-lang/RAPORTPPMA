@@ -39,3 +39,9 @@ export interface Student {
   attendance: Attendance;
   waliKelas?: string;
 }
+
+export interface GlobalSettings {
+  waliKelas: string;
+  logoUrl: string;
+  tanggalRaport: string;
+}
