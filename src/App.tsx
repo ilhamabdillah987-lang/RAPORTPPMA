@@ -248,9 +248,15 @@ export default function App() {
 
       if (res.ok) {
         if (!isEdit) {
-          setEditingStudent(payload as Student);
+          // If it's a new student, update local list instantly and select them
+          const newStudent = payload as Student;
+          setStudentsList(prev => [...prev, newStudent]);
+          setSearchTerm('');
+          setCurrentIndex(studentsList.length);
         }
+        
         if (selectedClass) fetchStudents(selectedClass);
+        
         if (!stayOpen) {
           setIsModalOpen(false);
           setEditingStudent(null);
@@ -579,8 +585,12 @@ export default function App() {
                   </div>
 
                   <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
-                    <button form="student-form" type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 flex items-center justify-center gap-3 transition-all">
-                      {editingStudent.id ? 'SELESAI' : 'TAMBAH SANTRI'}
+                    <button 
+                      form="student-form" 
+                      type="submit" 
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 flex items-center justify-center gap-3 transition-all"
+                    >
+                      {editingStudent.id ? 'SELESAI' : 'TAMBAH & LANJUT INPUT NILAI'}
                     </button>
                     <button onClick={handleCloseModal} className="px-8 bg-white text-slate-400 font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 transition-colors">
                       BATAL
