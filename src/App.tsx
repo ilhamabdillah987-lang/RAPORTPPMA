@@ -74,49 +74,29 @@ const StudentInfo = ({ student }: { student: Student }) => (
 );
 
 export default function App() {
-  const [user, setUser] = useState<{ id: number; username: string; name: string } | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('auth_token'));
+  const [selectedClass, setSelectedClass] = useState<string | null>(localStorage.getItem('selected_class'));
   const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authForm, setAuthForm] = useState({ username: '', password: '', name: '' });
-  const [authError, setAuthError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Partial<Student> | null>(null);
 
+  const classes = ['7', '8', '9', '10', '11', '12'];
+
   useEffect(() => {
-    if (token) {
-      fetchUser();
-      fetchStudents();
+    if (selectedClass) {
+      fetchStudents(selectedClass);
     } else {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [selectedClass]);
 
-  const fetchUser = async () => {
+  const fetchStudents = async (className: string) => {
+    setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const userData = await res.json();
-        setUser(userData);
-      } else {
-        handleLogout();
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchStudents = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/students`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE}/students?class=${className}`);
       if (res.ok) {
         const data = await res.json();
         setStudentsList(data);
@@ -128,39 +108,16 @@ export default function App() {
     }
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    const url = `${API_BASE}/auth/${authMode}`;
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authForm)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        if (authMode === 'login') {
-          setToken(data.token);
-          localStorage.setItem('auth_token', data.token);
-          setUser(data.user);
-        } else {
-          setAuthMode('login');
-          setAuthError('Registration successful! Please login.');
-        }
-      } else {
-        setAuthError(data.message || 'Authentication failed');
-      }
-    } catch (e) {
-      setAuthError('Server error. Please try again.');
-    }
+  const handleSelectClass = (className: string) => {
+    setSelectedClass(className);
+    localStorage.setItem('selected_class', className);
+    setCurrentIndex(0);
   };
 
-  const handleLogout = () => {
-    setToken(null);
-    setUser(null);
+  const handleClearClass = () => {
+    setSelectedClass(null);
+    localStorage.removeItem('selected_class');
     setStudentsList([]);
-    localStorage.removeItem('auth_token');
   };
 
   const getHuruf = (nilai: number | string) => {
@@ -235,14 +192,13 @@ export default function App() {
       const res = await fetch(url, {
         method,
         headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        await fetchStudents();
+        if (selectedClass) fetchStudents(selectedClass);
         setIsModalOpen(false);
         setEditingStudent(null);
       }
@@ -255,8 +211,7 @@ export default function App() {
     if (confirm('Apakah Anda yakin ingin menghapus data santri ini?')) {
       try {
         const res = await fetch(`${API_BASE}/students/${id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
+          method: 'DELETE'
         });
         if (res.ok) {
           const newList = studentsList.filter(s => s.id !== id);
@@ -275,7 +230,7 @@ export default function App() {
     setEditingStudent({
       name: '',
       nomorInduk: '',
-      class: 'X (SEPULUH)',
+      class: selectedClass || '7',
       semester: 'GANJIL',
       tahunPelajaran: '2025/2026',
       subjects: [
@@ -322,112 +277,48 @@ export default function App() {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  if (!token || !user) {
+  if (!selectedClass) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans">
         <motion.div 
           initial="hidden"
           animate="visible"
           variants={fadeIn}
-          className="max-w-md w-full bg-white rounded-3xl shadow-[0_20px_50px_rgba(8,112,184,0.1)] overflow-hidden border border-blue-50"
+          className="max-w-4xl w-full bg-white rounded-3xl shadow-[0_20px_50px_rgba(8,112,184,0.1)] overflow-hidden border border-blue-50"
         >
-          <div className="bg-gradient-to-br from-blue-700 to-blue-900 p-10 text-center text-white relative overflow-hidden">
+          <div className="bg-gradient-to-br from-blue-700 to-blue-900 p-12 text-center text-white relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
               <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white to-transparent"></div>
             </div>
             <div className="relative z-10">
               <div className="bg-white/20 w-24 h-24 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/30 shadow-2xl">
                 <div className="-rotate-12 flex flex-col items-center">
-                  <UserCircle size={48} className="text-white" />
+                  <LayoutDashboard size={48} className="text-white" />
                 </div>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight">PESANTREN AL-HIKMAH</h1>
-              <p className="text-blue-100/80 text-sm mt-2 font-medium">Laporan Hasil Belajar Santri</p>
+              <h1 className="text-3xl font-black tracking-tight uppercase">SISTEM RAPORT AL-HIKMAH</h1>
+              <p className="text-blue-100/80 text-sm mt-2 font-medium tracking-widest uppercase">Silahkan Pilih Tingkat Kelas</p>
             </div>
           </div>
           
-          <div className="p-10">
-            <form onSubmit={handleAuth} className="space-y-6">
-              <AnimatePresence mode="wait">
-                {authError && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className={`p-4 rounded-xl text-sm font-medium ${authError.includes('successful') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}
-                  >
-                    {authError}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              
-              {authMode === 'register' && (
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Nama Lengkap</label>
-                  <div className="relative group">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
-                    <input 
-                      required 
-                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none text-slate-700 font-medium"
-                      placeholder="Nama asli Anda"
-                      value={authForm.name} 
-                      onChange={e => setAuthForm({...authForm, name: e.target.value})} 
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Username</label>
-                <div className="relative group">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
-                  <input 
-                    required 
-                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none text-slate-700 font-medium"
-                    placeholder="Username/Email"
-                    value={authForm.username} 
-                    onChange={e => setAuthForm({...authForm, username: e.target.value})} 
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label>
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
-                  <input 
-                    required 
-                    type="password"
-                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none text-slate-700 font-medium"
-                    placeholder="••••••••"
-                    value={authForm.password} 
-                    onChange={e => setAuthForm({...authForm, password: e.target.value})} 
-                  />
-                </div>
-              </div>
-
-              <motion.button 
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit" 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition-all shadow-xl shadow-blue-200 active:shadow-blue-100"
-              >
-                {authMode === 'login' ? 'MASUK KE SISTEM' : 'BUAT AKUN BARU'}
-              </motion.button>
-
-              <div className="text-center pt-4">
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    setAuthMode(authMode === 'login' ? 'register' : 'login');
-                    setAuthError('');
-                  }}
-                  className="text-slate-500 hover:text-blue-600 text-sm font-semibold transition-colors"
+          <div className="p-12">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+              {classes.map((cls) => (
+                <motion.button
+                  key={cls}
+                  whileHover={{ scale: 1.05, translateY: -4 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleSelectClass(cls)}
+                  className="group relative overflow-hidden bg-slate-50 border-2 border-slate-100 hover:border-blue-500 hover:bg-white p-8 rounded-[32px] transition-all flex flex-col items-center gap-4 shadow-sm hover:shadow-xl hover:shadow-blue-100"
                 >
-                  {authMode === 'login' ? 'Belum punya akun? Daftar gratis' : 'Sudah punya akun? Masuk di sini'}
-                </button>
-              </div>
-            </form>
+                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl font-black text-slate-400 group-hover:text-blue-600 transition-colors shadow-sm group-hover:shadow-md">
+                    {cls}
+                  </div>
+                  <span className="text-xs font-black text-slate-400 group-hover:text-slate-800 uppercase tracking-widest transition-colors">KELAS {cls}</span>
+                  <div className="absolute top-0 right-0 w-12 h-12 bg-blue-600/5 rounded-bl-full translate-x-6 -translate-y-6 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform"></div>
+                </motion.button>
+              ))}
+            </div>
           </div>
         </motion.div>
       </div>
@@ -445,21 +336,21 @@ export default function App() {
         <div className="flex items-center justify-between mb-8 px-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-              <LayoutDashboard size={20} />
+              <ChevronLeft size={20} />
             </div>
             <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Wali Kelas</p>
-              <h2 className="text-sm font-bold text-slate-700 truncate max-w-[120px]">{user.name}</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tingkat Kelas</p>
+              <h2 className="text-sm font-bold text-slate-700 uppercase">KELAS {selectedClass}</h2>
             </div>
           </div>
           <motion.button 
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            onClick={handleLogout} 
-            className="text-slate-400 hover:text-rose-500 transition-colors p-2 rounded-lg hover:bg-rose-50"
-            title="Logout"
+            onClick={handleClearClass} 
+            className="text-slate-400 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-blue-50"
+            title="Kembali ke Pilih Kelas"
           >
-            <LogOut size={18} />
+            <X size={18} />
           </motion.button>
         </div>
 
@@ -828,7 +719,7 @@ export default function App() {
                      <p>Tangerang, 20 Desember 2025</p>
                      <p>Wali Kelas,</p>
                      <div className="h-28 uppercase font-bold text-[8pt] pt-10 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
-                     <p className="font-bold border-b-2 border-black inline-block min-w-[140px] text-lg">{user.name.toUpperCase()}</p>
+                     <p className="font-bold border-b-2 border-black inline-block min-w-[140px] text-lg">....................................</p>
                    </div>
                  </div>
                </section>
@@ -961,8 +852,8 @@ export default function App() {
                <div className="w-24 h-24 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-8 text-blue-600">
                  <UserCircle size={64} className="opacity-40" />
                </div>
-               <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-3 uppercase">Selamat Datang, {user.name}!</h2>
-               <p className="text-slate-500 max-w-sm mx-auto leading-relaxed font-medium">Sistem administrasi santri siap digunakan. Mulailah dengan menambahkan data santri ke dalam sistem.</p>
+               <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-3 uppercase">KELAS {selectedClass}</h2>
+               <p className="text-slate-500 max-w-sm mx-auto leading-relaxed font-medium">Silahkan pilih data santri di sebelah kiri atau tambahkan santri baru untuk Kelas {selectedClass}.</p>
                <motion.button 
                  whileHover={{ scale: 1.05 }}
                  whileTap={{ scale: 0.95 }}
