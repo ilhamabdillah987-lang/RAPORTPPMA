@@ -97,7 +97,22 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'identity' | 'grades'>('identity');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  const LOGO_URL = 'input_file_0.png';
+  const [logoUrl, setLogoUrl] = useState<string>(() => {
+    return localStorage.getItem('al_hikmah_custom_logo') || 'https://drive.google.com/uc?export=view&id=1IkAUSpwpQaZtECZzTNcSBvhxXZln0RFk';
+  });
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setLogoUrl(base64);
+        localStorage.setItem('al_hikmah_custom_logo', base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const classes = ['7', '8', '9', '10', '11', '12'];
 
@@ -401,7 +416,7 @@ export default function App() {
             </div>
             <div className="relative z-10">
               <div className="bg-white/20 w-32 h-32 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/30 shadow-2xl overflow-hidden p-4">
-                <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain -rotate-12" />
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain -rotate-12" />
               </div>
               <h1 className="text-3xl font-black tracking-tight uppercase">SISTEM RAPORT AL-HIKMAH</h1>
               <p className="text-blue-100/80 text-sm mt-2 font-medium tracking-widest uppercase">Silahkan Pilih Tingkat Kelas</p>
@@ -443,7 +458,7 @@ export default function App() {
         <div className="flex items-center justify-between mb-8 px-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 overflow-hidden p-1">
-              <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain" />
+              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tingkat Kelas</p>
@@ -522,6 +537,37 @@ export default function App() {
             >
               <Trash2 size={16} /> HAPUS DATA
             </button>
+          </div>
+        </div>
+
+        <div className="mt-8 px-2 space-y-4">
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
+            <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
+              <Settings size={12} /> LOGO PESANTREN
+            </h3>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-white text-blue-600 rounded-xl cursor-pointer hover:bg-blue-50 transition-all border border-blue-100 text-[10px] font-black">
+                <Plus size={14} /> GANTI LOGO
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleLogoUpload}
+                />
+              </label>
+              <button 
+                onClick={() => {
+                  if(confirm('Reset logo ke default?')) {
+                    const defaultLogo = 'https://drive.google.com/uc?export=view&id=1IkAUSpwpQaZtECZzTNcSBvhxXZln0RFk';
+                    setLogoUrl(defaultLogo);
+                    localStorage.removeItem('al_hikmah_custom_logo');
+                  }
+                }}
+                className="text-[9px] text-slate-400 hover:text-slate-600 transition-colors font-bold text-center underline underline-offset-2"
+              >
+                RESET KE DEFAULT
+              </button>
+            </div>
           </div>
         </div>
 
@@ -674,7 +720,7 @@ export default function App() {
              <div className="report-container shadow-2xl rounded-sm">
                {/* PAGE 1: COVER */}
                <section className="page flex flex-col items-center justify-center text-center">
-                 <img src={LOGO_URL} alt="Logo Al-Hikmah" className="w-64 h-64 object-contain mb-16" referrerPolicy="no-referrer" />
+                 <img src={logoUrl} alt="Logo Al-Hikmah" className="w-64 h-64 object-contain mb-16" referrerPolicy="no-referrer" />
                  <h1 className="text-4xl font-extrabold uppercase mb-4 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
                  <h2 className="text-2xl font-bold uppercase mb-20 text-slate-600">Pondok Pesantren Modern Al-Hikmah</h2>
                  
