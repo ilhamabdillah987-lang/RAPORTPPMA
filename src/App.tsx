@@ -32,10 +32,14 @@ const slideIn = {
   visible: { opacity: 1, x: 0, transition: { duration: 0.3 } }
 };
 
-const Header = () => (
+const Header = ({ logoUrl }: { logoUrl: string }) => (
   <div className="text-center mb-2 double-border-bottom relative">
     <div className="flex items-center justify-center gap-4 py-2">
-      <img src="https://drive.google.com/uc?export=view&id=1IkAUSpwpQaZtECZzTNcSBvhxXZln0RFk" width="80" alt="Logo Al-Hikmah" className="w-18 h-18 object-contain" referrerPolicy="no-referrer" />
+      {logoUrl ? (
+        <img src={logoUrl} width="80" alt="Logo" className="w-18 h-18 object-contain" referrerPolicy="no-referrer" />
+      ) : (
+        <div className="w-18 h-18 bg-slate-100 rounded-xl flex items-center justify-center text-[8pt] text-slate-400 font-bold border-2 border-dashed border-slate-200 uppercase">Logo</div>
+      )}
       <div>
         <h1 className="text-[11pt] font-bold uppercase leading-tight">YAYASAN PENDIDIKAN ISLAM AL-HIKMAH</h1>
         <h2 className="text-[13pt] font-bold uppercase leading-tight">PESANTREN MODERN AL-HIKMAH</h2>
@@ -98,7 +102,7 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const [logoUrl, setLogoUrl] = useState<string>(() => {
-    return localStorage.getItem('al_hikmah_custom_logo') || 'https://drive.google.com/uc?export=view&id=1IkAUSpwpQaZtECZzTNcSBvhxXZln0RFk';
+    return localStorage.getItem('al_hikmah_custom_logo') || '';
   });
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -416,7 +420,11 @@ export default function App() {
             </div>
             <div className="relative z-10">
               <div className="bg-white/20 w-32 h-32 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/30 shadow-2xl overflow-hidden p-4">
-                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain -rotate-12" />
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain -rotate-12" />
+                ) : (
+                  <div className="text-white/50 text-xs font-black uppercase -rotate-12">No Logo</div>
+                )}
               </div>
               <h1 className="text-3xl font-black tracking-tight uppercase">SISTEM RAPORT AL-HIKMAH</h1>
               <p className="text-blue-100/80 text-sm mt-2 font-medium tracking-widest uppercase">Silahkan Pilih Tingkat Kelas</p>
@@ -458,7 +466,11 @@ export default function App() {
         <div className="flex items-center justify-between mb-8 px-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 overflow-hidden p-1">
-              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              ) : (
+                <Settings size={16} className="text-slate-300" />
+              )}
             </div>
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tingkat Kelas</p>
@@ -557,15 +569,14 @@ export default function App() {
               </label>
               <button 
                 onClick={() => {
-                  if(confirm('Reset logo ke default?')) {
-                    const defaultLogo = 'https://drive.google.com/uc?export=view&id=1IkAUSpwpQaZtECZzTNcSBvhxXZln0RFk';
-                    setLogoUrl(defaultLogo);
+                  if(confirm('Hapus logo kustom?')) {
+                    setLogoUrl('');
                     localStorage.removeItem('al_hikmah_custom_logo');
                   }
                 }}
                 className="text-[9px] text-slate-400 hover:text-slate-600 transition-colors font-bold text-center underline underline-offset-2"
               >
-                RESET KE DEFAULT
+                HAPUS LOGO
               </button>
             </div>
           </div>
@@ -720,7 +731,13 @@ export default function App() {
              <div className="report-container shadow-2xl rounded-sm">
                {/* PAGE 1: COVER */}
                <section className="page flex flex-col items-center justify-center text-center">
-                 <img src={logoUrl} alt="Logo Al-Hikmah" className="w-64 h-64 object-contain mb-16" referrerPolicy="no-referrer" />
+                 {logoUrl ? (
+                   <img src={logoUrl} alt="Logo Al-Hikmah" className="w-64 h-64 object-contain mb-16" referrerPolicy="no-referrer" />
+                 ) : (
+                   <div className="w-64 h-64 border-4 border-dashed border-slate-200 rounded-3xl flex items-center justify-center mb-16 mx-auto">
+                     <span className="text-slate-300 font-extrabold text-2xl uppercase tracking-widest text-center px-4">LOGO PESANTREN</span>
+                   </div>
+                 )}
                  <h1 className="text-4xl font-extrabold uppercase mb-4 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
                  <h2 className="text-2xl font-bold uppercase mb-20 text-slate-600">Pondok Pesantren Modern Al-Hikmah</h2>
                  
@@ -754,7 +771,7 @@ export default function App() {
 
                {/* PAGE 2-5 same content but with selectedStudent */}
                <section className="page">
-                 <Header />
+                 <Header logoUrl={logoUrl} />
                  <StudentInfo student={selectedStudent} />
                  <table className="table-raport w-full text-center mt-2">
                    <thead>
@@ -865,7 +882,7 @@ export default function App() {
 
                {/* SIKAP */}
                <section className="page border-t-2 mt-8 print:border-none print:mt-0">
-                 <Header />
+                 <Header logoUrl={logoUrl} />
                  <StudentInfo student={selectedStudent} />
                  <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">B. SIKAP</h3>
                  <table className="table-raport mb-12 text-[10pt]">
@@ -914,7 +931,7 @@ export default function App() {
 
                {/* EKSTRA & ABSENSI */}
                <section className="page border-t-2 mt-8 print:border-none print:mt-0">
-                 <Header />
+                 <Header logoUrl={logoUrl} />
                  <StudentInfo student={selectedStudent} />
                  
                  <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">E. EKSTRAKURIKULER</h3>
@@ -969,7 +986,7 @@ export default function App() {
 
                {/* LEDGER */}
                <section className="page border-t-2 mt-8 print:border-none print:mt-0">
-                 <Header />
+                 <Header logoUrl={logoUrl} />
                  <div className="text-center mb-10 mt-6">
                    <h1 className="text-2xl font-black uppercase tracking-widest text-slate-800">Ledger Perkembangan Nilai Santri</h1>
                    <h2 className="text-lg font-bold uppercase text-slate-500 mt-1">Kelas {selectedStudent.class} • TA {selectedStudent.tahunPelajaran}</h2>
