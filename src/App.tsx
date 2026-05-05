@@ -86,13 +86,17 @@ export default function App() {
 
   const classes = ['7', '8', '9', '10', '11', '12'];
 
-  // Auto-save effect
+  // Auto-save effect: Updates UI in real-time, sinks to server with debounce
   useEffect(() => {
     if (!editingStudent || !editingStudent.id) return;
 
+    // REAL-TIME UI UPDATE: Update local list immediately as user types
+    // This allows background rankings and reports to reflect changes instantly
+    setStudentsList(prev => prev.map(s => s.id === editingStudent.id ? { ...s, ...editingStudent } as Student : s));
+
     const timer = setTimeout(() => {
       autoSaveStudent(editingStudent);
-    }, 1000); // 1 second debounce
+    }, 500); // 500ms debounce for faster server persistence
 
     return () => clearTimeout(timer);
   }, [editingStudent]);
@@ -118,9 +122,7 @@ export default function App() {
       });
       if (res.ok) {
         setSaveStatus('saved');
-        // Update local list without re-fetching everything
-        setStudentsList(prev => prev.map(s => s.id === student.id ? { ...s, ...student } as Student : s));
-        // We don't clear the status immediately if we might close the modal
+        // UI already updated by useEffect, no need to update studentsList again here
       } else {
         setSaveStatus('error');
       }
@@ -523,6 +525,38 @@ export default function App() {
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-8">
+                    {/* Real-time Result Summary for Modal */}
+                    {editingStudent.id && (
+                      <div className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
+                          <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Peringkat Sementara</p>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-2xl font-black text-blue-700">#{studentRankings.find(r => r.id === editingStudent.id)?.rank || '-'}</span>
+                            <span className="text-[10px] font-bold text-blue-400">dari {studentsList.length}</span>
+                          </div>
+                        </div>
+                        <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
+                          <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Rata-Rata Nilai</p>
+                          <p className="text-2xl font-black text-emerald-700">
+                            {(() => {
+                              const tulis = editingStudent.subjects?.reduce((sum, s) => sum + (typeof s.tulis?.nilai === 'number' ? s.tulis.nilai : 0), 0) || 0;
+                              const lisan = editingStudent.subjects?.reduce((sum, s) => sum + (typeof s.lisan?.nilai === 'number' ? s.lisan.nilai : 0), 0) || 0;
+                              const count = editingStudent.subjects?.length || 1;
+                              return ((tulis + lisan) / (count * 2)).toFixed(2);
+                            })()}
+                          </p>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Nilai Tulis</p>
+                          <p className="text-xl font-black text-slate-700">{editingStudent.subjects?.reduce((sum, s) => sum + (typeof s.tulis?.nilai === 'number' ? s.tulis.nilai : 0), 0) || 0}</p>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Nilai Lisan</p>
+                          <p className="text-xl font-black text-slate-700">{editingStudent.subjects?.reduce((sum, s) => sum + (typeof s.lisan?.nilai === 'number' ? s.lisan.nilai : 0), 0) || 0}</p>
+                        </div>
+                      </div>
+                    )}
+
                     <form id="student-form" onSubmit={handleSaveStudent} className="space-y-10">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         {/* Column 1: Identity */}
