@@ -223,8 +223,8 @@ export default function App() {
     return groups;
   }, [selectedStudent]);
 
-  const handleSaveStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveStudent = async (e?: React.FormEvent, stayOpen: boolean = false) => {
+    if (e) e.preventDefault();
     if (!editingStudent) return;
 
     const isEdit = !!editingStudent.id;
@@ -247,9 +247,15 @@ export default function App() {
       });
 
       if (res.ok) {
+        if (!isEdit) {
+          setEditingStudent(payload as Student);
+        }
         if (selectedClass) fetchStudents(selectedClass);
-        setIsModalOpen(false);
-        setEditingStudent(null);
+        if (!stayOpen) {
+          setIsModalOpen(false);
+          setEditingStudent(null);
+          setSaveStatus('idle');
+        }
       }
     } catch (e) {
       console.error(e);
@@ -383,8 +389,8 @@ export default function App() {
       >
         <div className="flex items-center justify-between mb-8 px-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-              <ChevronLeft size={20} />
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 overflow-hidden p-1">
+              <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tingkat Kelas</p>
@@ -702,15 +708,9 @@ export default function App() {
 
                   <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
                     {!editingStudent.id ? (
-                      activeTab === 'identity' ? (
-                        <button onClick={() => setActiveTab('grades')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 flex items-center justify-center gap-3">
-                          LANJUT KE INPUT NILAI <ChevronRight size={18} />
-                        </button>
-                      ) : (
-                        <button form="student-form" type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-emerald-200 flex items-center justify-center gap-3">
-                          <Save size={18} /> SIMPAN DATA SANTRI
-                        </button>
-                      )
+                      <button onClick={() => handleSaveStudent(undefined, true).then(() => setActiveTab('grades'))} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 flex items-center justify-center gap-3">
+                        LANJUT KE INPUT NILAI <ChevronRight size={18} />
+                      </button>
                     ) : (
                       <div className="flex-1 flex gap-4">
                         {activeTab === 'grades' && (
