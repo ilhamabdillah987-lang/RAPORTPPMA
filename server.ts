@@ -35,6 +35,10 @@ async function startServer() {
     });
   };
 
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok" });
+  });
+
   // Auth Routes
   app.post("/api/auth/register", async (req, res) => {
     const { username, password, name } = req.body;
