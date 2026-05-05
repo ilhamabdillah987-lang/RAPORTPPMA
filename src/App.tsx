@@ -82,8 +82,52 @@ export default function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Partial<Student> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const classes = ['7', '8', '9', '10', '11', '12'];
+
+  // Auto-save effect
+  useEffect(() => {
+    if (!editingStudent || !editingStudent.id) return;
+
+    const timer = setTimeout(() => {
+      autoSaveStudent(editingStudent);
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(timer);
+  }, [editingStudent]);
+
+  const handleCloseModal = async () => {
+    if (editingStudent && editingStudent.id && saveStatus === 'saving') {
+      // If still saving, wait or trigger immediate save
+      await autoSaveStudent(editingStudent);
+    }
+    setIsModalOpen(false);
+    setEditingStudent(null);
+    setSaveStatus('idle');
+  };
+
+  const autoSaveStudent = async (student: Partial<Student>) => {
+    if (!student.id) return;
+    setSaveStatus('saving');
+    try {
+      const res = await fetch(`${API_BASE}/students/${student.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(student)
+      });
+      if (res.ok) {
+        setSaveStatus('saved');
+        // Update local list without re-fetching everything
+        setStudentsList(prev => prev.map(s => s.id === student.id ? { ...s, ...student } as Student : s));
+        // We don't clear the status immediately if we might close the modal
+      } else {
+        setSaveStatus('error');
+      }
+    } catch (e) {
+      setSaveStatus('error');
+    }
+  };
 
   useEffect(() => {
     if (selectedClass) {
@@ -439,7 +483,7 @@ export default function App() {
                   initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
                   animate={{ opacity: 1, backdropFilter: 'blur(4px)' }}
                   exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="fixed inset-0 bg-slate-900/40" 
                 />
                 
@@ -455,9 +499,25 @@ export default function App() {
                         {editingStudent.id ? <Edit className="text-blue-600" size={20} /> : <Plus className="text-emerald-600" size={22} />}
                         {editingStudent.id ? 'SUNTING DATA SANTRI' : 'TAMBAH SANTRI BARU'}
                       </h2>
-                      <p className="text-xs text-slate-400 font-medium mt-0.5">Lengkapi semua informasi yang diperlukan</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <p className="text-xs text-slate-400 font-medium">Lengkapi semua informasi yang diperlukan</p>
+                        {editingStudent.id && (
+                          <div className="flex items-center gap-1.5 ml-2">
+                            <div className={`w-1.5 h-1.5 rounded-full ${
+                              saveStatus === 'saving' ? 'bg-amber-400 animate-pulse' : 
+                              saveStatus === 'saved' ? 'bg-emerald-500' : 
+                              saveStatus === 'error' ? 'bg-rose-500' : 'bg-slate-300'
+                            }`} />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              {saveStatus === 'saving' ? 'Menyimpan...' : 
+                               saveStatus === 'saved' ? 'Tersimpan Otomatis' : 
+                               saveStatus === 'error' ? 'Gagal Menyimpan' : 'Siap'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-100 transition-all">
+                    <button onClick={handleCloseModal} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-100 transition-all">
                       <X size={20} />
                     </button>
                   </div>
@@ -580,11 +640,17 @@ export default function App() {
                   </div>
 
                   <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
-                    <button form="student-form" type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 hover:translate-y-[-1px] transition-all flex items-center justify-center gap-3">
-                      <Save size={18} /> SIMPAN DATA PERMANEN
-                    </button>
-                    <button onClick={() => setIsModalOpen(false)} className="px-8 bg-white text-slate-400 font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 transition-colors">
-                      BATAL
+                    {!editingStudent.id ? (
+                      <button form="student-form" type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 hover:translate-y-[-1px] transition-all flex items-center justify-center gap-3">
+                        <Plus size={18} /> TAMBAH SANTRI
+                      </button>
+                    ) : (
+                      <button onClick={handleCloseModal} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-slate-200 hover:translate-y-[-1px] transition-all flex items-center justify-center gap-3">
+                        SELESAI
+                      </button>
+                    )}
+                    <button onClick={handleCloseModal} className="px-8 bg-white text-slate-400 font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 transition-colors">
+                      {editingStudent.id ? 'TUTUP' : 'BATAL'}
                     </button>
                   </div>
                 </motion.div>
