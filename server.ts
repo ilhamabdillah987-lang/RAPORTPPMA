@@ -17,6 +17,12 @@ async function startServer() {
   app.use(express.json());
   app.use(cors());
 
+  // Logging middleware
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+  });
+
   // Database setup with lowdb (pure JS, no GLIBC issues)
   const defaultData = { users: [], students: [] };
   const db = await JSONFilePreset('db.json', defaultData);

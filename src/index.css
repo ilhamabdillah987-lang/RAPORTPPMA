@@ -1,14 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Times+New+Roman&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Times+New+Roman&family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-serif: "Times New Roman", Times, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
   body {
-    background-color: #f3f4f6;
-    font-family: var(--font-serif);
+    background-color: #f8fafc;
+    font-family: var(--font-sans);
     margin: 0;
     padding: 0;
   }
@@ -16,16 +17,15 @@
   @media print {
     body {
       background-color: white;
+      font-family: var(--font-serif);
     }
   }
 }
 
-/* Report Styles */
+/* Report Styles - Only for Print/Display of the actual Raport */
 .report-container {
   width: 210mm;
-  margin: 20px auto;
   background: white;
-  box-shadow: 0 0 20px rgba(0,0,0,0.15);
 }
 
 .page {
@@ -38,6 +38,7 @@
   page-break-after: always;
   color: black;
   line-height: 1.3;
+  font-family: var(--font-serif);
   font-size: 10.5pt;
 }
 
@@ -76,7 +77,6 @@
   background-color: #f3f3f3;
   font-weight: bold;
   text-align: left;
-  padding-left: 10px;
 }
 
 .double-border-bottom {
@@ -87,13 +87,6 @@
 
 .signature-section {
   margin-top: 25px;
-  display: flex;
-  justify-content: space-between;
-}
-
-.signature-box {
-  text-align: center;
-  min-width: 180px;
 }
 
 .signature-line {
@@ -103,10 +96,6 @@
   display: inline-block;
   min-width: 150px;
 }
-
-.text-center { text-align: center; }
-.font-bold { font-weight: bold; }
-.uppercase { text-transform: uppercase; }
 
 @media print {
   .report-container {
@@ -122,130 +111,17 @@
   }
 }
 
-/* UI Controls */
-.controls-panel {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background: white;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 100;
-  border: 1px solid #e5e7eb;
-  width: 200px;
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
 }
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 20px;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-.modal-content {
-  background: white;
-  padding: 24px;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 900px;
-  max-height: 95vh;
-  overflow-y: auto;
-  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
 }
-
-.form-group {
-  margin-bottom: 12px;
-}
-
-.form-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 3px;
-}
-
-.form-input {
-  width: 100%;
-  padding: 6px 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.form-input:focus {
-  outline: 2px solid #2563eb;
-  border-color: transparent;
-}
-
-.btn-group {
-  display: flex;
-  gap: 8px;
-  margin-top: 20px;
-}
-
-.btn-primary {
-  background: #2563eb;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-danger {
-  background: #ef4444;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-control {
-  background: #111827;
-  color: white;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.2s;
-  font-size: 13px;
-}
-
-.btn-control:hover {
-  background: #374151;
-}
-
-.btn-control:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.select-student {
-  padding: 6px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 13px;
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }
