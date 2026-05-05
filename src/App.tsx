@@ -382,7 +382,8 @@ export default function App() {
       ],
       behavior: { spiritual: '', social: '' },
       attendance: { sakit: 0, izin: 0, alpha: 0 },
-      extracurriculars: []
+      extracurriculars: [],
+      waliKelas: ''
     });
     setIsModalOpen(true);
   };
@@ -660,6 +661,10 @@ export default function App() {
                               <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nomor Induk</label>
                               <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
                             </div>
+                            <div className="form-group">
+                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Wali Kelas</label>
+                              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.waliKelas || ''} onChange={e => setEditingStudent({...editingStudent, waliKelas: e.target.value})} />
+                            </div>
                           </div>
                         </div>
 
@@ -769,7 +774,7 @@ export default function App() {
                    </div>
                  </div>
 
-                 <div className="mt-auto mb-16 space-y-2">
+                 <div className="mt-auto mb-32 space-y-2">
                    <p className="font-black uppercase text-xl underline underline-offset-8 decoration-2 tracking-[0.2em] text-slate-900">SEMESTER {selectedStudent.semester}</p>
                    <p className="font-extrabold uppercase text-lg tracking-[0.15em] text-slate-500">TAHUN PELAJARAN {selectedStudent.tahunPelajaran}</p>
                  </div>
@@ -876,13 +881,15 @@ export default function App() {
                      <p>Mengetahui,</p>
                      <p>Orang Tua/Wali Santri</p>
                      <div className="h-28"></div>
-                     <div className="signature-line w-48 border-black"></div>
+                     <div className="signature-line w-48 border-b-2 border-black font-bold text-center h-8"></div>
                    </div>
                    <div className="signature-box flex flex-col items-center flex-1 text-center">
                      <p>Tangerang, 20 Desember 2025</p>
                      <p>Wali Kelas,</p>
                      <div className="h-28 uppercase font-bold text-[8pt] pt-10 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
-                     <p className="font-bold border-b-2 border-black inline-block min-w-[140px] text-lg">....................................</p>
+                     <div className="font-bold border-b-2 border-black inline-block min-w-[192px] text-lg uppercase h-8">
+                       {selectedStudent.waliKelas || ''}
+                     </div>
                    </div>
                  </div>
                </section>
@@ -982,13 +989,15 @@ export default function App() {
                       <p>Mengetahui,</p>
                       <p>Orang Tua/Wali Santri</p>
                       <div className="h-28"></div>
-                      <div className="signature-line w-48 border-black font-bold text-center">....................................</div>
+                      <div className="signature-line w-48 border-b-2 border-black font-bold text-center h-8"></div>
                     </div>
                     <div className="signature-box flex flex-col items-center flex-1 text-center">
                       <p>Tangerang, 20 Desember 2025</p>
                       <p>Wali Kelas,</p>
                       <div className="h-28 uppercase font-bold text-[8pt] pt-10 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
-                      <p className="font-bold border-b-2 border-black inline-block min-w-[140px] text-lg">....................................</p>
+                      <div className="font-bold border-b-2 border-black inline-block min-w-[192px] text-lg uppercase h-8">
+                        {selectedStudent.waliKelas || ''}
+                      </div>
                     </div>
                   </div>
                 </section>

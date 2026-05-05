@@ -37,4 +37,5 @@ export interface Student {
   };
   extracurriculars: Extracurricular[];
   attendance: Attendance;
+  waliKelas?: string;
 }
