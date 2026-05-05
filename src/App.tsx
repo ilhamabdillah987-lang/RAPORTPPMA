@@ -82,7 +82,10 @@ export default function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Partial<Student> | null>(null);
+  const [activeTab, setActiveTab] = useState<'identity' | 'grades'>('identity');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  const LOGO_URL = 'input_file_0.png';
 
   const classes = ['7', '8', '9', '10', '11', '12'];
 
@@ -273,6 +276,7 @@ export default function App() {
   };
 
   const openAddModal = () => {
+    setActiveTab('identity');
     setEditingStudent({
       name: '',
       nomorInduk: '',
@@ -337,10 +341,8 @@ export default function App() {
               <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white to-transparent"></div>
             </div>
             <div className="relative z-10">
-              <div className="bg-white/20 w-24 h-24 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/30 shadow-2xl">
-                <div className="-rotate-12 flex flex-col items-center">
-                  <LayoutDashboard size={48} className="text-white" />
-                </div>
+              <div className="bg-white/20 w-32 h-32 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/30 shadow-2xl overflow-hidden p-4">
+                <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain -rotate-12" />
               </div>
               <h1 className="text-3xl font-black tracking-tight uppercase">SISTEM RAPORT AL-HIKMAH</h1>
               <p className="text-blue-100/80 text-sm mt-2 font-medium tracking-widest uppercase">Silahkan Pilih Tingkat Kelas</p>
@@ -524,9 +526,24 @@ export default function App() {
                     </button>
                   </div>
 
+                  <div className="px-8 bg-slate-50 border-b border-slate-100 flex gap-8 shrink-0">
+                    <button 
+                      onClick={() => setActiveTab('identity')}
+                      className={`py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all border-b-2 ${activeTab === 'identity' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                      1. Identitas Santri
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('grades')}
+                      className={`py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all border-b-2 ${activeTab === 'grades' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                      2. Input Nilai & Sikap
+                    </button>
+                  </div>
+
                   <div className="flex-1 overflow-y-auto p-8">
                     {/* Real-time Result Summary for Modal */}
-                    {editingStudent.id && (
+                    {editingStudent.id && activeTab === 'grades' && (
                       <div className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
                           <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Peringkat Sementara</p>
@@ -558,21 +575,29 @@ export default function App() {
                     )}
 
                     <form id="student-form" onSubmit={handleSaveStudent} className="space-y-10">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        {/* Column 1: Identity */}
-                        <div className="space-y-6">
-                          <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] mb-4 flex items-center gap-2">
-                            <UserCircle size={14} /> IDENTITAS SANTRI
-                          </h3>
-                          <div className="space-y-4">
-                            <div className="form-group">
-                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Lengkap</label>
-                              <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
+                      {activeTab === 'identity' ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                          {/* Column 1: Identity */}
+                          <div className="space-y-6">
+                            <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] mb-4 flex items-center gap-2">
+                              <UserCircle size={14} /> IDENTITAS DASAR
+                            </h3>
+                            <div className="space-y-4">
+                              <div className="form-group">
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Lengkap</label>
+                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
+                              </div>
+                              <div className="form-group">
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nomor Induk</label>
+                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
+                              </div>
                             </div>
-                            <div className="form-group">
-                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nomor Induk</label>
-                              <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
-                            </div>
+                          </div>
+
+                          <div className="space-y-6">
+                            <h3 className="text-[10px] uppercase font-black text-slate-600 tracking-[0.2em] mb-4 flex items-center gap-2">
+                              <Settings size={14} /> INFORMASI KELAS
+                            </h3>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="form-group">
                                 <label className="text-xs font-bold text-slate-500 mb-1.5 block">Semester</label>
@@ -591,8 +616,57 @@ export default function App() {
                               <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.tahunPelajaran} onChange={e => setEditingStudent({...editingStudent, tahunPelajaran: e.target.value})} />
                             </div>
                           </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                          {/* Column 2: Subjects & Grades */}
+                          <div className="flex flex-col">
+                            <h3 className="text-[10px] uppercase font-black text-emerald-600 tracking-[0.2em] mb-4 flex items-center gap-2">
+                              <Edit size={14} /> INPUT NILAI PER MATA PELAJARAN
+                            </h3>
+                            <div className="flex-1 bg-slate-50 rounded-3xl p-6 border border-slate-100 overflow-y-auto max-h-[500px] border-b-4 border-slate-200 shadow-inner">
+                              {editingStudent.subjects?.map((sub, idx) => (
+                                <div key={idx} className="mb-6 last:mb-0 group">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <label className="text-[10px] font-black text-slate-400 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{sub.name}</label>
+                                    <span className="text-[10px] font-bold text-slate-300">KKM: {sub.kkm}</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-300">TULIS</span>
+                                      <input 
+                                        type="number" min="0" max="100" 
+                                        className="w-full pl-12 pr-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-center text-sm" 
+                                        value={typeof sub.tulis?.nilai === 'number' ? sub.tulis.nilai : ''} 
+                                        onChange={e => {
+                                          const newSubs = [...(editingStudent.subjects || [])];
+                                          const val = parseInt(e.target.value) || 0;
+                                          newSubs[idx] = { ...sub, tulis: { nilai: val, huruf: getHuruf(val) } };
+                                          setEditingStudent({...editingStudent, subjects: newSubs});
+                                        }} 
+                                      />
+                                    </div>
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-300">LISAN</span>
+                                      <input 
+                                        type="number" min="0" max="100" 
+                                        className="w-full pl-12 pr-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-center text-sm" 
+                                        value={typeof sub.lisan?.nilai === 'number' ? sub.lisan.nilai : ''} 
+                                        onChange={e => {
+                                          const newSubs = [...(editingStudent.subjects || [])];
+                                          const val = parseInt(e.target.value) || 0;
+                                          newSubs[idx] = { ...sub, lisan: { nilai: val, huruf: getHuruf(val) } };
+                                          setEditingStudent({...editingStudent, subjects: newSubs});
+                                        }} 
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
 
-                          <div className="pt-6">
+                          <div className="space-y-6">
                             <h3 className="text-[10px] uppercase font-black text-rose-600 tracking-[0.2em] mb-4 flex items-center gap-2">
                               <LayoutDashboard size={14} /> KEHADIRAN & SIKAP
                             </h3>
@@ -622,66 +696,38 @@ export default function App() {
                             </div>
                           </div>
                         </div>
-
-                        {/* Column 2: Subjects & Grades */}
-                        <div className="flex flex-col">
-                          <h3 className="text-[10px] uppercase font-black text-emerald-600 tracking-[0.2em] mb-4 flex items-center gap-2">
-                            <Edit size={14} /> INPUT NILAI PER MATA PELAJARAN
-                          </h3>
-                          <div className="flex-1 bg-slate-50 rounded-3xl p-6 border border-slate-100 overflow-y-auto max-h-[600px] border-b-4 border-slate-200 shadow-inner">
-                            {editingStudent.subjects?.map((sub, idx) => (
-                              <div key={idx} className="mb-6 last:mb-0 group">
-                                <div className="flex justify-between items-center mb-2">
-                                  <label className="text-[10px] font-black text-slate-400 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{sub.name}</label>
-                                  <span className="text-[10px] font-bold text-slate-300">KKM: {sub.kkm}</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-300">TULIS</span>
-                                    <input 
-                                      type="number" min="0" max="100" 
-                                      className="w-full pl-12 pr-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-center text-sm" 
-                                      value={typeof sub.tulis?.nilai === 'number' ? sub.tulis.nilai : ''} 
-                                      onChange={e => {
-                                        const newSubs = [...(editingStudent.subjects || [])];
-                                        const val = parseInt(e.target.value) || 0;
-                                        newSubs[idx] = { ...sub, tulis: { nilai: val, huruf: getHuruf(val) } };
-                                        setEditingStudent({...editingStudent, subjects: newSubs});
-                                      }} 
-                                    />
-                                  </div>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-300">LISAN</span>
-                                    <input 
-                                      type="number" min="0" max="100" 
-                                      className="w-full pl-12 pr-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-center text-sm" 
-                                      value={typeof sub.lisan?.nilai === 'number' ? sub.lisan.nilai : ''} 
-                                      onChange={e => {
-                                        const newSubs = [...(editingStudent.subjects || [])];
-                                        const val = parseInt(e.target.value) || 0;
-                                        newSubs[idx] = { ...sub, lisan: { nilai: val, huruf: getHuruf(val) } };
-                                        setEditingStudent({...editingStudent, subjects: newSubs});
-                                      }} 
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </form>
                   </div>
 
                   <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
                     {!editingStudent.id ? (
-                      <button form="student-form" type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 hover:translate-y-[-1px] transition-all flex items-center justify-center gap-3">
-                        <Plus size={18} /> TAMBAH SANTRI
-                      </button>
+                      activeTab === 'identity' ? (
+                        <button onClick={() => setActiveTab('grades')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 flex items-center justify-center gap-3">
+                          LANJUT KE INPUT NILAI <ChevronRight size={18} />
+                        </button>
+                      ) : (
+                        <button form="student-form" type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-emerald-200 flex items-center justify-center gap-3">
+                          <Save size={18} /> SIMPAN DATA SANTRI
+                        </button>
+                      )
                     ) : (
-                      <button onClick={handleCloseModal} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-slate-200 hover:translate-y-[-1px] transition-all flex items-center justify-center gap-3">
-                        SELESAI
-                      </button>
+                      <div className="flex-1 flex gap-4">
+                        {activeTab === 'grades' && (
+                          <button onClick={() => setActiveTab('identity')} className="bg-white border border-slate-200 text-slate-600 px-6 py-4 rounded-2xl font-bold flex items-center gap-2">
+                            <ChevronLeft size={18} /> KEMBALI
+                          </button>
+                        )}
+                        {activeTab === 'identity' ? (
+                          <button onClick={() => setActiveTab('grades')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest flex items-center justify-center gap-3 transition-all">
+                            INPUT NILAI SANTRI <ChevronRight size={18} />
+                          </button>
+                        ) : (
+                          <button onClick={handleCloseModal} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white p-4 rounded-2xl font-black text-sm tracking-widest flex items-center justify-center gap-3">
+                            <X size={18} /> SELESAI & TUTUP
+                          </button>
+                        )}
+                      </div>
                     )}
                     <button onClick={handleCloseModal} className="px-8 bg-white text-slate-400 font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 transition-colors">
                       {editingStudent.id ? 'TUTUP' : 'BATAL'}
@@ -717,7 +763,7 @@ export default function App() {
              <div className="report-container shadow-2xl rounded-sm">
                {/* PAGE 1: COVER */}
                <section className="page flex flex-col items-center justify-center text-center">
-                 <img src="https://drive.google.com/uc?export=view&id=1IkAUSpwpQaZtECZzTNcSBvhxXZln0RFk" alt="Logo Al-Hikmah" className="w-56 h-56 object-contain mb-16" referrerPolicy="no-referrer" />
+                 <img src={LOGO_URL} alt="Logo Al-Hikmah" className="w-64 h-64 object-contain mb-16" referrerPolicy="no-referrer" />
                  <h1 className="text-4xl font-extrabold uppercase mb-4 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
                  <h2 className="text-2xl font-bold uppercase mb-20 text-slate-600">Pondok Pesantren Modern Al-Hikmah</h2>
                  
