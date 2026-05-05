@@ -532,207 +532,61 @@ export default function App() {
                     </button>
                   </div>
 
-                  <div className="px-8 bg-slate-50 border-b border-slate-100 flex gap-8 shrink-0">
-                    <button 
-                      onClick={() => setActiveTab('identity')}
-                      className={`py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all border-b-2 ${activeTab === 'identity' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                    >
-                      1. Identitas Santri
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('grades')}
-                      className={`py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all border-b-2 ${activeTab === 'grades' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                    >
-                      2. Input Nilai & Sikap
-                    </button>
-                  </div>
-
                   <div className="flex-1 overflow-y-auto p-8">
-                    {/* Real-time Result Summary for Modal */}
-                    {editingStudent.id && activeTab === 'grades' && (
-                      <div className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
-                          <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Peringkat Sementara</p>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-black text-blue-700">#{studentRankings.find(r => r.id === editingStudent.id)?.rank || '-'}</span>
-                            <span className="text-[10px] font-bold text-blue-400">dari {studentsList.length}</span>
-                          </div>
-                        </div>
-                        <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
-                          <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Rata-Rata Nilai</p>
-                          <p className="text-2xl font-black text-emerald-700">
-                            {(() => {
-                              const tulis = editingStudent.subjects?.reduce((sum, s) => sum + (typeof s.tulis?.nilai === 'number' ? s.tulis.nilai : 0), 0) || 0;
-                              const lisan = editingStudent.subjects?.reduce((sum, s) => sum + (typeof s.lisan?.nilai === 'number' ? s.lisan.nilai : 0), 0) || 0;
-                              const count = editingStudent.subjects?.length || 1;
-                              return ((tulis + lisan) / (count * 2)).toFixed(2);
-                            })()}
-                          </p>
-                        </div>
-                        <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Nilai Tulis</p>
-                          <p className="text-xl font-black text-slate-700">{editingStudent.subjects?.reduce((sum, s) => sum + (typeof s.tulis?.nilai === 'number' ? s.tulis.nilai : 0), 0) || 0}</p>
-                        </div>
-                        <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Nilai Lisan</p>
-                          <p className="text-xl font-black text-slate-700">{editingStudent.subjects?.reduce((sum, s) => sum + (typeof s.lisan?.nilai === 'number' ? s.lisan.nilai : 0), 0) || 0}</p>
-                        </div>
-                      </div>
-                    )}
-
                     <form id="student-form" onSubmit={handleSaveStudent} className="space-y-10">
-                      {activeTab === 'identity' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                          {/* Column 1: Identity */}
-                          <div className="space-y-6">
-                            <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] mb-4 flex items-center gap-2">
-                              <UserCircle size={14} /> IDENTITAS DASAR
-                            </h3>
-                            <div className="space-y-4">
-                              <div className="form-group">
-                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Lengkap</label>
-                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
-                              </div>
-                              <div className="form-group">
-                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nomor Induk</label>
-                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-6">
-                            <h3 className="text-[10px] uppercase font-black text-slate-600 tracking-[0.2em] mb-4 flex items-center gap-2">
-                              <Settings size={14} /> INFORMASI KELAS
-                            </h3>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="form-group">
-                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Semester</label>
-                                <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.semester} onChange={e => setEditingStudent({...editingStudent, semester: e.target.value as any})}>
-                                  <option value="GANJIL">GANJIL</option>
-                                  <option value="GENAP">GENAP</option>
-                                </select>
-                              </div>
-                              <div className="form-group">
-                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Kelas</label>
-                                <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.class} onChange={e => setEditingStudent({...editingStudent, class: e.target.value})} />
-                              </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        {/* Column 1: Identity */}
+                        <div className="space-y-6">
+                          <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] mb-4 flex items-center gap-2">
+                            <UserCircle size={14} /> IDENTITAS DASAR
+                          </h3>
+                          <div className="space-y-4">
+                            <div className="form-group">
+                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Lengkap</label>
+                              <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
                             </div>
                             <div className="form-group">
-                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Tahun Pelajaran</label>
-                              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.tahunPelajaran} onChange={e => setEditingStudent({...editingStudent, tahunPelajaran: e.target.value})} />
+                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nomor Induk</label>
+                              <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
                             </div>
                           </div>
                         </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                          {/* Column 2: Subjects & Grades */}
-                          <div className="flex flex-col">
-                            <h3 className="text-[10px] uppercase font-black text-emerald-600 tracking-[0.2em] mb-4 flex items-center gap-2">
-                              <Edit size={14} /> INPUT NILAI PER MATA PELAJARAN
-                            </h3>
-                            <div className="flex-1 bg-slate-50 rounded-3xl p-6 border border-slate-100 overflow-y-auto max-h-[500px] border-b-4 border-slate-200 shadow-inner">
-                              {editingStudent.subjects?.map((sub, idx) => (
-                                <div key={idx} className="mb-6 last:mb-0 group">
-                                  <div className="flex justify-between items-center mb-2">
-                                    <label className="text-[10px] font-black text-slate-400 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{sub.name}</label>
-                                    <span className="text-[10px] font-bold text-slate-300">KKM: {sub.kkm}</span>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div className="relative">
-                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-300">TULIS</span>
-                                      <input 
-                                        type="number" min="0" max="100" 
-                                        className="w-full pl-12 pr-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-center text-sm" 
-                                        value={typeof sub.tulis?.nilai === 'number' ? sub.tulis.nilai : ''} 
-                                        onChange={e => {
-                                          const newSubs = [...(editingStudent.subjects || [])];
-                                          const val = parseInt(e.target.value) || 0;
-                                          newSubs[idx] = { ...sub, tulis: { nilai: val, huruf: getHuruf(val) } };
-                                          setEditingStudent({...editingStudent, subjects: newSubs});
-                                        }} 
-                                      />
-                                    </div>
-                                    <div className="relative">
-                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-300">LISAN</span>
-                                      <input 
-                                        type="number" min="0" max="100" 
-                                        className="w-full pl-12 pr-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-center text-sm" 
-                                        value={typeof sub.lisan?.nilai === 'number' ? sub.lisan.nilai : ''} 
-                                        onChange={e => {
-                                          const newSubs = [...(editingStudent.subjects || [])];
-                                          const val = parseInt(e.target.value) || 0;
-                                          newSubs[idx] = { ...sub, lisan: { nilai: val, huruf: getHuruf(val) } };
-                                          setEditingStudent({...editingStudent, subjects: newSubs});
-                                        }} 
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
 
-                          <div className="space-y-6">
-                            <h3 className="text-[10px] uppercase font-black text-rose-600 tracking-[0.2em] mb-4 flex items-center gap-2">
-                              <LayoutDashboard size={14} /> KEHADIRAN & SIKAP
-                            </h3>
-                            <div className="grid grid-cols-3 gap-3 mb-6">
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Sakit</label>
-                                <input type="number" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-bold" value={editingStudent.attendance?.sakit} onChange={e => setEditingStudent({...editingStudent, attendance: { ...editingStudent.attendance!, sakit: parseInt(e.target.value) || 0 }})} />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Izin</label>
-                                <input type="number" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-bold" value={editingStudent.attendance?.izin} onChange={e => setEditingStudent({...editingStudent, attendance: { ...editingStudent.attendance!, izin: parseInt(e.target.value) || 0 }})} />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Alpha</label>
-                                <input type="number" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-bold" value={editingStudent.attendance?.alpha} onChange={e => setEditingStudent({...editingStudent, attendance: { ...editingStudent.attendance!, alpha: parseInt(e.target.value) || 0 }})} />
-                              </div>
+                        <div className="space-y-6">
+                          <h3 className="text-[10px] uppercase font-black text-slate-600 tracking-[0.2em] mb-4 flex items-center gap-2">
+                            <Settings size={14} /> INFORMASI KELAS
+                          </h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="form-group">
+                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Semester</label>
+                              <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.semester} onChange={e => setEditingStudent({...editingStudent, semester: e.target.value as any})}>
+                                <option value="GANJIL">GANJIL</option>
+                                <option value="GENAP">GENAP</option>
+                              </select>
                             </div>
-                            <div className="space-y-4">
-                              <div className="form-group">
-                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Catatan Sikap Spiritual</label>
-                                <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 h-24 resize-none" value={editingStudent.behavior?.spiritual} onChange={e => setEditingStudent({...editingStudent, behavior: { ...editingStudent.behavior!, spiritual: e.target.value }})} />
-                              </div>
-                              <div className="form-group">
-                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Catatan Sikap Sosial</label>
-                                <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 h-24 resize-none" value={editingStudent.behavior?.social} onChange={e => setEditingStudent({...editingStudent, behavior: { ...editingStudent.behavior!, social: e.target.value }})} />
-                              </div>
+                            <div className="form-group">
+                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Kelas</label>
+                              <input readOnly className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-400 font-bold" value={editingStudent.class} />
                             </div>
                           </div>
+                          <div className="form-group">
+                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">Tahun Pelajaran</label>
+                            <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.tahunPelajaran} onChange={e => setEditingStudent({...editingStudent, tahunPelajaran: e.target.value})} />
+                          </div>
                         </div>
-                      )}
+                      </div>
                     </form>
                   </div>
 
                   <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
-                    {!editingStudent.id ? (
-                      <button onClick={() => handleSaveStudent(undefined, true).then(() => setActiveTab('grades'))} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 flex items-center justify-center gap-3">
-                        LANJUT KE INPUT NILAI <ChevronRight size={18} />
-                      </button>
-                    ) : (
-                      <div className="flex-1 flex gap-4">
-                        {activeTab === 'grades' && (
-                          <button onClick={() => setActiveTab('identity')} className="bg-white border border-slate-200 text-slate-600 px-6 py-4 rounded-2xl font-bold flex items-center gap-2">
-                            <ChevronLeft size={18} /> KEMBALI
-                          </button>
-                        )}
-                        {activeTab === 'identity' ? (
-                          <button onClick={() => setActiveTab('grades')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest flex items-center justify-center gap-3 transition-all">
-                            INPUT NILAI SANTRI <ChevronRight size={18} />
-                          </button>
-                        ) : (
-                          <button onClick={handleCloseModal} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white p-4 rounded-2xl font-black text-sm tracking-widest flex items-center justify-center gap-3">
-                            <X size={18} /> SELESAI & TUTUP
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    <button form="student-form" type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 flex items-center justify-center gap-3 transition-all">
+                      {editingStudent.id ? 'SELESAI' : 'TAMBAH SANTRI'}
+                    </button>
                     <button onClick={handleCloseModal} className="px-8 bg-white text-slate-400 font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 transition-colors">
-                      {editingStudent.id ? 'TUTUP' : 'BATAL'}
+                      BATAL
                     </button>
                   </div>
+
                 </motion.div>
               </div>
             </div>
@@ -828,9 +682,45 @@ export default function App() {
                              <td>{idx + 1}</td>
                              <td className="text-left font-medium">{sub.name}</td>
                              <td>{sub.kkm}</td>
-                             <td>{sub.tulis?.nilai ?? '-'}</td>
+                             <td className="p-0">
+                               <input 
+                                 type="number" min="0" max="100" 
+                                 className="w-full h-full py-2 bg-transparent text-center font-mono font-bold no-print focus:bg-blue-50/50 outline-none transition-all"
+                                 value={sub.tulis?.nilai ?? ''} 
+                                 onChange={e => {
+                                   const val = parseInt(e.target.value) || 0;
+                                   const newSubs = [...(selectedStudent.subjects || [])];
+                                   const subIdx = newSubs.findIndex(s => s.name === sub.name);
+                                   if (subIdx !== -1) {
+                                     newSubs[subIdx] = { ...newSubs[subIdx], tulis: { nilai: val, huruf: getHuruf(val) } };
+                                     const updated = {...selectedStudent, subjects: newSubs};
+                                     setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                                     autoSaveStudent(updated);
+                                   }
+                                 }}
+                               />
+                               <span className="hidden print:inline">{sub.tulis?.nilai ?? '-'}</span>
+                             </td>
                              <td className="font-bold">{sub.tulis?.huruf ?? '-'}</td>
-                             <td>{sub.lisan?.nilai ?? '-'}</td>
+                             <td className="p-0">
+                               <input 
+                                 type="number" min="0" max="100" 
+                                 className="w-full h-full py-2 bg-transparent text-center font-mono font-bold no-print focus:bg-blue-50/50 outline-none transition-all"
+                                 value={sub.lisan?.nilai ?? ''} 
+                                 onChange={e => {
+                                   const val = parseInt(e.target.value) || 0;
+                                   const newSubs = [...(selectedStudent.subjects || [])];
+                                   const subIdx = newSubs.findIndex(s => s.name === sub.name);
+                                   if (subIdx !== -1) {
+                                     newSubs[subIdx] = { ...newSubs[subIdx], lisan: { nilai: val, huruf: getHuruf(val) } };
+                                     const updated = {...selectedStudent, subjects: newSubs};
+                                     setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                                     autoSaveStudent(updated);
+                                   }
+                                 }}
+                               />
+                               <span className="hidden print:inline">{sub.lisan?.nilai ?? '-'}</span>
+                             </td>
                              <td className="font-bold">{sub.lisan?.huruf ?? '-'}</td>
                            </tr>
                          ))}
@@ -885,11 +775,35 @@ export default function App() {
                    <tbody>
                      <tr>
                        <td className="font-bold text-center py-8">Sikap Spiritual</td>
-                       <td className="text-justify px-6 py-6 leading-relaxed bg-slate-50/30 whitespace-pre-wrap">{selectedStudent.behavior.spiritual || '-'}</td>
+                                               <td className="relative px-6 py-6 bg-slate-50/30">
+                          <textarea 
+                            className="w-full min-h-[100px] bg-transparent outline-none resize-none no-print focus:bg-blue-50/50 p-2 rounded-xl transition-all leading-relaxed"
+                            placeholder="Tulis deskripsi sikap spiritual..."
+                            value={selectedStudent.behavior.spiritual || ''}
+                            onChange={e => {
+                                const updated = {...selectedStudent, behavior: {...selectedStudent.behavior, spiritual: e.target.value}};
+                                setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                                autoSaveStudent(updated);
+                            }}
+                          />
+                          <div className="hidden print:block whitespace-pre-wrap">{selectedStudent.behavior.spiritual || '-'}</div>
+                        </td>
                      </tr>
                      <tr>
                        <td className="font-bold text-center py-8">Sikap Sosial</td>
-                       <td className="text-justify px-6 py-6 leading-relaxed bg-slate-50/30 whitespace-pre-wrap">{selectedStudent.behavior.social || '-'}</td>
+                                               <td className="relative px-6 py-6 bg-slate-50/30">
+                          <textarea 
+                            className="w-full min-h-[100px] bg-transparent outline-none resize-none no-print focus:bg-blue-50/50 p-2 rounded-xl transition-all leading-relaxed"
+                            placeholder="Tulis deskripsi sikap sosial..."
+                            value={selectedStudent.behavior.social || ''}
+                            onChange={e => {
+                                const updated = {...selectedStudent, behavior: {...selectedStudent.behavior, social: e.target.value}};
+                                setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                                autoSaveStudent(updated);
+                            }}
+                          />
+                          <div className="hidden print:block whitespace-pre-wrap">{selectedStudent.behavior.social || '-'}</div>
+                        </td>
                      </tr>
                    </tbody>
                  </table>
@@ -929,9 +843,9 @@ export default function App() {
                      </tr>
                    </thead>
                    <tbody>
-                     <tr><td className="pl-4">Sakit</td><td className="text-center font-bold">{selectedStudent.attendance.sakit}</td></tr>
-                     <tr><td className="pl-4">Izin</td><td className="text-center font-bold">{selectedStudent.attendance.izin}</td></tr>
-                     <tr><td className="pl-4">Tanpa Keterangan</td><td className="text-center font-bold">{selectedStudent.attendance.alpha}</td></tr>
+                                           <tr><td className="pl-4">Sakit</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={selectedStudent.attendance.sakit} onChange={e => { const updated = {...selectedStudent, attendance: {...selectedStudent.attendance, sakit: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{selectedStudent.attendance.sakit}</span></td></tr>
+                                           <tr><td className="pl-4">Izin</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={selectedStudent.attendance.izin} onChange={e => { const updated = {...selectedStudent, attendance: {...selectedStudent.attendance, izin: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{selectedStudent.attendance.izin}</span></td></tr>
+                                           <tr><td className="pl-4">Tanpa Keterangan</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={selectedStudent.attendance.alpha} onChange={e => { const updated = {...selectedStudent, attendance: {...selectedStudent.attendance, alpha: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{selectedStudent.attendance.alpha}</span></td></tr>
                    </tbody>
                  </table>
 
