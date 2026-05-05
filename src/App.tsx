@@ -8,7 +8,19 @@ import { Student, Subject } from './types';
 import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const API_BASE = '/api';
+// No server needed, data is stored in LocalStorage
+const STORAGE_KEY = 'al_hikmah_students_data';
+
+// Helper to get all students from local storage
+const getStoredStudents = (): Student[] => {
+  const data = localStorage.getItem(STORAGE_KEY);
+  return data ? JSON.parse(data) : [];
+};
+
+// Helper to save students to local storage
+const saveStoredStudents = (students: Student[]) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+};
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -89,6 +101,46 @@ export default function App() {
 
   const classes = ['7', '8', '9', '10', '11', '12'];
 
+  // Initialize data with seed data if empty
+  useEffect(() => {
+    const existingData = localStorage.getItem(STORAGE_KEY);
+    if (!existingData) {
+      const seedData: Student[] = [
+        {
+          id: '1',
+          name: 'AHMAD ABDULLAH',
+          nomorInduk: '2023001',
+          noUrut: 1,
+          class: '7',
+          semester: 'GANJIL',
+          tahunPelajaran: '2023/2024',
+          subjects: [
+            { name: "Asasul Mubtadiin Fi Ilmi Nahwi", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 85, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
+            { name: "Mutammimah", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 75, huruf: 'C' }, lisan: { nilai: 78, huruf: 'C' } },
+            { name: "Asasul Mubtadiin Fi Ilmi Shorfi", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 90, huruf: 'A' }, lisan: { nilai: 88, huruf: 'B' } },
+            { name: "Durusullughah", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 92, huruf: 'A' }, lisan: { nilai: 95, huruf: 'A' } },
+            { name: "Qiraatul Kutub", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 82, huruf: 'B' }, lisan: { nilai: 84, huruf: 'B' } },
+            { name: "Imla'", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 80, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
+            { name: "Al-Qur'an", category: "AGAMA", kkm: 70, tulis: { nilai: 95, huruf: 'A' }, lisan: { nilai: 98, huruf: 'A' } },
+            { name: "Tajwid", category: "AGAMA", kkm: 70, tulis: { nilai: 88, huruf: 'B' }, lisan: { nilai: 85, huruf: 'B' } },
+            { name: "Fiqih Ibadah", category: "AGAMA", kkm: 70, tulis: { nilai: 82, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
+            { name: "Fiqih Muamalah", category: "AGAMA", kkm: 70, tulis: { nilai: 78, huruf: 'C' }, lisan: { nilai: 75, huruf: 'C' } },
+            { name: "Hafalan Hadits", category: "AGAMA", kkm: 70, tulis: { nilai: 90, huruf: 'A' }, lisan: { nilai: 92, huruf: 'A' } },
+            { name: "Grammar", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 85, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
+            { name: "Stories For You", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 88, huruf: 'B' }, lisan: { nilai: 85, huruf: 'B' } },
+            { name: "Dialogue/Speaking", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 90, huruf: 'A' }, lisan: { nilai: 95, huruf: 'A' } },
+            { name: "Dictation", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 82, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
+            { name: "Vocabularies", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 85, huruf: 'B' }, lisan: { nilai: 88, huruf: 'B' } }
+          ],
+          behavior: { spiritual: 'Sangat baik dalam menjalankan ibadah harian.', social: 'Sangat sopan dan menghargai teman sebaya.' },
+          attendance: { sakit: 1, izin: 0, alpha: 0 },
+          extracurriculars: []
+        }
+      ];
+      saveStoredStudents(seedData);
+    }
+  }, []);
+
   // Auto-save effect: Updates UI in real-time, sinks to server with debounce
   useEffect(() => {
     if (!editingStudent || !editingStudent.id) return;
@@ -118,14 +170,12 @@ export default function App() {
     if (!student.id) return;
     setSaveStatus('saving');
     try {
-      const res = await fetch(`${API_BASE}/students/${student.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(student)
-      });
-      if (res.ok) {
+      const allStudents = getStoredStudents();
+      const idx = allStudents.findIndex(s => s.id === student.id);
+      if (idx !== -1) {
+        allStudents[idx] = { ...allStudents[idx], ...student } as Student;
+        saveStoredStudents(allStudents);
         setSaveStatus('saved');
-        // UI already updated by useEffect, no need to update studentsList again here
       } else {
         setSaveStatus('error');
       }
@@ -145,11 +195,9 @@ export default function App() {
   const fetchStudents = async (className: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/students?class=${className}`);
-      if (res.ok) {
-        const data = await res.json();
-        setStudentsList(data);
-      }
+      const allStudents = getStoredStudents();
+      const filtered = allStudents.filter(s => s.class === className);
+      setStudentsList(filtered);
     } catch (e) {
       console.error(e);
     } finally {
@@ -228,40 +276,39 @@ export default function App() {
     if (!editingStudent) return;
 
     const isEdit = !!editingStudent.id;
-    const url = isEdit ? `${API_BASE}/students/${editingStudent.id}` : `${API_BASE}/students`;
-    const method = isEdit ? 'PUT' : 'POST';
 
     const payload = isEdit ? editingStudent : {
       ...editingStudent,
       id: Date.now().toString(),
       noUrut: studentsList.length + 1
-    };
+    } as Student;
 
     try {
-      const res = await fetch(url, {
-        method,
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
+      const allStudents = getStoredStudents();
+      if (isEdit) {
+        const idx = allStudents.findIndex(s => s.id === editingStudent.id);
+        if (idx !== -1) {
+          allStudents[idx] = payload as Student;
+        }
+      } else {
+        allStudents.push(payload as Student);
+      }
+      saveStoredStudents(allStudents);
 
-      if (res.ok) {
-        if (!isEdit) {
-          // If it's a new student, update local list instantly and select them
-          const newStudent = payload as Student;
-          setStudentsList(prev => [...prev, newStudent]);
-          setSearchTerm('');
-          setCurrentIndex(studentsList.length);
-        }
-        
-        if (selectedClass) fetchStudents(selectedClass);
-        
-        if (!stayOpen) {
-          setIsModalOpen(false);
-          setEditingStudent(null);
-          setSaveStatus('idle');
-        }
+      if (!isEdit) {
+        // If it's a new student, update local list instantly and select them
+        const newStudent = payload as Student;
+        setStudentsList(prev => [...prev, newStudent]);
+        setSearchTerm('');
+        setCurrentIndex(studentsList.length);
+      }
+      
+      if (selectedClass) fetchStudents(selectedClass);
+      
+      if (!stayOpen) {
+        setIsModalOpen(false);
+        setEditingStudent(null);
+        setSaveStatus('idle');
       }
     } catch (e) {
       console.error(e);
@@ -271,15 +318,15 @@ export default function App() {
   const handleDeleteStudent = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus data santri ini?')) {
       try {
-        const res = await fetch(`${API_BASE}/students/${id}`, {
-          method: 'DELETE'
-        });
-        if (res.ok) {
-          const newList = studentsList.filter(s => s.id !== id);
-          setStudentsList(newList);
-          if (currentIndex >= newList.length && newList.length > 0) {
-            setCurrentIndex(newList.length - 1);
-          }
+        const allStudents = getStoredStudents();
+        const newList = allStudents.filter(s => s.id !== id);
+        saveStoredStudents(newList);
+        
+        const filteredList = newList.filter(s => s.class === selectedClass);
+        setStudentsList(filteredList);
+        
+        if (currentIndex >= filteredList.length && filteredList.length > 0) {
+          setCurrentIndex(filteredList.length - 1);
         }
       } catch (e) {
         console.error(e);
