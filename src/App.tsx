@@ -85,7 +85,6 @@ const StudentInfo = ({ student }: { student: Student }) => (
         </tr>
       </tbody>
     </table>
-    <h3 className="text-[10pt] font-bold mt-3 mb-1 uppercase">D. CAPAIAN KOMPETENSI</h3>
   </div>
 );
 
@@ -978,7 +977,11 @@ export default function App() {
                         animate={{ scale: 1, opacity: 1 }}
                         className="font-black text-center text-3xl tracking-[0.15em] bg-white border-[3px] border-black px-12 py-6 uppercase inline-block"
                       >
-                       {selectedStudent.semester === 'GENAP' ? 'NAIK KE TINGKAT SELANJUTNYA' : 'TETAP SEMANGAT BELAJAR'}
+                       {selectedStudent.semester === 'GENAP' ? (
+                         selectedStudent.class === '9' || selectedStudent.class === '12' 
+                           ? 'LULUS / TIDAK LULUS' 
+                           : 'NAIK KELAS / TIDAK NAIK KELAS'
+                       ) : 'TETAP SEMANGAT BELAJAR'}
                      </motion.div>
                    </div>
                  </div>
