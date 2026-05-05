@@ -33,18 +33,20 @@ const slideIn = {
 };
 
 const Header = ({ logoUrl }: { logoUrl: string }) => (
-  <div className="text-center mb-2 double-border-bottom relative">
-    <div className="flex items-center justify-center gap-4 py-2">
-      {logoUrl ? (
-        <img src={logoUrl} width="80" alt="Logo" className="w-18 h-18 object-contain" referrerPolicy="no-referrer" />
-      ) : (
-        <div className="w-18 h-18 bg-slate-100 rounded-xl flex items-center justify-center text-[8pt] text-slate-400 font-bold border-2 border-dashed border-slate-200 uppercase">Logo</div>
-      )}
-      <div>
-        <h1 className="text-[11pt] font-bold uppercase leading-tight">YAYASAN PENDIDIKAN ISLAM AL-HIKMAH</h1>
-        <h2 className="text-[13pt] font-bold uppercase leading-tight">PESANTREN MODERN AL-HIKMAH</h2>
-        <p className="text-[7.5pt] font-medium">Jl. Al-Hikmah Kp. Pondok Jaya RT.05/01 Desa Pondok Jaya Kecamatan Sepatan</p>
-        <p className="text-[7.5pt] font-medium">Kabupaten Tangerang Provinsi Banten</p>
+  <div className="mb-2 double-border-bottom relative pb-1">
+    <div className="flex items-center gap-6 py-1">
+      <div className="shrink-0">
+        {logoUrl ? (
+          <img src={logoUrl} width="95" alt="Logo" className="w-22 h-22 object-contain" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="w-22 h-22 bg-slate-100 rounded-xl flex items-center justify-center text-[8pt] text-slate-400 font-bold border-2 border-dashed border-slate-200 uppercase">Logo</div>
+        )}
+      </div>
+      <div className="flex-1 text-center pr-[119px]">
+        <h1 className="text-[12pt] font-black uppercase leading-tight tracking-tight">YAYASAN PENDIDIKAN ISLAM AL-HIKMAH</h1>
+        <h2 className="text-[14.5pt] font-black uppercase leading-tight tracking-tight">PESANTREN MODERN AL-HIKMAH</h2>
+        <p className="text-[8.5pt] font-bold mt-1 text-slate-700">Jl. Al-Hikmah Kp. Pondok Jaya RT.05/01 Desa Pondok Jaya Kecamatan Sepatan</p>
+        <p className="text-[8.5pt] font-bold text-slate-700">Kabupaten Tangerang Provinsi Banten</p>
       </div>
     </div>
   </div>
@@ -729,42 +731,47 @@ export default function App() {
 
              <div className="report-container shadow-2xl rounded-sm">
                {/* PAGE 1: COVER */}
-               <section className="page flex flex-col items-center justify-center text-center">
+               <section className="page flex flex-col items-center justify-start pt-16 text-center">
                  {logoUrl ? (
-                   <img src={logoUrl} alt="Logo Al-Hikmah" className="w-64 h-64 object-contain mb-16" referrerPolicy="no-referrer" />
+                   <img src={logoUrl} alt="Logo Al-Hikmah" className="w-72 h-72 object-contain mb-12" referrerPolicy="no-referrer" />
                  ) : (
-                   <div className="w-64 h-64 border-4 border-dashed border-slate-200 rounded-3xl flex items-center justify-center mb-16 mx-auto">
+                   <div className="w-72 h-72 border-4 border-dashed border-slate-200 rounded-3xl flex items-center justify-center mb-12 mx-auto">
                      <span className="text-slate-300 font-extrabold text-2xl uppercase tracking-widest text-center px-4">LOGO PESANTREN</span>
                    </div>
                  )}
-                 <h1 className="text-4xl font-extrabold uppercase mb-4 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
-                 <h2 className="text-2xl font-bold uppercase mb-20 text-slate-600">Pondok Pesantren Modern Al-Hikmah</h2>
+                 <h1 className="text-5xl font-black uppercase mb-3 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
+                 <h2 className="text-2xl font-bold uppercase mb-20 text-slate-500 tracking-widest">Pondok Pesantren Modern Al-Hikmah</h2>
                  
-                 <div className="border-[6px] border-black p-12 w-full max-w-lg mx-auto bg-white">
-                   <table className="w-full text-xl text-left table-fixed border-collapse">
-                     <tbody>
-                       <tr className="border-b-2 border-slate-100">
-                         <td className="py-4 w-1/3">Nama</td>
-                         <td className="w-4 text-center">:</td>
-                         <td className="font-bold py-4 uppercase pl-2">{selectedStudent.name}</td>
-                       </tr>
-                       <tr className="border-b-2 border-slate-100">
-                         <td className="py-4">Nomor Induk</td>
-                         <td className="text-center">:</td>
-                         <td className="font-bold py-4 pl-2">{selectedStudent.nomorInduk}</td>
-                       </tr>
-                       <tr>
-                         <td className="py-4">Kelas</td>
-                         <td className="text-center">:</td>
-                         <td className="font-bold py-4 pl-2">{selectedStudent.class}</td>
-                       </tr>
-                     </tbody>
-                   </table>
+                 <div className="relative w-full max-w-xl py-12 px-8">
+                   {/* Decorative Elements */}
+                   <div className="absolute inset-0 border-[3px] border-black rounded-[40px] rotate-1 opacity-5"></div>
+                   <div className="absolute inset-0 border-[1.5px] border-slate-900 rounded-[35px]"></div>
+                   
+                   <div className="relative space-y-10">
+                     <div className="flex flex-col items-center">
+                       <span className="text-[10pt] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Nama Santri</span>
+                       <div className="w-full h-[1.5px] bg-gradient-to-r from-transparent via-slate-300 to-transparent mb-3"></div>
+                       <span className="text-3xl font-black text-slate-900 uppercase tracking-tight">{selectedStudent.name}</span>
+                     </div>
+
+                     <div className="grid grid-cols-2 gap-8">
+                       <div className="flex flex-col items-center">
+                         <span className="text-[9pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Nomor Induk</span>
+                         <div className="w-24 h-[1px] bg-slate-300 mb-2"></div>
+                         <span className="text-xl font-black text-slate-800">{selectedStudent.nomorInduk}</span>
+                       </div>
+                       <div className="flex flex-col items-center">
+                         <span className="text-[9pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Tingkat Kelas</span>
+                         <div className="w-24 h-[1px] bg-slate-300 mb-2"></div>
+                         <span className="text-xl font-black text-slate-800">{selectedStudent.class}</span>
+                       </div>
+                     </div>
+                   </div>
                  </div>
 
-                 <div className="absolute bottom-24 w-full text-center">
-                   <p className="font-bold uppercase leading-relaxed text-xl tracking-widest text-slate-800">SEMESTER {selectedStudent.semester}</p>
-                   <p className="font-bold uppercase leading-relaxed text-xl tracking-widest text-slate-800">TAHUN PELAJARAN {selectedStudent.tahunPelajaran}</p>
+                 <div className="mt-auto mb-16 space-y-2">
+                   <p className="font-black uppercase text-xl underline underline-offset-8 decoration-2 tracking-[0.2em] text-slate-900">SEMESTER {selectedStudent.semester}</p>
+                   <p className="font-extrabold uppercase text-lg tracking-[0.15em] text-slate-500">TAHUN PELAJARAN {selectedStudent.tahunPelajaran}</p>
                  </div>
                </section>
 
@@ -969,27 +976,25 @@ export default function App() {
                    </tbody>
                  </table>
 
-                 <div className="mt-12 bg-slate-50 p-8 border-2 border-black">
-                   <h3 className="font-bold mb-4 text-center uppercase tracking-widest underline underline-offset-4">Keputusan Akhir</h3>
-                   <div className="flex flex-col items-center">
-                     <p className="text-center text-slate-700 italic mb-6 leading-relaxed">Berdasarkan hasil pencapaian kompetensi dan kedisiplinan santri selama proses pembelajaran, maka diputuskan:</p>
-                     <motion.div 
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="font-black text-center text-3xl tracking-[0.15em] bg-white border-[3px] border-black px-12 py-6 uppercase inline-block"
-                      >
-                       {selectedStudent.semester === 'GENAP' ? (
-                         selectedStudent.class === '9' || selectedStudent.class === '12' 
-                           ? 'LULUS / TIDAK LULUS' 
-                           : 'NAIK KELAS / TIDAK NAIK KELAS'
-                       ) : null}
-                     </motion.div>
-                   </div>
-                 </div>
-               </section>
+                  {/* SIGNATURE SECTION */}
+                  <div className="signature-section mt-16 text-[10.5pt] flex justify-between items-start px-4">
+                    <div className="signature-box flex flex-col items-center flex-1">
+                      <p>Mengetahui,</p>
+                      <p>Orang Tua/Wali Santri</p>
+                      <div className="h-28"></div>
+                      <div className="signature-line w-48 border-black font-bold text-center">....................................</div>
+                    </div>
+                    <div className="signature-box flex flex-col items-center flex-1 text-center">
+                      <p>Tangerang, 20 Desember 2025</p>
+                      <p>Wali Kelas,</p>
+                      <div className="h-28 uppercase font-bold text-[8pt] pt-10 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
+                      <p className="font-bold border-b-2 border-black inline-block min-w-[140px] text-lg">....................................</p>
+                    </div>
+                  </div>
+                </section>
 
                {/* LEDGER */}
-               <section className="page border-t-2 mt-8 print:border-none print:mt-0">
+               <section className="page border-t-2 mt-8 print:hidden">
                  <Header logoUrl={logoUrl} />
                  <div className="text-center mb-10 mt-6">
                    <h1 className="text-2xl font-black uppercase tracking-widest text-slate-800">Ledger Perkembangan Nilai Santri</h1>
