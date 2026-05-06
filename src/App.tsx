@@ -66,7 +66,7 @@ const StudentInfo = ({ student, globalNamaKelas }: { student: Student, globalNam
           <td className="w-[23%] font-bold">{globalNamaKelas || student.class}</td>
         </tr>
         <tr>
-          <td>Nomor Induk</td>
+          <td>NIS/NISN</td>
           <td>:</td>
           <td className="font-bold">{student.nomorInduk}</td>
           <td>Semester</td>
@@ -166,9 +166,8 @@ export default function App() {
             { name: "Imla'", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 80, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
             { name: "Al-Qur'an", category: "AGAMA", kkm: 70, tulis: { nilai: 95, huruf: 'A' }, lisan: { nilai: 98, huruf: 'A' } },
             { name: "Tajwid", category: "AGAMA", kkm: 70, tulis: { nilai: 88, huruf: 'B' }, lisan: { nilai: 85, huruf: 'B' } },
-            { name: "Fiqih Ibadah", category: "AGAMA", kkm: 70, tulis: { nilai: 82, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
-            { name: "Fiqih Muamalah", category: "AGAMA", kkm: 70, tulis: { nilai: 78, huruf: 'C' }, lisan: { nilai: 75, huruf: 'C' } },
-            { name: "Hafalan Hadits", category: "AGAMA", kkm: 70, tulis: { nilai: 90, huruf: 'A' }, lisan: { nilai: 92, huruf: 'A' } },
+            { name: "Fiqih Qouliyah", category: "AGAMA", kkm: 70, tulis: { nilai: 82, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
+            { name: "Fiqih Fi'liyah", category: "AGAMA", kkm: 70, tulis: { nilai: 78, huruf: 'C' }, lisan: { nilai: 75, huruf: 'C' } },
             { name: "Grammar", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 85, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
             { name: "Stories For You", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 88, huruf: 'B' }, lisan: { nilai: 85, huruf: 'B' } },
             { name: "Dialogue/Speaking", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 90, huruf: 'A' }, lisan: { nilai: 95, huruf: 'A' } },
@@ -514,9 +513,8 @@ export default function App() {
         { name: "Imla'", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
         { name: "Al-Qur'an", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
         { name: "Tajwid", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Fiqih Ibadah", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Fiqih Muamalah", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Hafalan Hadits", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Fiqih Qouliyah", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Fiqih Fi'liyah", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
         { name: "Grammar", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
         { name: "Stories For You", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
         { name: "Dialogue/Speaking", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
@@ -980,7 +978,7 @@ export default function App() {
                           <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-12 text-center bg-slate-50 border-b">No</th>
                           <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-48 bg-slate-50 border-b sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Nama Santri</th>
                           {[
-                            { label: 'Nomor Induk', key: 'nomorInduk', isMain: true },
+                            { label: 'NIS/NISN', key: 'nomorInduk', isMain: true },
                             { label: 'NIS / NISN', key: 'nisNisn' },
                             { label: 'Tempat, Tanggal Lahir', key: 'tempatTanggalLahir' },
                             { label: 'Jenis Kelamin (L/P)', key: 'jenisKelamin' },
@@ -1140,7 +1138,7 @@ export default function App() {
                                 <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
                               </div>
                               <div className="form-group col-span-2">
-                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nomor Induk</label>
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">NIS/NISN</label>
                                 <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
                               </div>
                             </div>
@@ -1340,7 +1338,7 @@ export default function App() {
 
                      <div className="grid grid-cols-2 gap-4">
                        <div className="flex flex-col items-center border-r border-slate-100">
-                         <span className="text-[8pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Nomor Induk</span>
+                         <span className="text-[8pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">NIS/NISN</span>
                          <span className="text-base font-black text-slate-800">{selectedStudent.nomorInduk}</span>
                        </div>
                        <div className="flex flex-col items-center">
@@ -1521,17 +1519,17 @@ export default function App() {
                    </tbody>
                  </table>
 
-                 <div className="signature-section mt-10 text-[10pt] flex justify-between items-start px-4">
+                 <div className="signature-section mt-6 text-[10pt] flex justify-between items-start px-4">
                    <div className="signature-box flex flex-col items-center flex-1">
                      <p>Mengetahui,</p>
                      <p>Orang Tua/Wali Santri</p>
-                     <div className="h-20"></div>
+                     <div className="h-16"></div>
                      <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
                    </div>
                    <div className="signature-box flex flex-col items-center flex-1 text-center">
                      <p>Tangerang, {globalTanggalRaport}</p>
                      <p>Wali Kelas,</p>
-                     <div className="h-20 uppercase font-bold text-[8pt] pt-8 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
+                     <div className="h-16"></div>
                       <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
                         {globalWaliKelas || ''}
                       </div>
@@ -1614,7 +1612,7 @@ export default function App() {
                  </table>
 
                  <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">D. KEHADIRAN</h3>
-                 <table className="table-raport mb-12 text-[10pt] w-[300px]">
+                 <table className="table-raport mb-6 text-[10pt] w-[300px]">
                    <thead>
                      <tr className="bg-slate-50 h-10">
                        <th className="w-[60%]">KETERANGAN</th>
@@ -1629,17 +1627,17 @@ export default function App() {
                  </table>
 
                   {/* SIGNATURE SECTION */}
-                  <div className="signature-section mt-10 text-[10pt] flex justify-between items-start px-4">
+                  <div className="signature-section mt-6 text-[10pt] flex justify-between items-start px-4">
                     <div className="signature-box flex flex-col items-center flex-1">
                       <p>Mengetahui,</p>
                       <p>Orang Tua/Wali Santri</p>
-                      <div className="h-20"></div>
+                      <div className="h-16"></div>
                       <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
                     </div>
                     <div className="signature-box flex flex-col items-center flex-1 text-center">
                       <p>Tangerang, {globalTanggalRaport}</p>
                       <p>Wali Kelas,</p>
-                      <div className="h-20 uppercase font-bold text-[8pt] pt-8 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
+                      <div className="h-16"></div>
                       <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
                         {globalWaliKelas || ''}
                       </div>
