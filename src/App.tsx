@@ -92,7 +92,11 @@ const StudentInfo = ({ student, globalNamaKelas }: { student: Student, globalNam
 );
 
 export default function App() {
-  const [selectedClass, setSelectedClass] = useState<string | null>(localStorage.getItem('selected_class'));
+  const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA'];
+
+  const [selectedClass, setSelectedClass] = useState<string>(() => {
+    return localStorage.getItem('selected_class') || '10 SMA';
+  });
   const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [globalWaliKelas, setGlobalWaliKelas] = useState<string>(() => {
     return localStorage.getItem(`wali_kelas_${selectedClass}`) || '';
@@ -102,6 +106,9 @@ export default function App() {
   });
   const [globalTanggalRaport, setGlobalTanggalRaport] = useState<string>(() => {
     return localStorage.getItem(`tanggal_raport_${selectedClass}`) || '20 Desember 2025';
+  });
+  const [globalKepala, setGlobalKepala] = useState<string>(() => {
+    return localStorage.getItem(`kepala_kepasentrenan_${selectedClass}`) || '';
   });
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkData, setBulkData] = useState('');
@@ -132,7 +139,7 @@ export default function App() {
     }
   };
 
-  const classes = ['7', '8', '9', '10', '11', '12'];
+  const classes = CLASSES;
 
   // Initialize data with seed data if empty
   useEffect(() => {
@@ -266,6 +273,13 @@ export default function App() {
     }
   };
 
+  const handleUpdateGlobalKepala = (val: string) => {
+    setGlobalKepala(val);
+    if (selectedClass) {
+      localStorage.setItem(`kepala_kepasentrenan_${selectedClass}`, val);
+    }
+  };
+
   const downloadGradesTemplate = () => {
     const subjects = studentsList[0]?.subjects.map(s => s.name) || [
       "Asasul Mubtadiin Fi Ilmi Nahwi", "Mutammimah", "Asasul Mubtadiin Fi Ilmi Shorfi", "Durusullughah",
@@ -273,12 +287,16 @@ export default function App() {
       "Hafalan Hadits", "Grammar", "Stories For You", "Dialogue/Speaking", "Dictation", "Vocabularies"
     ];
     
-    const header = ["IDENTIFIER (NAMA/ID)", ...subjects];
+    const header = ["NOMOR INDUK", "NAMA SANTRI", ...subjects.flatMap(s => [`${s} (Tulis)`, `${s} (Lisan)`])];
     const data = [header];
     
-    // Add current students as sample
     studentsList.forEach(s => {
-      data.push([s.nomorInduk, ...s.subjects.map(sub => sub.tulis.nilai)]);
+      const row = [s.nomorInduk, s.name];
+      s.subjects.forEach(sub => {
+        row.push(sub.tulis.nilai as any);
+        row.push(sub.lisan.nilai as any);
+      });
+      data.push(row);
     });
 
     const worksheet = XLSX.utils.aoa_to_sheet(data);
@@ -289,9 +307,9 @@ export default function App() {
 
   const downloadIdentityTemplate = () => {
     const header = [
-      "Nama Lengkap", "Nomor Induk", "NIS / NISN", "Tempat, Tanggal Lahir", "Jenis Kelamin (L/P)", 
+      "NOMOR INDUK", "Nama Lengkap", "NIS / NISN", "Tempat, Tanggal Lahir", "Jenis Kelamin (L/P)", 
       "Agama", "Status dalam Keluarga", "Anak ke-", "Alamat Peserta Didik", "Nomor Telepon Rumah", 
-      "Sekolah Asal", "Diterima di Madrasah ini (Kelas)", "Diterima (Tanggal)", "Nama Ayah", 
+      "Sekolah Asal", "Di Pesantren Ini Diterima di Kelas", "Diterima (Tanggal)", "Nama Ayah", 
       "Nama Ibu", "Alamat Orang Tua", "Nomor Telepon Orang Tua", "Pekerjaan Ayah", 
       "Pekerjaan Ibu", "Nama Wali Santri", "Alamat Wali Santri", "Nomor Telepon Wali", "Pekerjaan Wali Santri"
     ];
@@ -299,7 +317,7 @@ export default function App() {
     
     studentsList.forEach(s => {
       data.push([
-        s.name, s.nomorInduk, s.identity?.nisNisn, s.identity?.tempatTanggalLahir, 
+        s.nomorInduk, s.name, s.identity?.nisNisn, s.identity?.tempatTanggalLahir, 
         s.identity?.jenisKelamin, s.identity?.agama, s.identity?.statusDalamKeluarga, 
         s.identity?.anakKe, s.identity?.alamatPesertaDidik, s.identity?.teleponRumah, 
         s.identity?.sekolahAsal, s.identity?.diterimaDiKelas, s.identity?.diterimaPadaTanggal, 
@@ -313,6 +331,86 @@ export default function App() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Template Identitas");
     XLSX.writeFile(workbook, `Template_Identitas_Kelas_${selectedClass}.xlsx`);
+  };
+
+  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>, type: 'grades' | 'identity') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+      
+      const header = data[0];
+      const rows = data.slice(1);
+      
+      const allStudents = getStoredStudents();
+      let updatedCount = 0;
+
+      rows.forEach(row => {
+        const ni = String(row[0]);
+        const sIdx = allStudents.findIndex(s => String(s.nomorInduk) === ni);
+        
+        if (sIdx !== -1) {
+          if (type === 'grades') {
+            const subjects = [...allStudents[sIdx].subjects];
+            subjects.forEach((sub) => {
+              const tulisHeader = `${sub.name} (Tulis)`;
+              const lisanHeader = `${sub.name} (Lisan)`;
+              const tCol = header.indexOf(tulisHeader);
+              const lCol = header.indexOf(lisanHeader);
+              
+              if (tCol !== -1) sub.tulis.nilai = row[tCol] || "";
+              if (lCol !== -1) sub.lisan.nilai = row[lCol] || "";
+            });
+            allStudents[sIdx].subjects = subjects;
+          } else {
+            allStudents[sIdx].identity = {
+              ...allStudents[sIdx].identity,
+              nisNisn: String(row[2] || ""),
+              tempatTanggalLahir: String(row[3] || ""),
+              jenisKelamin: String(row[4] || ""),
+              agama: String(row[5] || ""),
+              statusDalamKeluarga: String(row[6] || ""),
+              anakKe: String(row[7] || ""),
+              alamatPesertaDidik: String(row[8] || ""),
+              teleponRumah: String(row[9] || ""),
+              sekolahAsal: String(row[10] || ""),
+              diterimaDiKelas: String(row[11] || ""),
+              diterimaPadaTanggal: String(row[12] || ""),
+              namaAyah: String(row[13] || ""),
+              namaIbu: String(row[14] || ""),
+              alamatOrangTua: String(row[15] || ""),
+              teleponOrangTua: String(row[16] || ""),
+              pekerjaanAyah: String(row[17] || ""),
+              pekerjaanIbu: String(row[18] || ""),
+              namaWali: String(row[19] || ""),
+              alamatWali: String(row[20] || ""),
+              teleponWali: String(row[21] || ""),
+              pekerjaanWali: String(row[22] || ""),
+            };
+          }
+          updatedCount++;
+        }
+      });
+
+      if (updatedCount > 0) {
+        saveStoredStudents(allStudents);
+        if (selectedClass) fetchStudents(selectedClass);
+        alert(`Berhasil memperbarui data ${updatedCount} santri.`);
+        if (type === 'grades') setActiveTab('grades');
+        else setActiveTab('identity');
+      } else {
+        alert("Tidak ada data yang cocok dengan Nomor Induk di file Excel.");
+      }
+    };
+    reader.readAsBinaryString(file);
+    // Reset input
+    e.target.value = '';
   };
 
   const handleBulkImport = () => {
@@ -748,6 +846,41 @@ export default function App() {
                   onChange={e => handleUpdateGlobalWaliKelas(e.target.value)}
                 />
               </div>
+              <div>
+                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Kepala Kepesantrenan</label>
+                <input 
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
+                  placeholder="NAMA KEPALA..."
+                  value={globalKepala}
+                  onChange={e => handleUpdateGlobalKepala(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
+            <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
+              <FileText size={12} /> IMPORT EXCEL
+            </h3>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl cursor-pointer hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase">
+                <span className="flex items-center gap-2"><Plus size={14} /> Upload Nilai</span>
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls" 
+                  className="hidden" 
+                  onChange={e => handleExcelImport(e, 'grades')}
+                />
+              </label>
+              <label className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl cursor-pointer hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase">
+                <span className="flex items-center gap-2"><Plus size={14} /> Upload Identitas</span>
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls" 
+                  className="hidden" 
+                  onChange={e => handleExcelImport(e, 'identity')}
+                />
+              </label>
             </div>
           </div>
 
@@ -1080,7 +1213,7 @@ export default function App() {
                               { label: 'Alamat Peserta Didik', key: 'alamatPesertaDidik' },
                               { label: 'Nomor Telepon Rumah', key: 'teleponRumah' },
                               { label: 'Sekolah Asal', key: 'sekolahAsal' },
-                              { label: 'Diterima di Madrasah ini (Kelas)', key: 'diterimaDiKelas' },
+                              { label: 'Diterima di Pesantren ini (Kelas)', key: 'diterimaDiKelas' },
                               { label: 'Diterima (Tanggal)', key: 'diterimaPadaTanggal' },
                               { label: 'Nama Ayah', key: 'namaAyah' },
                               { label: 'Nama Ibu', key: 'namaIbu' },
@@ -1212,8 +1345,8 @@ export default function App() {
                          { label: '', isSpacer: true },
                          { id: "9.", label: 'Nomor Telepon Rumah', value: selectedStudent.identity?.teleponRumah },
                          { id: "10.", label: 'Sekolah Asal', value: selectedStudent.identity?.sekolahAsal },
-                         { id: "11.", label: 'Diterima di sekolah ini', isHeader: true },
-                         { label: 'Di kelas', indent: true, value: selectedStudent.identity?.diterimaDiKelas || (globalNamaKelas || selectedStudent.class) },
+                         { id: "11.", label: 'Diterima di pesantren ini', isHeader: true },
+                         { label: 'Di kelas', indent: true, value: selectedStudent.identity?.diterimaDiKelas },
                          { label: 'Pada tanggal', indent: true, value: selectedStudent.identity?.diterimaPadaTanggal },
                          { id: "12.", label: 'Nama Orang Tua', isHeader: true },
                          { label: 'a. Ayah', indent: true, value: selectedStudent.identity?.namaAyah },
@@ -1256,7 +1389,7 @@ export default function App() {
                      <p className="mb-1 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
                      <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
                      <div className="h-24"></div>
-                     <p className="font-black uppercase text-[10pt]">NIK.</p>
+                     <p className="font-black uppercase text-[10pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
                    </div>
                  </div>
                </section>
