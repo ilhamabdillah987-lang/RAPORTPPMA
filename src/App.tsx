@@ -53,6 +53,400 @@ const Header = ({ logoUrl }: { logoUrl: string }) => (
   </div>
 );
 
+const ReportTemplate = ({ student, logoUrl, globalNamaKelas, globalTanggalRaport, globalWaliKelas, globalKepala, studentRankings, autoSaveStudent, setStudentsList }: {
+  student: Student;
+  logoUrl: string;
+  globalNamaKelas: string;
+  globalTanggalRaport: string;
+  globalWaliKelas: string;
+  globalKepala: string;
+  studentRankings: any[];
+  autoSaveStudent: (s: Partial<Student>) => void;
+  setStudentsList: React.Dispatch<React.SetStateAction<Student[]>>;
+}) => {
+  const stats = useMemo(() => {
+    const tulisTotal = student.subjects.reduce((sum, sub) => sum + (typeof sub.tulis?.nilai === 'number' ? sub.tulis.nilai : 0), 0);
+    const lisanTotal = student.subjects.reduce((sum, sub) => sum + (typeof sub.lisan?.nilai === 'number' ? sub.lisan.nilai : 0), 0);
+    const count = student.subjects.length;
+    return {
+      tulisTotal,
+      lisanTotal,
+      tulisAvg: (tulisTotal / (count || 1)).toFixed(2),
+      lisanAvg: (lisanTotal / (count || 1)).toFixed(2)
+    };
+  }, [student]);
+
+  const groupedSubjects = useMemo<Record<string, Subject[]>>(() => {
+    const groups: Record<string, Subject[]> = {};
+    student.subjects.forEach(s => {
+      const cat = s.category || 'LAINNYA';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(s);
+    });
+    return groups;
+  }, [student]);
+
+  return (
+    <div className="report-container shadow-2xl rounded-sm print:shadow-none print:bg-white p-10 print:p-0 mb-20 print:mb-0">
+      {/* PAGE 1: COVER */}
+      <section className="page flex flex-col items-center justify-start pt-16 text-center">
+        {logoUrl ? (
+          <img src={logoUrl} alt="Logo" className="w-72 h-72 object-contain mb-12" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="w-72 h-72 border-4 border-dashed border-slate-200 rounded-3xl flex items-center justify-center mb-12 mx-auto">
+            <span className="text-slate-300 font-extrabold text-2xl uppercase tracking-widest px-4">LOGO PESANTREN</span>
+          </div>
+        )}
+        <h1 className="text-5xl font-black uppercase mb-3 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
+        <h2 className="text-2xl font-bold uppercase mb-12 text-slate-500 tracking-widest">Pondok Pesantren Modern Al-Hikmah</h2>
+        
+        <div className="relative w-full max-w-lg py-8 px-6 bg-white/50 backdrop-blur-sm p-8 rounded-3xl border border-slate-200/50 shadow-sm mt-4">
+          <div className="relative py-4 space-y-8">
+            <div className="flex flex-col items-center">
+              <span className="text-[9pt] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Nama Santri</span>
+              <span className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{student.name}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col items-center border-r border-slate-100">
+                <span className="text-[8pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">NIS/NISN</span>
+                <span className="text-base font-black text-slate-800">{student.nomorInduk}</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-[8pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Tingkat Kelas</span>
+                <span className="text-base font-black text-slate-800 uppercase">{globalNamaKelas || student.class}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12 mb-8 space-y-2 break-inside-avoid">
+          <p className="font-black uppercase text-xl underline underline-offset-8 decoration-2 tracking-[0.2em] text-slate-900">SEMESTER {student.semester}</p>
+          <p className="font-extrabold uppercase text-lg tracking-[0.15em] text-slate-500">TAHUN PELAJARAN {student.tahunPelajaran}</p>
+        </div>
+      </section>
+
+      {/* PAGE 2: IDENTITAS SANTRI */}
+      <section className="page flex flex-col p-12 text-[10.5pt] font-sans">
+        <h1 className="text-center text-[13pt] font-black uppercase mb-12 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
+        <div className="flex-1 space-y-1">
+          <table className="w-full border-collapse">
+            <tbody>
+              {[
+                { id: "1.", label: 'Nama Peserta Didik (Lengkap)', value: student.name },
+                { id: "2.", label: 'NIS / NISN', value: student.identity?.nisNisn },
+                { id: "3.", label: 'Tempat, Tanggal Lahir', value: student.identity?.tempatTanggalLahir },
+                { id: "4.", label: 'Jenis Kelamin', value: student.identity?.jenisKelamin },
+                { id: "5.", label: 'Agama', value: student.identity?.agama },
+                { id: "6.", label: 'Status dalam Keluarga', value: student.identity?.statusDalamKeluarga },
+                { id: "7.", label: 'Anak ke', value: student.identity?.anakKe },
+                { id: "8.", label: 'Alamat Peserta Didik', value: student.identity?.alamatPesertaDidik },
+                { label: '', isSpacer: true },
+                { id: "9.", label: 'Nomor Telepon Rumah', value: student.identity?.teleponRumah },
+                { id: "10.", label: 'Sekolah Asal', value: student.identity?.sekolahAsal },
+                { id: "11.", label: 'Diterima di pesantren ini', isHeader: true },
+                { label: 'Di kelas', indent: true, value: student.identity?.diterimaDiKelas },
+                { label: 'Pada tanggal', indent: true, value: student.identity?.diterimaPadaTanggal },
+                { id: "12.", label: 'Nama Orang Tua', isHeader: true },
+                { label: 'a. Ayah', indent: true, value: student.identity?.namaAyah },
+                { label: 'b. Ibu', indent: true, value: student.identity?.namaIbu },
+                { id: "13.", label: 'Alamat Orang Tua', value: student.identity?.alamatOrangTua },
+                { label: '', isSpacer: true },
+                { id: "14.", label: 'Nomor Telepon Rumah', value: student.identity?.teleponOrangTua },
+                { label: 'Pekerjaan Orang Tua', isHeader: true },
+                { label: 'a. Ayah', indent: true, value: student.identity?.pekerjaanAyah },
+                { label: 'b. Ibu', indent: true, value: student.identity?.pekerjaanIbu },
+                { id: "15.", label: 'Nama Wali Peserta Didik', value: student.identity?.namaWali },
+                { id: "16.", label: 'Alamat Wali Peserta Didik', value: student.identity?.alamatWali },
+                { label: 'Nomor Telepon Rumah', indent: true, value: student.identity?.teleponWali },
+                { id: "17.", label: 'Pekerjaan Wali Peserta Didik', value: student.identity?.pekerjaanWali },
+              ].map((row, idx) => {
+                if (row.isSpacer) return <tr key={`spacer-${idx}`}><td colSpan={4} className="h-4"></td></tr>;
+                return (
+                  <tr key={idx} className="align-top">
+                    <td className="w-8 py-1.5 font-bold">{(row as any).id || ''}</td>
+                    <td className={`w-[45%] py-1.5 ${row.indent ? 'pl-6' : ''} ${row.isHeader ? 'font-black' : 'font-medium'}`}>
+                      {row.label}
+                    </td>
+                    <td className="w-4 py-1.5 text-center">:</td>
+                    <td className={`py-1.5 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black uppercase' : ''}`}>
+                      {row.value}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex justify-between items-end mt-16 px-12">
+          <div className="w-[3cm] h-[4cm] border-2 border-slate-900 flex items-center justify-center text-center text-[7pt] text-slate-400 font-bold bg-slate-50 uppercase tracking-tighter leading-tight p-3 shrink-0">
+            Pas Foto<br/>3 x 4 cm
+          </div>
+          <div className="text-center w-80 mb-4">
+            <p className="mb-1 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
+            <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
+            <div className="h-24"></div>
+            <p className="font-black uppercase text-[10pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* PAGE 3: NILAI */}
+      <section className="page">
+        <Header logoUrl={logoUrl} />
+        <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />
+        <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block mt-4">A. NILAI TULIS & LISAN</h3>
+        <table className="table-raport w-full text-center mt-2">
+          <thead>
+            <tr>
+              <th rowSpan={2} className="w-[4%]">No</th>
+              <th rowSpan={2} className="w-[45%]">Mata Pelajaran</th>
+              <th rowSpan={2} className="w-[7%]">KKM</th>
+              <th colSpan={2} className="w-[22%]">Nilai Tulis</th>
+              <th colSpan={2} className="w-[22%]">Nilai Lisan</th>
+            </tr>
+            <tr>
+              <th className="w-[11%] text-[8pt] italic">SKOR</th>
+              <th className="w-[11%] text-[8pt] italic">HURUF</th>
+              <th className="w-[11%] text-[8pt] italic">SKOR</th>
+              <th className="w-[11%] text-[8pt] italic">HURUF</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(Object.entries(groupedSubjects) as [string, Subject[]][]).map(([category, subs], catIdx) => (
+              <React.Fragment key={category}>
+                <tr className="category-row">
+                  <td colSpan={7} className="font-bold uppercase py-2 bg-slate-50 border-y-2 border-black">
+                    <span className="ml-2">{catIdx + 1}. {category}</span>
+                  </td>
+                </tr>
+                {subs.map((sub, idx) => (
+                  <tr key={idx}>
+                    <td>{idx + 1}</td>
+                    <td className="text-left font-medium">{sub.name}</td>
+                    <td>{sub.kkm}</td>
+                    <td className="p-0">
+                      <input 
+                        type="number" min="0" max="100" 
+                        className="w-full h-full py-2 bg-transparent text-center font-mono font-bold no-print focus:bg-blue-50/50 outline-none transition-all"
+                        value={sub.tulis?.nilai ?? ''} 
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 0;
+                          const newSubs = [...(student.subjects || [])];
+                          const subIdx = newSubs.findIndex(s => s.name === sub.name);
+                          if (subIdx !== -1) {
+                            newSubs[subIdx] = { ...newSubs[subIdx], tulis: { nilai: val, huruf: getHuruf(val) } };
+                            const updated = {...student, subjects: newSubs};
+                            setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                            autoSaveStudent(updated);
+                          }
+                        }}
+                      />
+                      <span className="hidden print:inline">{sub.tulis?.nilai ?? '-'}</span>
+                    </td>
+                    <td className="font-bold">{sub.tulis?.huruf ?? '-'}</td>
+                    <td className="p-0">
+                      <input 
+                        type="number" min="0" max="100" 
+                        className="w-full h-full py-2 bg-transparent text-center font-mono font-bold no-print focus:bg-blue-50/50 outline-none transition-all"
+                        value={sub.lisan?.nilai ?? ''} 
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 0;
+                          const newSubs = [...(student.subjects || [])];
+                          const subIdx = newSubs.findIndex(s => s.name === sub.name);
+                          if (subIdx !== -1) {
+                            newSubs[subIdx] = { ...newSubs[subIdx], lisan: { nilai: val, huruf: getHuruf(val) } };
+                            const updated = {...student, subjects: newSubs};
+                            setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                            autoSaveStudent(updated);
+                          }
+                        }}
+                      />
+                      <span className="hidden print:inline">{sub.lisan?.nilai ?? '-'}</span>
+                    </td>
+                    <td className="font-bold">{sub.lisan?.huruf ?? '-'}</td>
+                  </tr>
+                ))}
+              </React.Fragment>
+            ))}
+            <tr className="font-bold bg-slate-100 border-t-2 border-black h-10">
+              <td colSpan={3} className="uppercase text-center">Jumlah Skor</td>
+              <td>{stats.tulisTotal}</td>
+              <td></td>
+              <td>{stats.lisanTotal}</td>
+              <td></td>
+            </tr>
+            <tr className="font-bold bg-slate-100 h-10">
+              <td colSpan={3} className="uppercase text-center">Rata-rata Skor</td>
+              <td>{stats.tulisAvg}</td>
+              <td></td>
+              <td>{stats.lisanAvg}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+        <div className="signature-section mt-6 text-[10pt] flex justify-between items-start px-4">
+          <div className="signature-box flex flex-col items-center flex-1">
+            <p>Mengetahui,</p>
+            <p>Orang Tua/Wali Santri</p>
+            <div className="h-16"></div>
+            <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
+          </div>
+          <div className="signature-box flex flex-col items-center flex-1 text-center">
+            <p>Tangerang, {globalTanggalRaport}</p>
+            <p>Wali Kelas,</p>
+            <div className="h-16"></div>
+            <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
+              {globalWaliKelas || ''}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PAGE 4: SIKAP */}
+      <section className="page flex flex-col">
+        <Header logoUrl={logoUrl} />
+        <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />
+        <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">B. SIKAP</h3>
+        <table className="table-raport mb-6 text-[10pt]">
+          <thead>
+            <tr className="bg-slate-50 h-10">
+              <th className="w-[30%]">ASPEK PENILAIAN</th>
+              <th className="w-[70%]">DESKRIPSI CAPAIAN</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="font-bold text-center py-8">Sikap Spiritual</td>
+              <td className="relative px-6 py-6 bg-slate-50/30">
+                <textarea 
+                  className="w-full min-h-[100px] bg-transparent outline-none resize-none no-print focus:bg-blue-50/50 p-2 rounded-xl transition-all leading-relaxed"
+                  placeholder="Tulis deskripsi sikap spiritual..."
+                  value={student.behavior.spiritual || ''}
+                  onChange={e => {
+                      const updated = {...student, behavior: {...student.behavior, spiritual: e.target.value}};
+                      setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                      autoSaveStudent(updated);
+                  }}
+                />
+                <div className="hidden print:block whitespace-pre-wrap">{student.behavior.spiritual || '-'}</div>
+              </td>
+            </tr>
+            <tr>
+              <td className="font-bold text-center py-8">Sikap Sosial</td>
+              <td className="relative px-6 py-6 bg-slate-50/30">
+                <textarea 
+                  className="w-full min-h-[100px] bg-transparent outline-none resize-none no-print focus:bg-blue-50/50 p-2 rounded-xl transition-all leading-relaxed"
+                  placeholder="Tulis deskripsi sikap sosial..."
+                  value={student.behavior.social || ''}
+                  onChange={e => {
+                      const updated = {...student, behavior: {...student.behavior, social: e.target.value}};
+                      setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                      autoSaveStudent(updated);
+                  }}
+                />
+                <div className="hidden print:block whitespace-pre-wrap">{student.behavior.social || '-'}</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      {/* PAGE 5: EKSTRA & ABSENSI */}
+      <section className="page flex flex-col">
+        <Header logoUrl={logoUrl} />
+        <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />
+        
+        <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">E. EKSTRAKURIKULER</h3>
+        <table className="table-raport mb-12 text-[10pt]">
+          <thead>
+            <tr className="bg-slate-50 h-10">
+              <th className="w-[40%] text-center">KEGIATAN / PROGRAM</th>
+              <th className="w-[60%] text-center">KETERANGAN PERKEMBANGAN</th>
+            </tr>
+          </thead>
+          <tbody>
+            {student.extracurriculars.length > 0 ? student.extracurriculars.map((ex, idx) => (
+              <tr key={idx}>
+                <td className="font-medium pl-4">{ex.activity}</td>
+                <td className="pl-4">{ex.note}</td>
+              </tr>
+            )) : (
+              <tr><td colSpan={2} className="text-center italic py-4 text-slate-400">Tidak ada data kegiatan ekstrakurikuler yang diikuti</td></tr>
+            )}
+          </tbody>
+        </table>
+
+        <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">D. KEHADIRAN</h3>
+        <table className="table-raport mb-6 text-[10pt] w-[300px]">
+          <thead>
+            <tr className="bg-slate-50 h-10">
+              <th className="w-[60%]">KETERANGAN</th>
+              <th className="w-[40%]">JUMLAH (HARI)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td className="pl-4">Sakit</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.sakit} onChange={e => { const updated = {...student, attendance: {...student.attendance, sakit: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{student.attendance.sakit}</span></td></tr>
+            <tr><td className="pl-4">Izin</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.izin} onChange={e => { const updated = {...student, attendance: {...student.attendance, izin: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{student.attendance.izin}</span></td></tr>
+            <tr><td className="pl-4">Tanpa Keterangan</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.alpha} onChange={e => { const updated = {...student, attendance: {...student.attendance, alpha: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{student.attendance.alpha}</span></td></tr>
+          </tbody>
+        </table>
+
+        <div className="signature-section mt-6 text-[10pt] flex justify-between items-start px-4">
+          <div className="signature-box flex flex-col items-center flex-1">
+            <p>Mengetahui,</p>
+            <p>Orang Tua/Wali Santri</p>
+            <div className="h-16"></div>
+            <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
+          </div>
+          <div className="signature-box flex flex-col items-center flex-1 text-center">
+            <p>Tangerang, {globalTanggalRaport}</p>
+            <p>Wali Kelas,</p>
+            <div className="h-16"></div>
+            <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
+              {globalWaliKelas || ''}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* LEDGER */}
+      <section className="page border-t-2 mt-8 print:hidden">
+        <Header logoUrl={logoUrl} />
+        <div className="text-center mb-10 mt-6">
+          <h1 className="text-2xl font-black uppercase tracking-widest text-slate-800">Ledger Perkembangan Nilai Santri</h1>
+          <h2 className="text-lg font-bold uppercase text-slate-500 mt-1">Kelas {student.class} • TA {student.tahunPelajaran}</h2>
+        </div>
+        
+        <table className="table-raport text-[10pt]">
+          <thead>
+            <tr className="bg-slate-50 h-12">
+              <th className="w-12">No</th>
+              <th>Nama Lengkap Santri</th>
+              <th className="w-24">Skor Rerata</th>
+              <th className="w-24">Ranking</th>
+            </tr>
+          </thead>
+          <tbody>
+            {studentRankings.map((s: any) => (
+              <tr key={s.id} className={s.id === student.id ? 'bg-blue-50/50 font-bold border-x-4 border-blue-600' : 'hover:bg-slate-50/50 transition-colors'}>
+                <td className="text-center font-medium font-mono">{s.rank}</td>
+                <td className="pl-6 uppercase">{s.name}</td>
+                <td className="text-center font-mono">{s.avg.toFixed(2)}</td>
+                <td className="text-center">
+                  <span className={`inline-block w-8 h-8 leading-8 rounded-full ${s.rank <= 3 ? 'bg-amber-100 text-amber-700 font-black ring-2 ring-amber-200' : 'font-bold text-slate-700'}`}>
+                    {s.rank}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  );
+};
+
 const StudentInfo = ({ student, globalNamaKelas }: { student: Student, globalNamaKelas?: string }) => (
   <div className="mb-2">
     <table className="table-header w-full text-[9pt]">
@@ -91,6 +485,15 @@ const StudentInfo = ({ student, globalNamaKelas }: { student: Student, globalNam
   </div>
 );
 
+
+const getHuruf = (nilai: number | string) => {
+  if (typeof nilai !== 'number') return "-";
+  if (nilai >= 90) return "A";
+  if (nilai >= 80) return "B";
+  if (nilai >= 70) return "C";
+  return "D";
+};
+
 export default function App() {
   const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA'];
 
@@ -114,6 +517,8 @@ export default function App() {
   const [isBulkIdentityOpen, setIsBulkIdentityOpen] = useState(false);
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // keep for single student grid if needed, or remove later
+  const [isPrintingAll, setIsPrintingAll] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [bulkData, setBulkData] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -373,18 +778,49 @@ export default function App() {
     }
   };
 
+  const handleDownloadBackup = () => {
+    const data = getStoredStudents();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Backup_Database_Raport_${new Date().toLocaleDateString().replace(/\//g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const content = evt.target?.result as string;
+        const data = JSON.parse(content);
+        if (Array.isArray(data)) {
+          if (confirm(`Peringatan: Ini akan mengganti seluruh database saat ini dengan ${data.length} data santri dari file backup. Lanjutkan?`)) {
+            saveStoredStudents(data);
+            if (selectedClass) fetchStudents(selectedClass);
+            alert('Database berhasil dipulihkan!');
+          }
+        } else {
+          alert('Format file backup tidak valid.');
+        }
+      } catch (err) {
+        alert('Gagal membaca file: ' + err);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const handleClearClass = () => {
     setSelectedClass(null);
     localStorage.removeItem('selected_class');
     setStudentsList([]);
-  };
-
-  const getHuruf = (nilai: number | string) => {
-    if (typeof nilai !== 'number') return "-";
-    if (nilai >= 90) return "A";
-    if (nilai >= 80) return "B";
-    if (nilai >= 70) return "C";
-    return "D";
   };
 
   const filteredStudents = useMemo(() => {
@@ -408,30 +844,6 @@ export default function App() {
     });
     return list.sort((a, b) => b.avg - a.avg).map((s, idx) => ({ ...s, rank: idx + 1 }));
   }, [studentsList]);
-
-  const stats = useMemo(() => {
-    if (!selectedStudent) return { tulisTotal: 0, lisanTotal: 0, tulisAvg: "0", lisanAvg: "0" };
-    const tulisTotal = selectedStudent.subjects.reduce((sum, sub) => sum + (typeof sub.tulis?.nilai === 'number' ? sub.tulis.nilai : 0), 0);
-    const lisanTotal = selectedStudent.subjects.reduce((sum, sub) => sum + (typeof sub.lisan?.nilai === 'number' ? sub.lisan.nilai : 0), 0);
-    const count = selectedStudent.subjects.length;
-    return {
-      tulisTotal,
-      lisanTotal,
-      tulisAvg: (tulisTotal / count).toFixed(2),
-      lisanAvg: (lisanTotal / count).toFixed(2)
-    };
-  }, [selectedStudent]);
-
-  const groupedSubjects = useMemo<Record<string, Subject[]>>(() => {
-    if (!selectedStudent) return {};
-    const groups: Record<string, Subject[]> = {};
-    selectedStudent.subjects.forEach(s => {
-      const cat = s.category || 'LAINNYA';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(s);
-    });
-    return groups;
-  }, [selectedStudent]);
 
   const handleSaveStudent = async (e?: React.FormEvent, stayOpen: boolean = false) => {
     if (e) e.preventDefault();
@@ -559,12 +971,16 @@ export default function App() {
 
   const handlePrint = () => {
     if (!selectedStudent) return;
-    const originalTitle = document.title;
-    document.title = `Raport_${selectedStudent.name}`;
     window.print();
+  };
+
+  const handlePrintAll = () => {
+    if (filteredStudents.length === 0) return;
+    setIsPrintingAll(true);
     setTimeout(() => {
-      document.title = originalTitle;
-    }, 100);
+      window.print();
+      setIsPrintingAll(false);
+    }, 1000);
   };
 
   if (isLoading) {
@@ -789,6 +1205,29 @@ export default function App() {
             </div>
           </div>
 
+          <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 border-dashed">
+            <h3 className="text-amber-600 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
+              <Settings size={12} /> MENU ADMIN (DATABASE)
+            </h3>
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={handleDownloadBackup}
+                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-amber-700 rounded-xl hover:bg-amber-100 transition-all border border-amber-200 text-[9px] font-black uppercase shadow-sm"
+              >
+                <span className="flex items-center gap-2"><Save size={14} /> Download/Simpan DB</span>
+              </button>
+              <label className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl cursor-pointer hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase">
+                <span className="flex items-center gap-2"><FileText size={14} /> Import Database</span>
+                <input 
+                  type="file" 
+                  accept=".json" 
+                  className="hidden" 
+                  onChange={handleImportBackup}
+                />
+              </label>
+            </div>
+          </div>
+
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
             <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
               <Settings size={12} /> LOGO PESANTREN
@@ -832,6 +1271,13 @@ export default function App() {
             className="w-full bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-xl shadow-blue-100 hover:translate-y-[-2px] active:translate-y-[0]"
           >
             <Printer size={18} /> CETAK RAPORT
+          </button>
+          <button 
+            onClick={handlePrintAll} 
+            disabled={filteredStudents.length === 0}
+            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all border border-slate-200"
+          >
+            <Printer size={18} /> CETAK SEMUA RAPORT
           </button>
         </div>
       </motion.aside>
@@ -1293,9 +1739,24 @@ export default function App() {
               </div>
             </div>
           </AnimatePresence>
-        )}
-
-        {selectedStudent ? (
+        )}        {isPrintingAll ? (
+          <div className="flex flex-col items-center bg-white min-h-screen p-10">
+            {filteredStudents.map(student => (
+              <ReportTemplate 
+                key={student.id}
+                student={student}
+                logoUrl={logoUrl}
+                globalNamaKelas={globalNamaKelas}
+                globalTanggalRaport={globalTanggalRaport}
+                globalWaliKelas={globalWaliKelas}
+                globalKepala={globalKepala}
+                studentRankings={studentRankings}
+                autoSaveStudent={autoSaveStudent}
+                setStudentsList={setStudentsList}
+              />
+            ))}
+          </div>
+        ) : selectedStudent ? (
           <motion.div 
             key={selectedStudent.id}
             initial={{ opacity: 0, y: 10 }}
@@ -1316,372 +1777,17 @@ export default function App() {
                </div>
              </div>
 
-             <div className="report-container shadow-2xl rounded-sm">
-               {/* PAGE 1: COVER */}
-               <section className="page flex flex-col items-center justify-start pt-16 text-center">
-                 {logoUrl ? (
-                   <img src={logoUrl} alt="Logo Al-Hikmah" className="w-72 h-72 object-contain mb-12" referrerPolicy="no-referrer" />
-                 ) : (
-                   <div className="w-72 h-72 border-4 border-dashed border-slate-200 rounded-3xl flex items-center justify-center mb-12 mx-auto">
-                     <span className="text-slate-300 font-extrabold text-2xl uppercase tracking-widest text-center px-4">LOGO PESANTREN</span>
-                   </div>
-                 )}
-                 <h1 className="text-5xl font-black uppercase mb-3 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
-                 <h2 className="text-2xl font-bold uppercase mb-12 text-slate-500 tracking-widest">Pondok Pesantren Modern Al-Hikmah</h2>
-                 
-                 <div className="relative w-full max-w-lg py-8 px-6 bg-white/50 backdrop-blur-sm p-8 rounded-3xl border border-slate-200/50 shadow-sm mt-4">
-                   <div className="relative py-4 space-y-8">
-                     <div className="flex flex-col items-center">
-                       <span className="text-[9pt] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Nama Santri</span>
-                       <span className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{selectedStudent.name}</span>
-                     </div>
-
-                     <div className="grid grid-cols-2 gap-4">
-                       <div className="flex flex-col items-center border-r border-slate-100">
-                         <span className="text-[8pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">NIS/NISN</span>
-                         <span className="text-base font-black text-slate-800">{selectedStudent.nomorInduk}</span>
-                       </div>
-                       <div className="flex flex-col items-center">
-                         <span className="text-[8pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Tingkat Kelas</span>
-                         <span className="text-base font-black text-slate-800 uppercase">{globalNamaKelas || selectedStudent.class}</span>
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-
-                 <div className="mt-12 mb-8 space-y-2 break-inside-avoid">
-                   <p className="font-black uppercase text-xl underline underline-offset-8 decoration-2 tracking-[0.2em] text-slate-900">SEMESTER {selectedStudent.semester}</p>
-                   <p className="font-extrabold uppercase text-lg tracking-[0.15em] text-slate-500">TAHUN PELAJARAN {selectedStudent.tahunPelajaran}</p>
-                 </div>
-               </section>
-
-               {/* PAGE 2: IDENTITAS SANTRI */}
-               <section className="page flex flex-col p-12 text-[10.5pt] font-sans">
-                 <h1 className="text-center text-[13pt] font-black uppercase mb-12 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
-                 
-                 <div className="flex-1 space-y-1">
-                   <table className="w-full border-collapse">
-                     <tbody>
-                       {[
-                         { id: "1.", label: 'Nama Peserta Didik (Lengkap)', value: selectedStudent.name },
-                         { id: "2.", label: 'NIS / NISN', value: selectedStudent.identity?.nisNisn },
-                         { id: "3.", label: 'Tempat, Tanggal Lahir', value: selectedStudent.identity?.tempatTanggalLahir },
-                         { id: "4.", label: 'Jenis Kelamin', value: selectedStudent.identity?.jenisKelamin },
-                         { id: "5.", label: 'Agama', value: selectedStudent.identity?.agama },
-                         { id: "6.", label: 'Status dalam Keluarga', value: selectedStudent.identity?.statusDalamKeluarga },
-                         { id: "7.", label: 'Anak ke', value: selectedStudent.identity?.anakKe },
-                         { id: "8.", label: 'Alamat Peserta Didik', value: selectedStudent.identity?.alamatPesertaDidik },
-                         { label: '', isSpacer: true },
-                         { id: "9.", label: 'Nomor Telepon Rumah', value: selectedStudent.identity?.teleponRumah },
-                         { id: "10.", label: 'Sekolah Asal', value: selectedStudent.identity?.sekolahAsal },
-                         { id: "11.", label: 'Diterima di pesantren ini', isHeader: true },
-                         { label: 'Di kelas', indent: true, value: selectedStudent.identity?.diterimaDiKelas },
-                         { label: 'Pada tanggal', indent: true, value: selectedStudent.identity?.diterimaPadaTanggal },
-                         { id: "12.", label: 'Nama Orang Tua', isHeader: true },
-                         { label: 'a. Ayah', indent: true, value: selectedStudent.identity?.namaAyah },
-                         { label: 'b. Ibu', indent: true, value: selectedStudent.identity?.namaIbu },
-                         { id: "13.", label: 'Alamat Orang Tua', value: selectedStudent.identity?.alamatOrangTua },
-                         { label: '', isSpacer: true },
-                         { id: "14.", label: 'Nomor Telepon Rumah', value: selectedStudent.identity?.teleponOrangTua },
-                         { label: 'Pekerjaan Orang Tua', isHeader: true },
-                         { label: 'a. Ayah', indent: true, value: selectedStudent.identity?.pekerjaanAyah },
-                         { label: 'b. Ibu', indent: true, value: selectedStudent.identity?.pekerjaanIbu },
-                         { id: "15.", label: 'Nama Wali Peserta Didik', value: selectedStudent.identity?.namaWali },
-                         { id: "16.", label: 'Alamat Wali Peserta Didik', value: selectedStudent.identity?.alamatWali },
-                         { label: 'Nomor Telepon Rumah', indent: true, value: selectedStudent.identity?.teleponWali },
-                         { id: "17.", label: 'Pekerjaan Wali Peserta Didik', value: selectedStudent.identity?.pekerjaanWali },
-                       ].map((row, idx) => {
-                         if (row.isSpacer) return <tr key={`spacer-${idx}`}><td colSpan={4} className="h-4"></td></tr>;
-                         return (
-                           <tr key={idx} className="align-top">
-                             <td className="w-8 py-1.5 font-bold">{(row as any).id || ''}</td>
-                             <td className={`w-[45%] py-1.5 ${row.indent ? 'pl-6' : ''} ${row.isHeader ? 'font-black' : 'font-medium'}`}>
-                               {row.label}
-                             </td>
-                             <td className="w-4 py-1.5 text-center">:</td>
-                             <td className={`py-1.5 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black uppercase' : ''}`}>
-                               {row.value}
-                             </td>
-                           </tr>
-                         );
-                       })}
-                     </tbody>
-                   </table>
-                 </div>
-
-                 <div className="flex justify-between items-end mt-16 px-12">
-                   <div className="w-[3cm] h-[4cm] border-2 border-slate-900 flex items-center justify-center text-center text-[7pt] text-slate-400 font-bold bg-slate-50 uppercase tracking-tighter leading-tight p-3 shrink-0">
-                     Pas Foto<br/>3 x 4 cm
-                   </div>
-                   
-                   <div className="text-center w-80 mb-4">
-                     <p className="mb-1 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
-                     <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
-                     <div className="h-24"></div>
-                     <p className="font-black uppercase text-[10pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
-                   </div>
-                 </div>
-               </section>
-
-               {/* PAGE 2-5 same content but with selectedStudent */}
-               <section className="page">
-                 <Header logoUrl={logoUrl} />
-                 <StudentInfo student={selectedStudent} />
-                 <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block mt-4">A. NILAI TULIS & LISAN</h3>
-                 <table className="table-raport w-full text-center mt-2">
-                   <thead>
-                     <tr>
-                       <th rowSpan={2} className="w-[4%]">No</th>
-                       <th rowSpan={2} className="w-[45%]">Mata Pelajaran</th>
-                       <th rowSpan={2} className="w-[7%]">KKM</th>
-                       <th colSpan={2} className="w-[22%]">Nilai Tulis</th>
-                       <th colSpan={2} className="w-[22%]">Nilai Lisan</th>
-                     </tr>
-                     <tr>
-                       <th className="w-[11%] text-[8pt] italic">SKOR</th>
-                       <th className="w-[11%] text-[8pt] italic">HURUF</th>
-                       <th className="w-[11%] text-[8pt] italic">SKOR</th>
-                       <th className="w-[11%] text-[8pt] italic">HURUF</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {(Object.entries(groupedSubjects) as [string, Subject[]][]).map(([category, subs], catIdx) => (
-                       <React.Fragment key={category}>
-                         <tr className="category-row">
-                           <td colSpan={7} className="font-bold uppercase py-2 bg-slate-50 border-y-2 border-black">
-                             <span className="ml-2">{catIdx + 1}. {category}</span>
-                           </td>
-                         </tr>
-                         {subs.map((sub, idx) => (
-                           <tr key={idx}>
-                             <td>{idx + 1}</td>
-                             <td className="text-left font-medium">{sub.name}</td>
-                             <td>{sub.kkm}</td>
-                             <td className="p-0">
-                               <input 
-                                 type="number" min="0" max="100" 
-                                 className="w-full h-full py-2 bg-transparent text-center font-mono font-bold no-print focus:bg-blue-50/50 outline-none transition-all"
-                                 value={sub.tulis?.nilai ?? ''} 
-                                 onChange={e => {
-                                   const val = parseInt(e.target.value) || 0;
-                                   const newSubs = [...(selectedStudent.subjects || [])];
-                                   const subIdx = newSubs.findIndex(s => s.name === sub.name);
-                                   if (subIdx !== -1) {
-                                     newSubs[subIdx] = { ...newSubs[subIdx], tulis: { nilai: val, huruf: getHuruf(val) } };
-                                     const updated = {...selectedStudent, subjects: newSubs};
-                                     setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
-                                     autoSaveStudent(updated);
-                                   }
-                                 }}
-                               />
-                               <span className="hidden print:inline">{sub.tulis?.nilai ?? '-'}</span>
-                             </td>
-                             <td className="font-bold">{sub.tulis?.huruf ?? '-'}</td>
-                             <td className="p-0">
-                               <input 
-                                 type="number" min="0" max="100" 
-                                 className="w-full h-full py-2 bg-transparent text-center font-mono font-bold no-print focus:bg-blue-50/50 outline-none transition-all"
-                                 value={sub.lisan?.nilai ?? ''} 
-                                 onChange={e => {
-                                   const val = parseInt(e.target.value) || 0;
-                                   const newSubs = [...(selectedStudent.subjects || [])];
-                                   const subIdx = newSubs.findIndex(s => s.name === sub.name);
-                                   if (subIdx !== -1) {
-                                     newSubs[subIdx] = { ...newSubs[subIdx], lisan: { nilai: val, huruf: getHuruf(val) } };
-                                     const updated = {...selectedStudent, subjects: newSubs};
-                                     setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
-                                     autoSaveStudent(updated);
-                                   }
-                                 }}
-                               />
-                               <span className="hidden print:inline">{sub.lisan?.nilai ?? '-'}</span>
-                             </td>
-                             <td className="font-bold">{sub.lisan?.huruf ?? '-'}</td>
-                           </tr>
-                         ))}
-                       </React.Fragment>
-                     ))}
-                     
-                     <tr className="font-bold bg-slate-100 border-t-2 border-black h-10">
-                       <td colSpan={3} className="uppercase text-center">Jumlah Skor</td>
-                       <td>{stats.tulisTotal}</td>
-                       <td></td>
-                       <td>{stats.lisanTotal}</td>
-                       <td></td>
-                     </tr>
-                     <tr className="font-bold bg-slate-100 h-10">
-                       <td colSpan={3} className="uppercase text-center">Rata-rata Skor</td>
-                       <td>{stats.tulisAvg}</td>
-                       <td></td>
-                       <td>{stats.lisanAvg}</td>
-                       <td></td>
-                     </tr>
-                   </tbody>
-                 </table>
-
-                 <div className="signature-section mt-6 text-[10pt] flex justify-between items-start px-4">
-                   <div className="signature-box flex flex-col items-center flex-1">
-                     <p>Mengetahui,</p>
-                     <p>Orang Tua/Wali Santri</p>
-                     <div className="h-16"></div>
-                     <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
-                   </div>
-                   <div className="signature-box flex flex-col items-center flex-1 text-center">
-                     <p>Tangerang, {globalTanggalRaport}</p>
-                     <p>Wali Kelas,</p>
-                     <div className="h-16"></div>
-                      <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
-                        {globalWaliKelas || ''}
-                      </div>
-                   </div>
-                 </div>
-               </section>
-
-               {/* SIKAP */}
-               <section className="page border-t-2 mt-8 print:border-none print:mt-0">
-                 <Header logoUrl={logoUrl} />
-                 <StudentInfo student={selectedStudent} />
-                 <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">B. SIKAP</h3>
-                 <table className="table-raport mb-12 text-[10pt]">
-                   <thead>
-                     <tr className="bg-slate-50 h-10">
-                       <th className="w-[30%]">ASPEK PENILAIAN</th>
-                       <th className="w-[70%]">DESKRIPSI CAPAIAN</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     <tr>
-                       <td className="font-bold text-center py-8">Sikap Spiritual</td>
-                                               <td className="relative px-6 py-6 bg-slate-50/30">
-                          <textarea 
-                            className="w-full min-h-[100px] bg-transparent outline-none resize-none no-print focus:bg-blue-50/50 p-2 rounded-xl transition-all leading-relaxed"
-                            placeholder="Tulis deskripsi sikap spiritual..."
-                            value={selectedStudent.behavior.spiritual || ''}
-                            onChange={e => {
-                                const updated = {...selectedStudent, behavior: {...selectedStudent.behavior, spiritual: e.target.value}};
-                                setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
-                                autoSaveStudent(updated);
-                            }}
-                          />
-                          <div className="hidden print:block whitespace-pre-wrap">{selectedStudent.behavior.spiritual || '-'}</div>
-                        </td>
-                     </tr>
-                     <tr>
-                       <td className="font-bold text-center py-8">Sikap Sosial</td>
-                                               <td className="relative px-6 py-6 bg-slate-50/30">
-                          <textarea 
-                            className="w-full min-h-[100px] bg-transparent outline-none resize-none no-print focus:bg-blue-50/50 p-2 rounded-xl transition-all leading-relaxed"
-                            placeholder="Tulis deskripsi sikap sosial..."
-                            value={selectedStudent.behavior.social || ''}
-                            onChange={e => {
-                                const updated = {...selectedStudent, behavior: {...selectedStudent.behavior, social: e.target.value}};
-                                setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
-                                autoSaveStudent(updated);
-                            }}
-                          />
-                          <div className="hidden print:block whitespace-pre-wrap">{selectedStudent.behavior.social || '-'}</div>
-                        </td>
-                     </tr>
-                   </tbody>
-                 </table>
-               </section>
-
-               {/* EKSTRAKURIKULER & ABSENSI */}
-               <section className="page border-t-2 mt-8 print:border-none print:mt-0">
-                 <Header logoUrl={logoUrl} />
-                 <StudentInfo student={selectedStudent} />
-                 
-                 <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">E. EKSTRAKURIKULER</h3>
-                 <table className="table-raport mb-12 text-[10pt]">
-                   <thead>
-                     <tr className="bg-slate-50 h-10">
-                       <th className="w-[40%] text-center">KEGIATAN / PROGRAM</th>
-                       <th className="w-[60%] text-center">KETERANGAN PERKEMBANGAN</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {selectedStudent.extracurriculars.length > 0 ? selectedStudent.extracurriculars.map((ex, idx) => (
-                       <tr key={idx}>
-                         <td className="font-medium pl-4">{ex.activity}</td>
-                         <td className="pl-4">{ex.note}</td>
-                       </tr>
-                     )) : (
-                       <tr><td colSpan={2} className="text-center italic py-4 text-slate-400">Tidak ada data kegiatan ekstrakurikuler yang diikuti</td></tr>
-                     )}
-                   </tbody>
-                 </table>
-
-                 <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">D. KEHADIRAN</h3>
-                 <table className="table-raport mb-6 text-[10pt] w-[300px]">
-                   <thead>
-                     <tr className="bg-slate-50 h-10">
-                       <th className="w-[60%]">KETERANGAN</th>
-                       <th className="w-[40%]">JUMLAH (HARI)</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                                           <tr><td className="pl-4">Sakit</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={selectedStudent.attendance.sakit} onChange={e => { const updated = {...selectedStudent, attendance: {...selectedStudent.attendance, sakit: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{selectedStudent.attendance.sakit}</span></td></tr>
-                                           <tr><td className="pl-4">Izin</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={selectedStudent.attendance.izin} onChange={e => { const updated = {...selectedStudent, attendance: {...selectedStudent.attendance, izin: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{selectedStudent.attendance.izin}</span></td></tr>
-                                           <tr><td className="pl-4">Tanpa Keterangan</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={selectedStudent.attendance.alpha} onChange={e => { const updated = {...selectedStudent, attendance: {...selectedStudent.attendance, alpha: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{selectedStudent.attendance.alpha}</span></td></tr>
-                   </tbody>
-                 </table>
-
-                  {/* SIGNATURE SECTION */}
-                  <div className="signature-section mt-6 text-[10pt] flex justify-between items-start px-4">
-                    <div className="signature-box flex flex-col items-center flex-1">
-                      <p>Mengetahui,</p>
-                      <p>Orang Tua/Wali Santri</p>
-                      <div className="h-16"></div>
-                      <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
-                    </div>
-                    <div className="signature-box flex flex-col items-center flex-1 text-center">
-                      <p>Tangerang, {globalTanggalRaport}</p>
-                      <p>Wali Kelas,</p>
-                      <div className="h-16"></div>
-                      <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
-                        {globalWaliKelas || ''}
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-               {/* LEDGER */}
-               <section className="page border-t-2 mt-8 print:hidden">
-                 <Header logoUrl={logoUrl} />
-                 <div className="text-center mb-10 mt-6">
-                   <h1 className="text-2xl font-black uppercase tracking-widest text-slate-800">Ledger Perkembangan Nilai Santri</h1>
-                   <h2 className="text-lg font-bold uppercase text-slate-500 mt-1">Kelas {selectedStudent.class} • TA {selectedStudent.tahunPelajaran}</h2>
-                 </div>
-                 
-                 <table className="table-raport text-[10pt]">
-                   <thead>
-                     <tr className="bg-slate-50 h-12">
-                       <th className="w-12">No</th>
-                       <th>Nama Lengkap Santri</th>
-                       <th className="w-24">Skor Rerata</th>
-                       <th className="w-24">Ranking</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {studentRankings.map((s) => (
-                       <tr key={s.id} className={s.id === selectedStudent.id ? 'bg-blue-50/50 font-bold border-x-4 border-blue-600' : 'hover:bg-slate-50/50 transition-colors'}>
-                         <td className="text-center font-medium font-mono">{s.rank}</td>
-                         <td className="pl-6 uppercase">{s.name}</td>
-                         <td className="text-center font-mono">{s.avg.toFixed(2)}</td>
-                         <td className="text-center">
-                           <span className={`inline-block w-8 h-8 leading-8 rounded-full ${s.rank <= 3 ? 'bg-amber-100 text-amber-700 font-black ring-2 ring-amber-200' : 'font-bold text-slate-700'}`}>
-                             {s.rank}
-                           </span>
-                         </td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-                 <div className="mt-8 p-4 bg-blue-50/50 rounded-xl border border-blue-100 no-print">
-                   <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest text-center">Ledger ini bersifat internal untuk wali kelas</p>
-                 </div>
-               </section>
-             </div>
+             <ReportTemplate 
+                student={selectedStudent}
+                logoUrl={logoUrl}
+                globalNamaKelas={globalNamaKelas}
+                globalTanggalRaport={globalTanggalRaport}
+                globalWaliKelas={globalWaliKelas}
+                globalKepala={globalKepala}
+                studentRankings={studentRankings}
+                autoSaveStudent={autoSaveStudent}
+                setStudentsList={setStudentsList}
+              />
           </motion.div>
         ) : (
           <div className="h-screen flex flex-col items-center justify-center p-12 text-center bg-slate-50">
