@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { Student, Subject } from './types';
 import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -263,6 +264,55 @@ export default function App() {
     if (selectedClass) {
       localStorage.setItem(`tanggal_raport_${selectedClass}`, val);
     }
+  };
+
+  const downloadGradesTemplate = () => {
+    const subjects = studentsList[0]?.subjects.map(s => s.name) || [
+      "Asasul Mubtadiin Fi Ilmi Nahwi", "Mutammimah", "Asasul Mubtadiin Fi Ilmi Shorfi", "Durusullughah",
+      "Qiraatul Kutub", "Imla'", "Al-Qur'an", "Tajwid", "Fiqih Ibadah", "Fiqih Muamalah",
+      "Hafalan Hadits", "Grammar", "Stories For You", "Dialogue/Speaking", "Dictation", "Vocabularies"
+    ];
+    
+    const header = ["IDENTIFIER (NAMA/ID)", ...subjects];
+    const data = [header];
+    
+    // Add current students as sample
+    studentsList.forEach(s => {
+      data.push([s.nomorInduk, ...s.subjects.map(sub => sub.tulis.nilai)]);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template Nilai");
+    XLSX.writeFile(workbook, `Template_Nilai_Kelas_${selectedClass}.xlsx`);
+  };
+
+  const downloadIdentityTemplate = () => {
+    const header = [
+      "Nama Lengkap", "Nomor Induk", "NIS / NISN", "Tempat, Tanggal Lahir", "Jenis Kelamin (L/P)", 
+      "Agama", "Status dalam Keluarga", "Anak ke-", "Alamat Peserta Didik", "Nomor Telepon Rumah", 
+      "Sekolah Asal", "Diterima di Madrasah ini (Kelas)", "Diterima (Tanggal)", "Nama Ayah", 
+      "Nama Ibu", "Alamat Orang Tua", "Nomor Telepon Orang Tua", "Pekerjaan Ayah", 
+      "Pekerjaan Ibu", "Nama Wali Santri", "Alamat Wali Santri", "Nomor Telepon Wali", "Pekerjaan Wali Santri"
+    ];
+    const data = [header];
+    
+    studentsList.forEach(s => {
+      data.push([
+        s.name, s.nomorInduk, s.identity?.nisNisn, s.identity?.tempatTanggalLahir, 
+        s.identity?.jenisKelamin, s.identity?.agama, s.identity?.statusDalamKeluarga, 
+        s.identity?.anakKe, s.identity?.alamatPesertaDidik, s.identity?.teleponRumah, 
+        s.identity?.sekolahAsal, s.identity?.diterimaDiKelas, s.identity?.diterimaPadaTanggal, 
+        s.identity?.namaAyah, s.identity?.namaIbu, s.identity?.alamatOrangTua, 
+        s.identity?.teleponOrangTua, s.identity?.pekerjaanAyah, s.identity?.pekerjaanIbu, 
+        s.identity?.namaWali, s.identity?.alamatWali, s.identity?.teleponWali, s.identity?.pekerjaanWali
+      ]);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template Identitas");
+    XLSX.writeFile(workbook, `Template_Identitas_Kelas_${selectedClass}.xlsx`);
   };
 
   const handleBulkImport = () => {
@@ -945,12 +995,21 @@ export default function App() {
 
                       {activeTab === 'grades' && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 p-0.5">
-                           <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-6 flex items-start gap-3">
-                             <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><FileText size={18} /></div>
-                             <div>
-                               <p className="text-sm font-bold text-amber-800">Mode Input Nilai</p>
-                               <p className="text-xs text-amber-700/80 mt-0.5">Nilai yang Anda masukkan di sini akan langsung disimpan ke profil santri.</p>
+                           <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-6 flex items-start justify-between gap-3">
+                             <div className="flex items-start gap-3">
+                               <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><FileText size={18} /></div>
+                               <div>
+                                 <p className="text-sm font-bold text-amber-800">Mode Input Nilai</p>
+                                 <p className="text-xs text-amber-700/80 mt-0.5">Nilai yang Anda masukkan di sini akan langsung disimpan ke profil santri.</p>
+                               </div>
                              </div>
+                             <button 
+                               type="button"
+                               onClick={downloadGradesTemplate}
+                               className="bg-white hover:bg-slate-50 text-blue-600 border border-blue-100 px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-sm transition-all whitespace-nowrap"
+                             >
+                               Template Excel
+                             </button>
                            </div>
                            <div className="grid grid-cols-1 gap-6">
                              {editingStudent.subjects?.map((sub, idx) => (
@@ -998,9 +1057,18 @@ export default function App() {
 
                       {activeTab === 'identity' && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                          <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] mb-6 flex items-center gap-2">
-                             <User size={14} /> KETERANGAN TENTANG DIRI PESERTA DIDIK
-                          </h3>
+                          <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] flex items-center gap-2">
+                               <User size={14} /> KETERANGAN TENTANG DIRI PESERTA DIDIK
+                            </h3>
+                            <button 
+                               type="button"
+                               onClick={downloadIdentityTemplate}
+                               className="bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 transition-all shadow-sm"
+                             >
+                               Template Excel
+                             </button>
+                          </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
                             {[
                               { label: 'NIS / NISN', key: 'nisNisn' },
@@ -1097,9 +1165,9 @@ export default function App() {
                    </div>
                  )}
                  <h1 className="text-5xl font-black uppercase mb-3 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
-                 <h2 className="text-2xl font-bold uppercase mb-20 text-slate-500 tracking-widest">Pondok Pesantren Modern Al-Hikmah</h2>
+                 <h2 className="text-2xl font-bold uppercase mb-12 text-slate-500 tracking-widest">Pondok Pesantren Modern Al-Hikmah</h2>
                  
-                 <div className="relative w-full max-w-lg py-8 px-6 bg-white/50 backdrop-blur-sm p-8 rounded-3xl border border-slate-200/50 shadow-sm mt-8">
+                 <div className="relative w-full max-w-lg py-8 px-6 bg-white/50 backdrop-blur-sm p-8 rounded-3xl border border-slate-200/50 shadow-sm mt-4">
                    <div className="relative py-4 space-y-8">
                      <div className="flex flex-col items-center">
                        <span className="text-[9pt] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Nama Santri</span>
@@ -1119,11 +1187,10 @@ export default function App() {
                    </div>
                  </div>
 
-                 <div className="mt-auto mb-32 space-y-2">
+                 <div className="mt-12 mb-8 space-y-2 break-inside-avoid">
                    <p className="font-black uppercase text-xl underline underline-offset-8 decoration-2 tracking-[0.2em] text-slate-900">SEMESTER {selectedStudent.semester}</p>
                    <p className="font-extrabold uppercase text-lg tracking-[0.15em] text-slate-500">TAHUN PELAJARAN {selectedStudent.tahunPelajaran}</p>
                  </div>
-                 <div className="page-number">Halaman 1</div>
                </section>
 
                {/* PAGE 2: IDENTITAS SANTRI */}
@@ -1192,8 +1259,6 @@ export default function App() {
                      <p className="font-black uppercase text-[10pt]">NIK.</p>
                    </div>
                  </div>
-                 
-                 <div className="page-number">Halaman 2</div>
                </section>
 
                {/* PAGE 2-5 same content but with selectedStudent */}
@@ -1357,7 +1422,6 @@ export default function App() {
                      </tr>
                    </tbody>
                  </table>
-                 <div className="page-number">Halaman 3</div>
                </section>
 
                {/* EKSTRAKURIKULER & ABSENSI */}
@@ -1417,7 +1481,6 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  <div className="page-number">Halaman 4</div>
                 </section>
 
                {/* LEDGER */}
