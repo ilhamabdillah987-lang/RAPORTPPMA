@@ -665,13 +665,13 @@ export default function App() {
         </div>
 
         <div className="pb-6 pt-4 border-t border-slate-100 flex flex-col gap-3">
-          <button 
-            onClick={() => setIsBulkModalOpen(true)}
-            disabled={filteredStudents.length === 0}
-            className="w-full bg-slate-800 hover:bg-slate-900 text-white p-3 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all shadow-lg shadow-slate-100"
-          >
-            <LayoutDashboard size={14} /> INPUT NILAI MASSAL (EXCEL)
-          </button>
+            <button 
+              onClick={() => setIsBulkModalOpen(true)}
+              disabled={filteredStudents.length === 0}
+              className="w-full bg-slate-800 hover:bg-slate-900 text-white p-3 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all shadow-lg shadow-slate-100"
+            >
+              <LayoutDashboard size={14} /> INPUT NILAI (GRID)
+            </button>
           <button 
             onClick={handlePrint} 
             disabled={filteredStudents.length === 0}
@@ -699,52 +699,77 @@ export default function App() {
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.9, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden p-8"
+                  className="relative w-full max-w-4xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                 >
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">INPUT NILAI MASSAL</h2>
+                  <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100">
+                    <div>
+                      <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT NILAI : {selectedStudent?.name}</h2>
+                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">Lengkapi nilai tulis dan lisan untuk seluruh mata pelajaran</p>
+                    </div>
                     <button onClick={() => setIsBulkModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
                   </div>
                   
-                  <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 mb-6">
-                    <p className="text-sm font-bold text-blue-800 mb-2">Instruksi:</p>
-                    <ul className="text-xs text-blue-700/80 space-y-2 list-disc pl-4 font-medium">
-                      <li>Copy data dari Excel dengan kolom: <span className="font-black">Nomor Induk / Nama</span> + <span className="font-black">Nilai-Nilai</span></li>
-                      <li>Data akan otomatis ter-update pada Santri yang sesuai (Nama/ID)</li>
-                      <li>Nilai akan masuk ke kolom Tulis & Lisan secara bersamaan</li>
-                    </ul>
+                  <div className="flex-1 overflow-y-auto p-8">
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50">
+                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-12 text-center">No</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Mata Pelajaran</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-24 text-center bg-blue-50/50">Tulis</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-24 text-center bg-emerald-50/50">Lisan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedStudent?.subjects.map((sub, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                              <td className="px-4 py-3 text-xs font-bold text-slate-400 border-b border-slate-100 text-center">{idx + 1}</td>
+                              <td className="px-4 py-3 text-sm font-bold text-slate-700 border-b border-slate-100 uppercase">{sub.name}</td>
+                              <td className="px-2 py-1 border-b border-slate-100 bg-blue-50/30 group-hover:bg-blue-50/50 transition-all">
+                                <input 
+                                  type="number" 
+                                  min="0" max="100"
+                                  className="w-full bg-white border border-blue-200 rounded-lg px-2 py-2 text-center text-sm font-black text-blue-600 outline-none focus:ring-2 focus:ring-blue-400"
+                                  value={sub.tulis?.nilai || ''}
+                                  onChange={e => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    const newSubs = [...(selectedStudent.subjects || [])];
+                                    newSubs[idx] = { ...newSubs[idx], tulis: { nilai: val, huruf: getHuruf(val) } };
+                                    const updated = {...selectedStudent, subjects: newSubs};
+                                    setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                                    autoSaveStudent(updated);
+                                  }}
+                                />
+                              </td>
+                              <td className="px-2 py-1 border-b border-slate-100 bg-emerald-50/30 group-hover:bg-emerald-50/50 transition-all">
+                                <input 
+                                  type="number" 
+                                  min="0" max="100"
+                                  className="w-full bg-white border border-emerald-200 rounded-lg px-2 py-2 text-center text-sm font-black text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-400"
+                                  value={sub.lisan?.nilai || ''}
+                                  onChange={e => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    const newSubs = [...(selectedStudent.subjects || [])];
+                                    newSubs[idx] = { ...newSubs[idx], lisan: { nilai: val, huruf: getHuruf(val) } };
+                                    const updated = {...selectedStudent, subjects: newSubs};
+                                    setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+                                    autoSaveStudent(updated);
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-
-                  <textarea 
-                    className="w-full h-64 p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-mono text-xs transition-all"
-                    placeholder="Paste data Excel Anda di sini..."
-                    value={bulkData}
-                    onChange={e => setBulkData(e.target.value)}
-                  />
-
-                  {bulkResults && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-6 p-4 bg-emerald-50 text-emerald-700 rounded-xl flex items-center gap-3 font-bold text-sm border border-emerald-100"
-                    >
-                      <Save size={18} /> Berhasil mengupdate {bulkResults.success} data santri dari {bulkResults.total} baris.
-                    </motion.div>
-                  )}
-
-                  <div className="mt-8 flex gap-4">
-                    <button 
-                      onClick={handleBulkImport}
-                      disabled={!bulkData.trim()}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white py-4 rounded-2xl font-black tracking-widest transition-all shadow-xl shadow-blue-100"
-                    >
-                      PROSES DATA EXCEL
-                    </button>
+                  
+                  <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
                     <button 
                       onClick={() => setIsBulkModalOpen(false)}
-                      className="px-8 bg-slate-100 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 transition-colors"
+                      className="px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black tracking-widest shadow-xl shadow-blue-100 transition-all active:scale-95"
                     >
-                      BATAL
+                      SIMPAN & TUTUP
                     </button>
                   </div>
                 </motion.div>
@@ -941,17 +966,17 @@ export default function App() {
                  <table className="table-raport w-full text-center mt-2">
                    <thead>
                      <tr>
-                       <th rowSpan={2} className="w-[5%]">No</th>
-                       <th rowSpan={2} className="w-[35%]">Mata Pelajaran</th>
-                       <th rowSpan={2} className="w-[8%]">KKM</th>
-                       <th colSpan={2} className="w-[26%]">Nilai Tulis</th>
-                       <th colSpan={2} className="w-[26%]">Nilai Lisan</th>
+                       <th rowSpan={2} className="w-[4%]">No</th>
+                       <th rowSpan={2} className="w-[45%]">Mata Pelajaran</th>
+                       <th rowSpan={2} className="w-[7%]">KKM</th>
+                       <th colSpan={2} className="w-[22%]">Nilai Tulis</th>
+                       <th colSpan={2} className="w-[22%]">Nilai Lisan</th>
                      </tr>
                      <tr>
-                       <th className="w-[13%] text-xs italic">SKOR</th>
-                       <th className="w-[13%] text-xs italic">HURUF</th>
-                       <th className="w-[13%] text-xs italic">SKOR</th>
-                       <th className="w-[13%] text-xs italic">HURUF</th>
+                       <th className="w-[11%] text-[8pt] italic">SKOR</th>
+                       <th className="w-[11%] text-[8pt] italic">HURUF</th>
+                       <th className="w-[11%] text-[8pt] italic">SKOR</th>
+                       <th className="w-[11%] text-[8pt] italic">HURUF</th>
                      </tr>
                    </thead>
                    <tbody>
@@ -1029,18 +1054,18 @@ export default function App() {
                    </tbody>
                  </table>
 
-                 <div className="signature-section mt-16 text-[10.5pt] flex justify-between items-start px-4">
+                 <div className="signature-section mt-10 text-[10pt] flex justify-between items-start px-4">
                    <div className="signature-box flex flex-col items-center flex-1">
                      <p>Mengetahui,</p>
                      <p>Orang Tua/Wali Santri</p>
-                     <div className="h-28"></div>
-                     <div className="signature-line w-48 border-b-2 border-black font-bold text-center h-8"></div>
+                     <div className="h-20"></div>
+                     <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
                    </div>
                    <div className="signature-box flex flex-col items-center flex-1 text-center">
                      <p>Tangerang, 20 Desember 2025</p>
                      <p>Wali Kelas,</p>
-                     <div className="h-28 uppercase font-bold text-[8pt] pt-10 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
-                      <div className="font-bold border-b-2 border-black inline-block min-w-[192px] text-lg uppercase h-8">
+                     <div className="h-20 uppercase font-bold text-[8pt] pt-8 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
+                      <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
                         {globalWaliKelas || ''}
                       </div>
                    </div>
@@ -1138,18 +1163,18 @@ export default function App() {
                  </table>
 
                   {/* SIGNATURE SECTION */}
-                  <div className="signature-section mt-16 text-[10.5pt] flex justify-between items-start px-4">
+                  <div className="signature-section mt-10 text-[10pt] flex justify-between items-start px-4">
                     <div className="signature-box flex flex-col items-center flex-1">
                       <p>Mengetahui,</p>
                       <p>Orang Tua/Wali Santri</p>
-                      <div className="h-28"></div>
-                      <div className="signature-line w-48 border-b-2 border-black font-bold text-center h-8"></div>
+                      <div className="h-20"></div>
+                      <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
                     </div>
                     <div className="signature-box flex flex-col items-center flex-1 text-center">
                       <p>Tangerang, 20 Desember 2025</p>
                       <p>Wali Kelas,</p>
-                      <div className="h-28 uppercase font-bold text-[8pt] pt-10 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
-                      <div className="font-bold border-b-2 border-black inline-block min-w-[192px] text-lg uppercase h-8">
+                      <div className="h-20 uppercase font-bold text-[8pt] pt-8 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
+                      <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
                         {globalWaliKelas || ''}
                       </div>
                     </div>

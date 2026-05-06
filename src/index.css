@@ -84,12 +84,12 @@
   width: 100%;
   border-collapse: collapse;
   border: 1.5px solid black;
-  font-size: 9.5pt;
+  font-size: 9pt;
 }
 
 .table-raport td, .table-raport th {
   border: 1px solid black;
-  padding: 3px 6px;
+  padding: 2px 4px;
   vertical-align: middle;
 }
 
@@ -107,17 +107,17 @@
 }
 
 .double-border-bottom {
-  border-bottom: 3.5px double black;
-  padding-bottom: 5px;
-  margin-bottom: 10px;
+  border-bottom: 3px double black;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .signature-section {
-  margin-top: 25px;
+  margin-top: 15px;
 }
 
 .signature-line {
-  margin-top: 50px;
+  margin-top: 40px;
   border-bottom: 1px solid black;
   font-weight: bold;
   display: inline-block;
