@@ -110,9 +110,11 @@ export default function App() {
   const [globalKepala, setGlobalKepala] = useState<string>(() => {
     return localStorage.getItem(`kepala_kepasentrenan_${selectedClass}`) || '';
   });
-  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isBulkGradesOpen, setIsBulkGradesOpen] = useState(false);
+  const [isBulkIdentityOpen, setIsBulkIdentityOpen] = useState(false);
+  const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // keep for single student grid if needed, or remove later
   const [bulkData, setBulkData] = useState('');
-  const [bulkResults, setBulkResults] = useState<{success: number, total: number} | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -121,6 +123,7 @@ export default function App() {
   const [editingStudent, setEditingStudent] = useState<Partial<Student> | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'grades' | 'identity'>('basic');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [selectedSubjectIndex, setSelectedSubjectIndex] = useState(0);
 
   const [logoUrl, setLogoUrl] = useState<string>(() => {
     return localStorage.getItem('al_hikmah_custom_logo') || '';
@@ -280,190 +283,94 @@ export default function App() {
     }
   };
 
-  const downloadGradesTemplate = () => {
-    const subjects = studentsList[0]?.subjects.map(s => s.name) || [
-      "Asasul Mubtadiin Fi Ilmi Nahwi", "Mutammimah", "Asasul Mubtadiin Fi Ilmi Shorfi", "Durusullughah",
-      "Qiraatul Kutub", "Imla'", "Al-Qur'an", "Tajwid", "Fiqih Ibadah", "Fiqih Muamalah",
-      "Hafalan Hadits", "Grammar", "Stories For You", "Dialogue/Speaking", "Dictation", "Vocabularies"
-    ];
-    
-    const header = ["NOMOR INDUK", "NAMA SANTRI", ...subjects.flatMap(s => [`${s} (Tulis)`, `${s} (Lisan)`])];
-    const data = [header];
-    
-    studentsList.forEach(s => {
-      const row = [s.nomorInduk, s.name];
-      s.subjects.forEach(sub => {
-        row.push(sub.tulis.nilai as any);
-        row.push(sub.lisan.nilai as any);
-      });
-      data.push(row);
-    });
+  const handleBulkAddStudents = (namesString: string) => {
+    const names = namesString.split('\n').map(n => n.trim()).filter(n => n !== '');
+    if (names.length === 0) return;
 
-    const worksheet = XLSX.utils.aoa_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Template Nilai");
-    XLSX.writeFile(workbook, `Template_Nilai_Kelas_${selectedClass}.xlsx`);
-  };
-
-  const downloadIdentityTemplate = () => {
-    const header = [
-      "NOMOR INDUK", "Nama Lengkap", "NIS / NISN", "Tempat, Tanggal Lahir", "Jenis Kelamin (L/P)", 
-      "Agama", "Status dalam Keluarga", "Anak ke-", "Alamat Peserta Didik", "Nomor Telepon Rumah", 
-      "Sekolah Asal", "Di Pesantren Ini Diterima di Kelas", "Diterima (Tanggal)", "Nama Ayah", 
-      "Nama Ibu", "Alamat Orang Tua", "Nomor Telepon Orang Tua", "Pekerjaan Ayah", 
-      "Pekerjaan Ibu", "Nama Wali Santri", "Alamat Wali Santri", "Nomor Telepon Wali", "Pekerjaan Wali Santri"
-    ];
-    const data = [header];
-    
-    studentsList.forEach(s => {
-      data.push([
-        s.nomorInduk, s.name, s.identity?.nisNisn, s.identity?.tempatTanggalLahir, 
-        s.identity?.jenisKelamin, s.identity?.agama, s.identity?.statusDalamKeluarga, 
-        s.identity?.anakKe, s.identity?.alamatPesertaDidik, s.identity?.teleponRumah, 
-        s.identity?.sekolahAsal, s.identity?.diterimaDiKelas, s.identity?.diterimaPadaTanggal, 
-        s.identity?.namaAyah, s.identity?.namaIbu, s.identity?.alamatOrangTua, 
-        s.identity?.teleponOrangTua, s.identity?.pekerjaanAyah, s.identity?.pekerjaanIbu, 
-        s.identity?.namaWali, s.identity?.alamatWali, s.identity?.teleponWali, s.identity?.pekerjaanWali
-      ]);
-    });
-
-    const worksheet = XLSX.utils.aoa_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Template Identitas");
-    XLSX.writeFile(workbook, `Template_Identitas_Kelas_${selectedClass}.xlsx`);
-  };
-
-  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>, type: 'grades' | 'identity') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-      
-      const header = data[0];
-      const rows = data.slice(1);
-      
-      const allStudents = getStoredStudents();
-      let updatedCount = 0;
-
-      rows.forEach(row => {
-        const ni = String(row[0]);
-        const sIdx = allStudents.findIndex(s => String(s.nomorInduk) === ni);
-        
-        if (sIdx !== -1) {
-          if (type === 'grades') {
-            const subjects = [...allStudents[sIdx].subjects];
-            subjects.forEach((sub) => {
-              const tulisHeader = `${sub.name} (Tulis)`;
-              const lisanHeader = `${sub.name} (Lisan)`;
-              const tCol = header.indexOf(tulisHeader);
-              const lCol = header.indexOf(lisanHeader);
-              
-              if (tCol !== -1) sub.tulis.nilai = row[tCol] || "";
-              if (lCol !== -1) sub.lisan.nilai = row[lCol] || "";
-            });
-            allStudents[sIdx].subjects = subjects;
-          } else {
-            allStudents[sIdx].identity = {
-              ...allStudents[sIdx].identity,
-              nisNisn: String(row[2] || ""),
-              tempatTanggalLahir: String(row[3] || ""),
-              jenisKelamin: String(row[4] || ""),
-              agama: String(row[5] || ""),
-              statusDalamKeluarga: String(row[6] || ""),
-              anakKe: String(row[7] || ""),
-              alamatPesertaDidik: String(row[8] || ""),
-              teleponRumah: String(row[9] || ""),
-              sekolahAsal: String(row[10] || ""),
-              diterimaDiKelas: String(row[11] || ""),
-              diterimaPadaTanggal: String(row[12] || ""),
-              namaAyah: String(row[13] || ""),
-              namaIbu: String(row[14] || ""),
-              alamatOrangTua: String(row[15] || ""),
-              teleponOrangTua: String(row[16] || ""),
-              pekerjaanAyah: String(row[17] || ""),
-              pekerjaanIbu: String(row[18] || ""),
-              namaWali: String(row[19] || ""),
-              alamatWali: String(row[20] || ""),
-              teleponWali: String(row[21] || ""),
-              pekerjaanWali: String(row[22] || ""),
-            };
-          }
-          updatedCount++;
-        }
-      });
-
-      if (updatedCount > 0) {
-        saveStoredStudents(allStudents);
-        if (selectedClass) fetchStudents(selectedClass);
-        alert(`Berhasil memperbarui data ${updatedCount} santri.`);
-        if (type === 'grades') setActiveTab('grades');
-        else setActiveTab('identity');
-      } else {
-        alert("Tidak ada data yang cocok dengan Nomor Induk di file Excel.");
-      }
-    };
-    reader.readAsBinaryString(file);
-    // Reset input
-    e.target.value = '';
-  };
-
-  const handleBulkImport = () => {
-    const lines = bulkData.trim().split('\n');
-    let successCount = 0;
     const allStudents = getStoredStudents();
-    
-    lines.forEach(line => {
-      const columns = line.split('\t'); // Excel uses tabs
-      if (columns.length < 2) return;
-
-      const identifier = columns[0].trim().toUpperCase(); // Could be Name or ID
-      const grades = columns.slice(1);
-
-      // Find student by ID or Name
-      const studentIdx = allStudents.findIndex(s => 
-        s.nomorInduk.toUpperCase() === identifier || 
-        s.name.toUpperCase() === identifier
-      );
-
-      if (studentIdx !== -1) {
-        const student = allStudents[studentIdx];
-        const newSubjects = [...student.subjects];
-        
-        // Map grades to subjects in order
-        grades.forEach((gradeStr, idx) => {
-          if (idx < newSubjects.length) {
-            const val = parseInt(gradeStr) || 0;
-            // Simply update both Tulis and Lisan with same value for simplicity if only one column per subject
-            // Or assume 2 columns per subject. Let's assume one column = Tulis, and we default Lisan to 0 or same.
-            // Professional preference: one column per input.
-            newSubjects[idx] = {
-              ...newSubjects[idx],
-              tulis: { nilai: val, huruf: getHuruf(val) },
-              lisan: { ...newSubjects[idx].lisan, nilai: val, huruf: getHuruf(val) }
-            };
-          }
-        });
-
-        allStudents[studentIdx] = { ...student, subjects: newSubjects };
-        successCount++;
+    const newStudents: Student[] = names.map((name, index) => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: name.toUpperCase(),
+      nomorInduk: '',
+      noUrut: (allStudents.length + index + 1),
+      class: selectedClass || '10 SMA',
+      semester: 'GANJIL',
+      tahunPelajaran: '2025/2026',
+      subjects: studentsList[0]?.subjects.map(s => ({ ...s, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } })) || [],
+      behavior: { spiritual: '', social: '' },
+      attendance: { sakit: 0, izin: 0, alpha: 0 },
+      extracurriculars: [],
+      identity: {
+        nisNisn: '',
+        tempatTanggalLahir: '',
+        jenisKelamin: '',
+        agama: 'ISLAM',
+        statusDalamKeluarga: '',
+        anakKe: '',
+        alamatPesertaDidik: '',
+        teleponRumah: '',
+        sekolahAsal: '',
+        diterimaDiKelas: '',
+        diterimaPadaTanggal: '',
+        namaAyah: '',
+        namaIbu: '',
+        alamatOrangTua: '',
+        teleponOrangTua: '',
+        pekerjaanAyah: '',
+        pekerjaanIbu: '',
+        namaWali: '',
+        alamatWali: '',
+        teleponWali: '',
+        pekerjaanWali: ''
       }
-    });
+    }));
 
-    if (successCount > 0) {
+    const updatedData = [...allStudents, ...newStudents];
+    saveStoredStudents(updatedData);
+    if (selectedClass) fetchStudents(selectedClass);
+    setIsBulkAddOpen(false);
+    alert(`Berhasil menambahkan ${newStudents.length} santri.`);
+  };
+
+  const handleBulkUpdateGrades = (studentId: string, subIdx: number, type: 'tulis' | 'lisan', value: number) => {
+    const allStudents = getStoredStudents();
+    const sIdx = allStudents.findIndex(s => s.id === studentId);
+    if (sIdx !== -1) {
+      const student = allStudents[sIdx];
+      const newSubs = [...student.subjects];
+      newSubs[subIdx] = {
+        ...newSubs[subIdx],
+        [type]: { nilai: value, huruf: getHuruf(value) }
+      };
+      allStudents[sIdx] = { ...student, subjects: newSubs };
       saveStoredStudents(allStudents);
-      if (selectedClass) fetchStudents(selectedClass);
-      setBulkResults({ success: successCount, total: lines.length });
-      setTimeout(() => {
-        setIsBulkModalOpen(false);
-        setBulkResults(null);
-        setBulkData('');
-      }, 2000);
+      setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
+    }
+  };
+
+  const handleBulkUpdateIdentity = (studentId: string, key: string, value: string) => {
+    const allStudents = getStoredStudents();
+    const sIdx = allStudents.findIndex(s => s.id === studentId);
+    if (sIdx !== -1) {
+      const student = allStudents[sIdx];
+      const currentIdentity = student.identity || {
+        nisNisn: '', tempatTanggalLahir: '', jenisKelamin: '', agama: 'ISLAM',
+        statusDalamKeluarga: '', anakKe: '', alamatPesertaDidik: '', teleponRumah: '',
+        sekolahAsal: '', diterimaDiKelas: '', diterimaPadaTanggal: '',
+        namaAyah: '', namaIbu: '', alamatOrangTua: '', teleponOrangTua: '',
+        pekerjaanAyah: '', pekerjaanIbu: '', namaWali: '', alamatWali: '',
+        teleponWali: '', pekerjaanWali: ''
+      };
+      
+      allStudents[sIdx] = {
+        ...student,
+        identity: {
+          ...currentIdentity,
+          [key]: value
+        }
+      };
+      saveStoredStudents(allStudents);
+      setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
     }
   };
 
@@ -860,27 +767,27 @@ export default function App() {
 
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
             <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
-              <FileText size={12} /> IMPORT EXCEL
+              <FileText size={12} /> INPUT MASSAL (KELAS)
             </h3>
             <div className="flex flex-col gap-2">
-              <label className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl cursor-pointer hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase">
-                <span className="flex items-center gap-2"><Plus size={14} /> Upload Nilai</span>
-                <input 
-                  type="file" 
-                  accept=".xlsx, .xls" 
-                  className="hidden" 
-                  onChange={e => handleExcelImport(e, 'grades')}
-                />
-              </label>
-              <label className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl cursor-pointer hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase">
-                <span className="flex items-center gap-2"><Plus size={14} /> Upload Identitas</span>
-                <input 
-                  type="file" 
-                  accept=".xlsx, .xls" 
-                  className="hidden" 
-                  onChange={e => handleExcelImport(e, 'identity')}
-                />
-              </label>
+              <button 
+                onClick={() => setIsBulkAddOpen(true)}
+                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
+              >
+                <span className="flex items-center gap-2"><Plus size={14} /> Input Data Santri</span>
+              </button>
+              <button 
+                onClick={() => setIsBulkGradesOpen(true)}
+                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
+              >
+                <span className="flex items-center gap-2"><LayoutDashboard size={14} /> Input Nilai Massal</span>
+              </button>
+              <button 
+                onClick={() => setIsBulkIdentityOpen(true)}
+                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
+              >
+                <span className="flex items-center gap-2"><UserCircle size={14} /> Input Identitas Massal</span>
+              </button>
             </div>
           </div>
 
@@ -933,93 +840,231 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto">
-        {isBulkModalOpen && (
+        {/* MULTI STUDENT ADD MODAL */}
+        {isBulkAddOpen && (
           <AnimatePresence>
             <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
               <div className="flex min-h-full items-center justify-center p-4">
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setIsBulkModalOpen(false)}
-                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
-                />
-                
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  className="relative w-full max-w-4xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-                >
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkAddOpen(false)} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col">
                   <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT NILAI : {selectedStudent?.name}</h2>
-                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">Lengkapi nilai tulis dan lisan untuk seluruh mata pelajaran</p>
+                      <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT DATA SANTRI SEKALIGUS</h2>
+                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">Masukkan daftar nama santri (Satu nama per baris)</p>
                     </div>
-                    <button onClick={() => setIsBulkModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
+                    <button onClick={() => setIsBulkAddOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
                   </div>
-                  
-                  <div className="flex-1 overflow-y-auto p-8">
-                    <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50">
-                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-12 text-center">No</th>
-                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Mata Pelajaran</th>
-                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-24 text-center bg-blue-50/50">Tulis</th>
-                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-24 text-center bg-emerald-50/50">Lisan</th>
+                  <div className="p-8">
+                    <textarea 
+                      className="w-full h-80 p-6 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all uppercase placeholder:normal-case"
+                      placeholder="Contoh:&#10;Abdullah&#10;Abdurrahman&#10;Ahmad..."
+                      value={bulkData}
+                      onChange={e => setBulkData(e.target.value)}
+                    />
+                    <div className="mt-6 flex gap-4">
+                      <button 
+                        onClick={() => handleBulkAddStudents(bulkData)}
+                        className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black tracking-widest shadow-xl shadow-blue-100 transition-all active:scale-95 uppercase flex items-center justify-center gap-2"
+                      >
+                        <Plus size={20} /> Tambahkan Santri
+                      </button>
+                      <button onClick={() => setIsBulkAddOpen(false)} className="px-8 py-4 bg-white text-slate-400 font-black rounded-2xl border border-slate-200 hover:bg-slate-50 transition-all uppercase">Batal</button>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </AnimatePresence>
+        )}
+
+        {/* BULK GRADES MODAL */}
+        {isBulkGradesOpen && (
+          <AnimatePresence>
+            <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
+              <div className="flex min-h-full items-center justify-center p-4">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkGradesOpen(false)} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative w-full max-w-5xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100">
+                    <div>
+                      <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT NILAI KELAS: {selectedClass}</h2>
+                      <div className="flex items-center gap-4 mt-2">
+                         <div className="flex items-center gap-2">
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilih Mata Pelajaran:</span>
+                           <select 
+                            className="bg-slate-100 border-none rounded-xl px-4 py-2 text-xs font-black text-blue-600 outline-none focus:ring-2 focus:ring-blue-400 uppercase"
+                            value={selectedSubjectIndex}
+                            onChange={e => setSelectedSubjectIndex(parseInt(e.target.value))}
+                           >
+                             {studentsList[0]?.subjects.map((s, i) => (
+                               <option key={i} value={i}>{s.name}</option>
+                             ))}
+                           </select>
+                         </div>
+                      </div>
+                    </div>
+                    <button onClick={() => setIsBulkGradesOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-8 pt-4">
+                    <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl mb-6 flex items-center gap-3">
+                      <div className="bg-blue-600 text-white p-2 rounded-xl"><LayoutDashboard size={18} /></div>
+                      <div>
+                        <p className="text-sm font-bold text-blue-800">Mode Grid Nilai</p>
+                        <p className="text-[10px] font-bold text-blue-600/70 uppercase">Mata Pelajaran: {studentsList[0]?.subjects[selectedSubjectIndex]?.name}</p>
+                      </div>
+                    </div>
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50">
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-center">No</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">Nama Santri</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-40 text-center bg-blue-100/50">Nilai Tulis</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-40 text-center bg-emerald-100/50">Nilai Lisan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {studentsList.map((s, idx) => (
+                          <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
+                            <td className="px-6 py-4 text-xs font-bold text-slate-300 text-center">{idx + 1}</td>
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-black text-slate-700 uppercase">{s.name}</p>
+                              <p className="text-[10px] font-bold text-slate-400">NI: {s.nomorInduk || '-'}</p>
+                            </td>
+                            <td className="px-6 py-4 bg-blue-50/20 group-hover:bg-blue-50/40">
+                              <input 
+                                type="number" min="0" max="100"
+                                className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-center text-sm font-black text-blue-600 focus:ring-4 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+                                value={s.subjects[selectedSubjectIndex]?.tulis?.nilai || ''}
+                                onChange={e => handleBulkUpdateGrades(s.id, selectedSubjectIndex, 'tulis', parseInt(e.target.value) || 0)}
+                              />
+                            </td>
+                            <td className="px-6 py-4 bg-emerald-50/20 group-hover:bg-emerald-50/40">
+                              <input 
+                                type="number" min="0" max="100"
+                                className="w-full bg-white border border-emerald-200 rounded-xl px-4 py-3 text-center text-sm font-black text-emerald-600 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all"
+                                value={s.subjects[selectedSubjectIndex]?.lisan?.nilai || ''}
+                                onChange={e => handleBulkUpdateGrades(s.id, selectedSubjectIndex, 'lisan', parseInt(e.target.value) || 0)}
+                              />
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {selectedStudent?.subjects.map((sub, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition-colors group">
-                              <td className="px-4 py-3 text-xs font-bold text-slate-400 border-b border-slate-100 text-center">{idx + 1}</td>
-                              <td className="px-4 py-3 text-sm font-bold text-slate-700 border-b border-slate-100 uppercase">{sub.name}</td>
-                              <td className="px-2 py-1 border-b border-slate-100 bg-blue-50/30 group-hover:bg-blue-50/50 transition-all">
-                                <input 
-                                  type="number" 
-                                  min="0" max="100"
-                                  className="w-full bg-white border border-blue-200 rounded-lg px-2 py-2 text-center text-sm font-black text-blue-600 outline-none focus:ring-2 focus:ring-blue-400"
-                                  value={sub.tulis?.nilai || ''}
-                                  onChange={e => {
-                                    const val = parseInt(e.target.value) || 0;
-                                    const newSubs = [...(selectedStudent.subjects || [])];
-                                    newSubs[idx] = { ...newSubs[idx], tulis: { nilai: val, huruf: getHuruf(val) } };
-                                    const updated = {...selectedStudent, subjects: newSubs};
-                                    setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
-                                    autoSaveStudent(updated);
-                                  }}
-                                />
-                              </td>
-                              <td className="px-2 py-1 border-b border-slate-100 bg-emerald-50/30 group-hover:bg-emerald-50/50 transition-all">
-                                <input 
-                                  type="number" 
-                                  min="0" max="100"
-                                  className="w-full bg-white border border-emerald-200 rounded-lg px-2 py-2 text-center text-sm font-black text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-400"
-                                  value={sub.lisan?.nilai || ''}
-                                  onChange={e => {
-                                    const val = parseInt(e.target.value) || 0;
-                                    const newSubs = [...(selectedStudent.subjects || [])];
-                                    newSubs[idx] = { ...newSubs[idx], lisan: { nilai: val, huruf: getHuruf(val) } };
-                                    const updated = {...selectedStudent, subjects: newSubs};
-                                    setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
-                                    autoSaveStudent(updated);
-                                  }}
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  
                   <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
-                    <button 
-                      onClick={() => setIsBulkModalOpen(false)}
-                      className="px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black tracking-widest shadow-xl shadow-blue-100 transition-all active:scale-95"
-                    >
-                      SIMPAN & TUTUP
-                    </button>
+                    <button onClick={() => setIsBulkGradesOpen(false)} className="px-12 py-4 bg-slate-900 hover:bg-black text-white rounded-2xl font-black tracking-widest transition-all">SELESAI</button>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </AnimatePresence>
+        )}
+
+        {/* BULK IDENTITY MODAL */}
+        {isBulkIdentityOpen && (
+          <AnimatePresence>
+            <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
+              <div className="flex min-h-full items-center justify-center p-4">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkIdentityOpen(false)} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative w-full max-w-7xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100">
+                    <div>
+                      <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT IDENTITAS KELAS: {selectedClass}</h2>
+                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">Sunting data identitas santri dalam satu tabel</p>
+                    </div>
+                    <button onClick={() => setIsBulkIdentityOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
+                  </div>
+                  <div className="flex-1 overflow-x-auto overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-slate-200">
+                    <table className="w-full text-left border-collapse table-fixed min-w-[3000px]">
+                      <thead>
+                        <tr className="bg-slate-50 sticky top-0 z-10">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-12 text-center bg-slate-50 border-b">No</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-48 bg-slate-50 border-b sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Nama Santri</th>
+                          {[
+                            { label: 'Nomor Induk', key: 'nomorInduk', isMain: true },
+                            { label: 'NIS / NISN', key: 'nisNisn' },
+                            { label: 'Tempat, Tanggal Lahir', key: 'tempatTanggalLahir' },
+                            { label: 'Jenis Kelamin (L/P)', key: 'jenisKelamin' },
+                            { label: 'Agama', key: 'agama' },
+                            { label: 'Status dalam Keluarga', key: 'statusDalamKeluarga' },
+                            { label: 'Anak ke-', key: 'anakKe' },
+                            { label: 'Alamat Peserta Didik', key: 'alamatPesertaDidik' },
+                            { label: 'Nomor Telepon Rumah', key: 'teleponRumah' },
+                            { label: 'Sekolah Asal', key: 'sekolahAsal' },
+                            { label: 'Di Pesantren Diterima di Kelas', key: 'diterimaDiKelas' },
+                            { label: 'Diterima (Tanggal)', key: 'diterimaPadaTanggal' },
+                            { label: 'Nama Ayah', key: 'namaAyah' },
+                            { label: 'Nama Ibu', key: 'namaIbu' },
+                            { label: 'Alamat Orang Tua', key: 'alamatOrangTua' },
+                            { label: 'Nomor Telepon Orang Tua', key: 'teleponOrangTua' },
+                            { label: 'Pekerjaan Ayah', key: 'pekerjaanAyah' },
+                            { label: 'Pekerjaan Ibu', key: 'pekerjaanIbu' },
+                            { label: 'Nama Wali', key: 'namaWali' },
+                            { label: 'Alamat Wali', key: 'alamatWali' },
+                            { label: 'Telepon Wali', key: 'teleponWali' },
+                            { label: 'Pekerjaan Wali', key: 'pekerjaanWali' }
+                          ].map(field => (
+                            <th key={field.key} className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-48 bg-slate-50 border-b">{field.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {studentsList.map((s, idx) => (
+                          <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-3 text-xs font-bold text-slate-300 text-center">{idx + 1}</td>
+                            <td className="px-4 py-3 bg-white sticky left-0 z-10 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                              <p className="text-xs font-black text-slate-700 uppercase truncate">{s.name}</p>
+                            </td>
+                            {[
+                              { key: 'nomorInduk', isMain: true },
+                              { key: 'nisNisn' },
+                              { key: 'tempatTanggalLahir' },
+                              { key: 'jenisKelamin' },
+                              { key: 'agama' },
+                              { key: 'statusDalamKeluarga' },
+                              { key: 'anakKe' },
+                              { key: 'alamatPesertaDidik' },
+                              { key: 'teleponRumah' },
+                              { key: 'sekolahAsal' },
+                              { key: 'diterimaDiKelas' },
+                              { key: 'diterimaPadaTanggal' },
+                              { key: 'namaAyah' },
+                              { key: 'namaIbu' },
+                              { key: 'alamatOrangTua' },
+                              { key: 'teleponOrangTua' },
+                              { key: 'pekerjaanAyah' },
+                              { key: 'pekerjaanIbu' },
+                              { key: 'namaWali' },
+                              { key: 'alamatWali' },
+                              { key: 'teleponWali' },
+                              { key: 'pekerjaanWali' }
+                            ].map(field => (
+                              <td key={field.key} className="px-2 py-1">
+                                <input 
+                                  className="w-full bg-transparent border-none px-2 py-1.5 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none uppercase"
+                                  value={field.isMain ? (s as any)[field.key] : (s.identity as any)?.[field.key] || ''}
+                                  onChange={e => {
+                                    if (field.isMain) {
+                                      const all = getStoredStudents();
+                                      const idxx = all.findIndex(stud => stud.id === s.id);
+                                      if (idxx !== -1) {
+                                        (all[idxx] as any)[field.key] = e.target.value.toUpperCase();
+                                        saveStoredStudents(all);
+                                        setStudentsList(prev => prev.map(stud => stud.id === s.id ? all[idxx] : stud));
+                                      }
+                                    } else {
+                                      handleBulkUpdateIdentity(s.id, field.key, e.target.value);
+                                    }
+                                  }}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
+                    <button onClick={() => setIsBulkIdentityOpen(false)} className="px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black tracking-widest transition-all">SIMPAN & SELESAI</button>
                   </div>
                 </motion.div>
               </div>
@@ -1136,13 +1181,6 @@ export default function App() {
                                  <p className="text-xs text-amber-700/80 mt-0.5">Nilai yang Anda masukkan di sini akan langsung disimpan ke profil santri.</p>
                                </div>
                              </div>
-                             <button 
-                               type="button"
-                               onClick={downloadGradesTemplate}
-                               className="bg-white hover:bg-slate-50 text-blue-600 border border-blue-100 px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-sm transition-all whitespace-nowrap"
-                             >
-                               Template Excel
-                             </button>
                            </div>
                            <div className="grid grid-cols-1 gap-6">
                              {editingStudent.subjects?.map((sub, idx) => (
@@ -1194,13 +1232,6 @@ export default function App() {
                             <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] flex items-center gap-2">
                                <User size={14} /> KETERANGAN TENTANG DIRI PESERTA DIDIK
                             </h3>
-                            <button 
-                               type="button"
-                               onClick={downloadIdentityTemplate}
-                               className="bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 transition-all shadow-sm"
-                             >
-                               Template Excel
-                             </button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
                             {[
