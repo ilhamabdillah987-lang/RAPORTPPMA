@@ -53,7 +53,8 @@ const Header = ({ logoUrl }: { logoUrl: string }) => (
   </div>
 );
 
-const ReportTemplate = ({ student, logoUrl, globalNamaKelas, globalTanggalRaport, globalWaliKelas, globalKepala, studentRankings, autoSaveStudent, setStudentsList }: {
+interface ReportTemplateProps {
+  key?: string | number;
   student: Student;
   logoUrl: string;
   globalNamaKelas: string;
@@ -61,9 +62,15 @@ const ReportTemplate = ({ student, logoUrl, globalNamaKelas, globalTanggalRaport
   globalWaliKelas: string;
   globalKepala: string;
   studentRankings: any[];
-  autoSaveStudent: (s: Partial<Student>) => void;
+  autoSaveStudent: (s: Partial<Student>) => void | Promise<void>;
   setStudentsList: React.Dispatch<React.SetStateAction<Student[]>>;
-}) => {
+}
+
+const ReportTemplate = ({ 
+  student, logoUrl, globalNamaKelas, globalTanggalRaport, 
+  globalWaliKelas, globalKepala, studentRankings, 
+  autoSaveStudent, setStudentsList 
+}: ReportTemplateProps) => {
   const stats = useMemo(() => {
     const tulisTotal = student.subjects.reduce((sum, sub) => sum + (typeof sub.tulis?.nilai === 'number' ? sub.tulis.nilai : 0), 0);
     const lisanTotal = student.subjects.reduce((sum, sub) => sum + (typeof sub.lisan?.nilai === 'number' ? sub.lisan.nilai : 0), 0);
@@ -518,7 +525,6 @@ export default function App() {
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // keep for single student grid if needed, or remove later
   const [isPrintingAll, setIsPrintingAll] = useState(false);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [bulkData, setBulkData] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -776,45 +782,6 @@ export default function App() {
       saveStoredStudents(allStudents);
       setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
     }
-  };
-
-  const handleDownloadBackup = () => {
-    const data = getStoredStudents();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Backup_Database_Raport_${new Date().toLocaleDateString().replace(/\//g, '-')}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const content = evt.target?.result as string;
-        const data = JSON.parse(content);
-        if (Array.isArray(data)) {
-          if (confirm(`Peringatan: Ini akan mengganti seluruh database saat ini dengan ${data.length} data santri dari file backup. Lanjutkan?`)) {
-            saveStoredStudents(data);
-            if (selectedClass) fetchStudents(selectedClass);
-            alert('Database berhasil dipulihkan!');
-          }
-        } else {
-          alert('Format file backup tidak valid.');
-        }
-      } catch (err) {
-        alert('Gagal membaca file: ' + err);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   };
 
   const handleClearClass = () => {
@@ -1205,29 +1172,6 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 border-dashed">
-            <h3 className="text-amber-600 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
-              <Settings size={12} /> MENU ADMIN (DATABASE)
-            </h3>
-            <div className="flex flex-col gap-2">
-              <button 
-                onClick={handleDownloadBackup}
-                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-amber-700 rounded-xl hover:bg-amber-100 transition-all border border-amber-200 text-[9px] font-black uppercase shadow-sm"
-              >
-                <span className="flex items-center gap-2"><Save size={14} /> Download/Simpan DB</span>
-              </button>
-              <label className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl cursor-pointer hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase">
-                <span className="flex items-center gap-2"><FileText size={14} /> Import Database</span>
-                <input 
-                  type="file" 
-                  accept=".json" 
-                  className="hidden" 
-                  onChange={handleImportBackup}
-                />
-              </label>
-            </div>
-          </div>
-
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
             <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
               <Settings size={12} /> LOGO PESANTREN
@@ -1270,14 +1214,14 @@ export default function App() {
             disabled={filteredStudents.length === 0}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-xl shadow-blue-100 hover:translate-y-[-2px] active:translate-y-[0]"
           >
-            <Printer size={18} /> CETAK RAPORT
+            <Printer size={18} /> CETAK RAPORT (PDF)
           </button>
           <button 
             onClick={handlePrintAll} 
             disabled={filteredStudents.length === 0}
             className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all border border-slate-200"
           >
-            <Printer size={18} /> CETAK SEMUA RAPORT
+            <Printer size={18} /> CETAK SEMUA KELAS (PDF)
           </button>
         </div>
       </motion.aside>
@@ -1805,10 +1749,12 @@ export default function App() {
                  whileHover={{ scale: 1.05 }}
                  whileTap={{ scale: 0.95 }}
                  onClick={openAddModal} 
-                 className="mt-10 bg-blue-600 text-white px-10 py-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200"
+                 className="mt-10 bg-blue-600 text-white px-10 py-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 w-full"
                >
                  TAMBAH SANTRI PERTAMA
                </motion.button>
+
+
              </motion.div>
           </div>
         )}
