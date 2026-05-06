@@ -364,7 +364,7 @@ const ReportTemplate = ({
         <Header logoUrl={logoUrl} />
         <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />
         
-        <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">E. EKSTRAKURIKULER</h3>
+        <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">C. EKSTRAKURIKULER</h3>
         <table className="table-raport mb-12 text-[10pt]">
           <thead>
             <tr className="bg-slate-50 h-10">
@@ -532,7 +532,7 @@ export default function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Partial<Student> | null>(null);
-  const [activeTab, setActiveTab] = useState<'basic' | 'grades' | 'identity'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'grades' | 'identity' | 'extra'>('basic');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [selectedSubjectIndex, setSelectedSubjectIndex] = useState(0);
 
@@ -1510,6 +1510,7 @@ export default function App() {
                     <div className="flex gap-1 bg-white p-1 rounded-2xl border border-slate-200">
                       <button onClick={() => setActiveTab('basic')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'basic' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Informasi Dasar</button>
                       <button onClick={() => setActiveTab('grades')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'grades' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Nilai Akademik</button>
+                      <button onClick={() => setActiveTab('extra')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'extra' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Ekstrakurikuler</button>
                       <button onClick={() => setActiveTab('identity')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'identity' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Identitas Santri</button>
                     </div>
 
@@ -1611,6 +1612,92 @@ export default function App() {
                                </div>
                              ))}
                            </div>
+                        </div>
+                      )}
+
+                      {activeTab === 'extra' && (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                          <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] flex items-center gap-2">
+                               <Plus size={14} /> KEGIATAN EKSTRAKURIKULER
+                            </h3>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                const newExtras = [...(editingStudent.extracurriculars || [])];
+                                newExtras.push({ activity: '', note: '' });
+                                setEditingStudent({ ...editingStudent, extracurriculars: newExtras });
+                              }}
+                              className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+                            >
+                              <Plus size={12} /> Tambah Kegiatan
+                            </button>
+                          </div>
+                          <div className="space-y-4">
+                            {(editingStudent.extracurriculars || []).length > 0 ? (
+                              (editingStudent.extracurriculars || []).map((ex, idx) => (
+                                <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 group">
+                                  <div className="flex gap-4 items-start">
+                                    <div className="flex-1 space-y-4">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="form-group">
+                                          <label className="text-[10px] font-bold text-slate-500 mb-1 block uppercase tracking-wider">Nama Kegiatan</label>
+                                          <input 
+                                            placeholder="Contoh: Pramuka, Silat, dll"
+                                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium text-slate-700" 
+                                            value={ex.activity}
+                                            onChange={e => {
+                                              const newExtras = [...(editingStudent.extracurriculars || [])];
+                                              newExtras[idx] = { ...newExtras[idx], activity: e.target.value };
+                                              setEditingStudent({ ...editingStudent, extracurriculars: newExtras });
+                                            }}
+                                          />
+                                        </div>
+                                        <div className="form-group">
+                                          <label className="text-[10px] font-bold text-slate-500 mb-1 block uppercase tracking-wider">Keterangan / Nilai</label>
+                                          <input 
+                                            placeholder="Contoh: Sangat Baik, Aktif, dll"
+                                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium text-slate-700" 
+                                            value={ex.note}
+                                            onChange={e => {
+                                              const newExtras = [...(editingStudent.extracurriculars || [])];
+                                              newExtras[idx] = { ...newExtras[idx], note: e.target.value };
+                                              setEditingStudent({ ...editingStudent, extracurriculars: newExtras });
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <button 
+                                      type="button"
+                                      onClick={() => {
+                                        const newExtras = (editingStudent.extracurriculars || []).filter((_, i) => i !== idx);
+                                        setEditingStudent({ ...editingStudent, extracurriculars: newExtras });
+                                      }}
+                                      className="mt-6 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                    >
+                                      <Trash2 size={18} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-center py-12 border-2 border-dashed border-slate-100 rounded-3xl">
+                                <p className="text-slate-400 font-bold text-sm">Belum ada data ekstrakurikuler</p>
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    const newExtras = [...(editingStudent.extracurriculars || [])];
+                                    newExtras.push({ activity: '', note: '' });
+                                    setEditingStudent({ ...editingStudent, extracurriculars: newExtras });
+                                  }}
+                                  className="mt-4 text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-4 py-2 rounded-xl hover:bg-blue-100 transition-colors inline-flex items-center gap-2"
+                                >
+                                  <Plus size={14} /> Klik untuk Menambahkan
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
 
