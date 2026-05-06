@@ -22,6 +22,30 @@ export interface Extracurricular {
   note: string;
 }
 
+export interface StudentIdentity {
+  nisNisn: string;
+  tempatTanggalLahir: string;
+  jenisKelamin: string;
+  agama: string;
+  statusDalamKeluarga: string;
+  anakKe: string;
+  alamatPesertaDidik: string;
+  teleponRumah: string;
+  sekolahAsal: string;
+  diterimaDiKelas: string;
+  diterimaPadaTanggal: string;
+  namaAyah: string;
+  namaIbu: string;
+  alamatOrangTua: string;
+  teleponOrangTua: string;
+  pekerjaanAyah: string;
+  pekerjaanIbu: string;
+  namaWali: string;
+  alamatWali: string;
+  teleponWali: string;
+  pekerjaanWali: string;
+}
+
 export interface Student {
   id: string;
   name: string;
@@ -38,10 +62,12 @@ export interface Student {
   extracurriculars: Extracurricular[];
   attendance: Attendance;
   waliKelas?: string;
+  identity?: StudentIdentity;
 }
 
 export interface GlobalSettings {
   waliKelas: string;
   logoUrl: string;
   tanggalRaport: string;
+  namaKelas: string;
 }

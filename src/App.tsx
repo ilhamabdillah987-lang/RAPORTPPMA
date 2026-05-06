@@ -52,7 +52,7 @@ const Header = ({ logoUrl }: { logoUrl: string }) => (
   </div>
 );
 
-const StudentInfo = ({ student }: { student: Student }) => (
+const StudentInfo = ({ student, globalNamaKelas }: { student: Student, globalNamaKelas?: string }) => (
   <div className="mb-2">
     <table className="table-header w-full text-[9pt]">
       <tbody>
@@ -62,7 +62,7 @@ const StudentInfo = ({ student }: { student: Student }) => (
           <td className="w-[40%] font-bold uppercase">{student.name}</td>
           <td className="w-[15%]">Kelas</td>
           <td className="w-[2%]">:</td>
-          <td className="w-[23%] font-bold">{student.class}</td>
+          <td className="w-[23%] font-bold">{globalNamaKelas || student.class}</td>
         </tr>
         <tr>
           <td>Nomor Induk</td>
@@ -96,6 +96,12 @@ export default function App() {
   const [globalWaliKelas, setGlobalWaliKelas] = useState<string>(() => {
     return localStorage.getItem(`wali_kelas_${selectedClass}`) || '';
   });
+  const [globalNamaKelas, setGlobalNamaKelas] = useState<string>(() => {
+    return localStorage.getItem(`nama_kelas_${selectedClass}`) || '';
+  });
+  const [globalTanggalRaport, setGlobalTanggalRaport] = useState<string>(() => {
+    return localStorage.getItem(`tanggal_raport_${selectedClass}`) || '20 Desember 2025';
+  });
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkData, setBulkData] = useState('');
   const [bulkResults, setBulkResults] = useState<{success: number, total: number} | null>(null);
@@ -105,7 +111,7 @@ export default function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Partial<Student> | null>(null);
-  const [activeTab, setActiveTab] = useState<'identity' | 'grades'>('identity');
+  const [activeTab, setActiveTab] = useState<'basic' | 'grades' | 'identity'>('basic');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const [logoUrl, setLogoUrl] = useState<string>(() => {
@@ -242,6 +248,20 @@ export default function App() {
     setGlobalWaliKelas(val);
     if (selectedClass) {
       localStorage.setItem(`wali_kelas_${selectedClass}`, val);
+    }
+  };
+
+  const handleUpdateGlobalNamaKelas = (val: string) => {
+    setGlobalNamaKelas(val);
+    if (selectedClass) {
+      localStorage.setItem(`nama_kelas_${selectedClass}`, val);
+    }
+  };
+
+  const handleUpdateGlobalTanggalRaport = (val: string) => {
+    setGlobalTanggalRaport(val);
+    if (selectedClass) {
+      localStorage.setItem(`tanggal_raport_${selectedClass}`, val);
     }
   };
 
@@ -423,7 +443,7 @@ export default function App() {
   };
 
   const openAddModal = () => {
-    setActiveTab('identity');
+    setActiveTab('basic');
     setEditingStudent({
       name: '',
       nomorInduk: '',
@@ -451,7 +471,30 @@ export default function App() {
       behavior: { spiritual: '', social: '' },
       attendance: { sakit: 0, izin: 0, alpha: 0 },
       extracurriculars: [],
-      waliKelas: ''
+      waliKelas: '',
+      identity: {
+        nisNisn: '',
+        tempatTanggalLahir: '',
+        jenisKelamin: '',
+        agama: 'Islam',
+        statusDalamKeluarga: '',
+        anakKe: '',
+        alamatPesertaDidik: '',
+        teleponRumah: '',
+        sekolahAsal: '',
+        diterimaDiKelas: '',
+        diterimaPadaTanggal: '',
+        namaAyah: '',
+        namaIbu: '',
+        alamatOrangTua: '',
+        teleponOrangTua: '',
+        pekerjaanAyah: '',
+        pekerjaanIbu: '',
+        namaWali: '',
+        alamatWali: '',
+        teleponWali: '',
+        pekerjaanWali: ''
+      }
     });
     setIsModalOpen(true);
   };
@@ -625,14 +668,37 @@ export default function App() {
         <div className="mt-8 px-2 space-y-4">
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
             <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
-              <UserCircle size={12} /> WALI KELAS
+              <Settings size={12} /> SETTING RAPORT
             </h3>
-            <input 
-              className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
-              placeholder="NAMA WALI KELAS..."
-              value={globalWaliKelas}
-              onChange={e => handleUpdateGlobalWaliKelas(e.target.value)}
-            />
+            <div className="space-y-3">
+              <div>
+                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Nama Kelas</label>
+                <input 
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
+                  placeholder="X (SEPULUH)..."
+                  value={globalNamaKelas}
+                  onChange={e => handleUpdateGlobalNamaKelas(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Tanggal Raport</label>
+                <input 
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
+                  placeholder="20 DESEMBER 2025..."
+                  value={globalTanggalRaport}
+                  onChange={e => handleUpdateGlobalTanggalRaport(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Wali Kelas</label>
+                <input 
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
+                  placeholder="NAMA WALI KELAS..."
+                  value={globalWaliKelas}
+                  onChange={e => handleUpdateGlobalWaliKelas(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
@@ -825,49 +891,158 @@ export default function App() {
                     </button>
                   </div>
 
+                    <div className="flex gap-1 bg-white p-1 rounded-2xl border border-slate-200">
+                      <button onClick={() => setActiveTab('basic')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'basic' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Informasi Dasar</button>
+                      <button onClick={() => setActiveTab('grades')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'grades' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Nilai Akademik</button>
+                      <button onClick={() => setActiveTab('identity')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'identity' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Identitas Santri</button>
+                    </div>
+
                   <div className="flex-1 overflow-y-auto p-8">
                     <form id="student-form" onSubmit={handleSaveStudent} className="space-y-10">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        {/* Column 1: Identity */}
-                        <div className="space-y-6">
-                          <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] mb-4 flex items-center gap-2">
-                            <UserCircle size={14} /> IDENTITAS DASAR
-                          </h3>
-                          <div className="space-y-4">
-                            <div className="form-group col-span-2">
-                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Lengkap</label>
-                              <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
-                            </div>
-                            <div className="form-group col-span-2">
-                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nomor Induk</label>
-                              <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
+                      {activeTab === 'basic' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                          {/* Column 1: Identity */}
+                          <div className="space-y-6">
+                            <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] mb-4 flex items-center gap-2">
+                              <UserCircle size={14} /> IDENTITAS DASAR
+                            </h3>
+                            <div className="space-y-4">
+                              <div className="form-group col-span-2">
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Lengkap</label>
+                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
+                              </div>
+                              <div className="form-group col-span-2">
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nomor Induk</label>
+                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="space-y-6">
-                          <h3 className="text-[10px] uppercase font-black text-slate-600 tracking-[0.2em] mb-4 flex items-center gap-2">
-                            <Settings size={14} /> INFORMASI KELAS
-                          </h3>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="form-group">
-                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Semester</label>
-                              <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.semester} onChange={e => setEditingStudent({...editingStudent, semester: e.target.value as any})}>
-                                <option value="GANJIL">GANJIL</option>
-                                <option value="GENAP">GENAP</option>
-                              </select>
+                          <div className="space-y-6">
+                            <h3 className="text-[10px] uppercase font-black text-slate-600 tracking-[0.2em] mb-4 flex items-center gap-2">
+                              <Settings size={14} /> INFORMASI KELAS
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="form-group">
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Semester</label>
+                                <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.semester} onChange={e => setEditingStudent({...editingStudent, semester: e.target.value as any})}>
+                                  <option value="GANJIL">GANJIL</option>
+                                  <option value="GENAP">GENAP</option>
+                                </select>
+                              </div>
+                              <div className="form-group">
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">Kelas</label>
+                                <input readOnly className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-400 font-bold" value={editingStudent.class} />
+                              </div>
                             </div>
                             <div className="form-group">
-                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Kelas</label>
-                              <input readOnly className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-400 font-bold" value={editingStudent.class} />
+                              <label className="text-xs font-bold text-slate-500 mb-1.5 block">Tahun Pelajaran</label>
+                              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.tahunPelajaran} onChange={e => setEditingStudent({...editingStudent, tahunPelajaran: e.target.value})} />
                             </div>
-                          </div>
-                          <div className="form-group">
-                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">Tahun Pelajaran</label>
-                            <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.tahunPelajaran} onChange={e => setEditingStudent({...editingStudent, tahunPelajaran: e.target.value})} />
                           </div>
                         </div>
-                      </div>
+                      )}
+
+                      {activeTab === 'grades' && (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 p-0.5">
+                           <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-6 flex items-start gap-3">
+                             <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><FileText size={18} /></div>
+                             <div>
+                               <p className="text-sm font-bold text-amber-800">Mode Input Nilai</p>
+                               <p className="text-xs text-amber-700/80 mt-0.5">Nilai yang Anda masukkan di sini akan langsung disimpan ke profil santri.</p>
+                             </div>
+                           </div>
+                           <div className="grid grid-cols-1 gap-6">
+                             {editingStudent.subjects?.map((sub, idx) => (
+                               <div key={idx} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all">
+                                 <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200">{idx + 1}</div>
+                                 <div className="flex-1">
+                                   <p className="text-xs font-black text-slate-400 uppercase tracking-wider">{sub.category}</p>
+                                   <p className="text-sm font-bold text-slate-700 uppercase">{sub.name}</p>
+                                 </div>
+                                 <div className="flex items-center gap-4">
+                                   <div className="text-center">
+                                     <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Tulis</label>
+                                     <input 
+                                       type="number" min="0" max="100"
+                                       className="w-16 h-10 text-center bg-white border border-slate-200 rounded-xl font-bold text-blue-600 outline-none focus:ring-2 focus:ring-blue-100"
+                                       value={sub.tulis.nilai}
+                                       onChange={e => {
+                                         const val = parseInt(e.target.value) || 0;
+                                         const newSubs = [...(editingStudent.subjects || [])];
+                                         newSubs[idx] = { ...newSubs[idx], tulis: { nilai: val, huruf: getHuruf(val) } };
+                                         setEditingStudent({...editingStudent, subjects: newSubs});
+                                       }}
+                                     />
+                                   </div>
+                                   <div className="text-center">
+                                     <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Lisan</label>
+                                     <input 
+                                       type="number" min="0" max="100"
+                                       className="w-16 h-10 text-center bg-white border border-slate-200 rounded-xl font-bold text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-100"
+                                       value={sub.lisan.nilai}
+                                       onChange={e => {
+                                         const val = parseInt(e.target.value) || 0;
+                                         const newSubs = [...(editingStudent.subjects || [])];
+                                         newSubs[idx] = { ...newSubs[idx], lisan: { nilai: val, huruf: getHuruf(val) } };
+                                         setEditingStudent({...editingStudent, subjects: newSubs});
+                                       }}
+                                     />
+                                   </div>
+                                 </div>
+                               </div>
+                             ))}
+                           </div>
+                        </div>
+                      )}
+
+                      {activeTab === 'identity' && (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                          <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] mb-6 flex items-center gap-2">
+                             <User size={14} /> KETERANGAN TENTANG DIRI PESERTA DIDIK
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
+                            {[
+                              { label: 'NIS / NISN', key: 'nisNisn' },
+                              { label: 'Tempat, Tanggal Lahir', key: 'tempatTanggalLahir' },
+                              { label: 'Jenis Kelamin (L/P)', key: 'jenisKelamin' },
+                              { label: 'Agama', key: 'agama' },
+                              { label: 'Status dalam Keluarga', key: 'statusDalamKeluarga' },
+                              { label: 'Anak ke-', key: 'anakKe' },
+                              { label: 'Alamat Peserta Didik', key: 'alamatPesertaDidik' },
+                              { label: 'Nomor Telepon Rumah', key: 'teleponRumah' },
+                              { label: 'Sekolah Asal', key: 'sekolahAsal' },
+                              { label: 'Diterima di Madrasah ini (Kelas)', key: 'diterimaDiKelas' },
+                              { label: 'Diterima (Tanggal)', key: 'diterimaPadaTanggal' },
+                              { label: 'Nama Ayah', key: 'namaAyah' },
+                              { label: 'Nama Ibu', key: 'namaIbu' },
+                              { label: 'Alamat Orang Tua', key: 'alamatOrangTua' },
+                              { label: 'Nomor Telepon Orang Tua', key: 'teleponOrangTua' },
+                              { label: 'Pekerjaan Ayah', key: 'pekerjaanAyah' },
+                              { label: 'Pekerjaan Ibu', key: 'pekerjaanIbu' },
+                              { label: 'Nama Wali Santri', key: 'namaWali' },
+                              { label: 'Alamat Wali Santri', key: 'alamatWali' },
+                              { label: 'Nomor Telepon Wali', key: 'teleponWali' },
+                              { label: 'Pekerjaan Wali Santri', key: 'pekerjaanWali' }
+                            ].map(field => (
+                              <div key={field.key} className="form-group">
+                                <label className="text-[11px] font-bold text-slate-500 mb-1.5 block">{field.label}</label>
+                                <input 
+                                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" 
+                                  value={(editingStudent.identity as any)?.[field.key] || ''} 
+                                  onChange={e => setEditingStudent({
+                                    ...editingStudent, 
+                                    identity: { 
+                                      ...(editingStudent.identity || {} as any), 
+                                      [field.key]: e.target.value 
+                                    }
+                                  })} 
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </form>
                   </div>
 
@@ -924,28 +1099,21 @@ export default function App() {
                  <h1 className="text-5xl font-black uppercase mb-3 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
                  <h2 className="text-2xl font-bold uppercase mb-20 text-slate-500 tracking-widest">Pondok Pesantren Modern Al-Hikmah</h2>
                  
-                 <div className="relative w-full max-w-xl py-12 px-8">
-                   {/* Decorative Elements */}
-                   <div className="absolute inset-0 border-[3px] border-black rounded-[40px] rotate-1 opacity-5"></div>
-                   <div className="absolute inset-0 border-[1.5px] border-slate-900 rounded-[35px]"></div>
-                   
-                   <div className="relative space-y-10">
+                 <div className="relative w-full max-w-lg py-8 px-6 bg-white/50 backdrop-blur-sm p-8 rounded-3xl border border-slate-200/50 shadow-sm mt-8">
+                   <div className="relative py-4 space-y-8">
                      <div className="flex flex-col items-center">
-                       <span className="text-[10pt] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Nama Santri</span>
-                       <div className="w-full h-[1.5px] bg-gradient-to-r from-transparent via-slate-300 to-transparent mb-3"></div>
-                       <span className="text-3xl font-black text-slate-900 uppercase tracking-tight">{selectedStudent.name}</span>
+                       <span className="text-[9pt] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Nama Santri</span>
+                       <span className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{selectedStudent.name}</span>
                      </div>
 
-                     <div className="grid grid-cols-2 gap-8">
-                       <div className="flex flex-col items-center">
-                         <span className="text-[9pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Nomor Induk</span>
-                         <div className="w-24 h-[1px] bg-slate-300 mb-2"></div>
-                         <span className="text-xl font-black text-slate-800">{selectedStudent.nomorInduk}</span>
+                     <div className="grid grid-cols-2 gap-4">
+                       <div className="flex flex-col items-center border-r border-slate-100">
+                         <span className="text-[8pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Nomor Induk</span>
+                         <span className="text-base font-black text-slate-800">{selectedStudent.nomorInduk}</span>
                        </div>
                        <div className="flex flex-col items-center">
-                         <span className="text-[9pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Tingkat Kelas</span>
-                         <div className="w-24 h-[1px] bg-slate-300 mb-2"></div>
-                         <span className="text-xl font-black text-slate-800">{selectedStudent.class}</span>
+                         <span className="text-[8pt] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Tingkat Kelas</span>
+                         <span className="text-base font-black text-slate-800 uppercase">{globalNamaKelas || selectedStudent.class}</span>
                        </div>
                      </div>
                    </div>
@@ -956,6 +1124,76 @@ export default function App() {
                    <p className="font-extrabold uppercase text-lg tracking-[0.15em] text-slate-500">TAHUN PELAJARAN {selectedStudent.tahunPelajaran}</p>
                  </div>
                  <div className="page-number">Halaman 1</div>
+               </section>
+
+               {/* PAGE 2: IDENTITAS SANTRI */}
+               <section className="page flex flex-col p-12 text-[10.5pt] font-sans">
+                 <h1 className="text-center text-[13pt] font-black uppercase mb-12 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
+                 
+                 <div className="flex-1 space-y-1">
+                   <table className="w-full border-collapse">
+                     <tbody>
+                       {[
+                         { id: "1.", label: 'Nama Peserta Didik (Lengkap)', value: selectedStudent.name },
+                         { id: "2.", label: 'NIS / NISN', value: selectedStudent.identity?.nisNisn },
+                         { id: "3.", label: 'Tempat, Tanggal Lahir', value: selectedStudent.identity?.tempatTanggalLahir },
+                         { id: "4.", label: 'Jenis Kelamin', value: selectedStudent.identity?.jenisKelamin },
+                         { id: "5.", label: 'Agama', value: selectedStudent.identity?.agama },
+                         { id: "6.", label: 'Status dalam Keluarga', value: selectedStudent.identity?.statusDalamKeluarga },
+                         { id: "7.", label: 'Anak ke', value: selectedStudent.identity?.anakKe },
+                         { id: "8.", label: 'Alamat Peserta Didik', value: selectedStudent.identity?.alamatPesertaDidik },
+                         { label: '', isSpacer: true },
+                         { id: "9.", label: 'Nomor Telepon Rumah', value: selectedStudent.identity?.teleponRumah },
+                         { id: "10.", label: 'Sekolah Asal', value: selectedStudent.identity?.sekolahAsal },
+                         { id: "11.", label: 'Diterima di sekolah ini', isHeader: true },
+                         { label: 'Di kelas', indent: true, value: selectedStudent.identity?.diterimaDiKelas || (globalNamaKelas || selectedStudent.class) },
+                         { label: 'Pada tanggal', indent: true, value: selectedStudent.identity?.diterimaPadaTanggal },
+                         { id: "12.", label: 'Nama Orang Tua', isHeader: true },
+                         { label: 'a. Ayah', indent: true, value: selectedStudent.identity?.namaAyah },
+                         { label: 'b. Ibu', indent: true, value: selectedStudent.identity?.namaIbu },
+                         { id: "13.", label: 'Alamat Orang Tua', value: selectedStudent.identity?.alamatOrangTua },
+                         { label: '', isSpacer: true },
+                         { id: "14.", label: 'Nomor Telepon Rumah', value: selectedStudent.identity?.teleponOrangTua },
+                         { label: 'Pekerjaan Orang Tua', isHeader: true },
+                         { label: 'a. Ayah', indent: true, value: selectedStudent.identity?.pekerjaanAyah },
+                         { label: 'b. Ibu', indent: true, value: selectedStudent.identity?.pekerjaanIbu },
+                         { id: "15.", label: 'Nama Wali Peserta Didik', value: selectedStudent.identity?.namaWali },
+                         { id: "16.", label: 'Alamat Wali Peserta Didik', value: selectedStudent.identity?.alamatWali },
+                         { label: 'Nomor Telepon Rumah', indent: true, value: selectedStudent.identity?.teleponWali },
+                         { id: "17.", label: 'Pekerjaan Wali Peserta Didik', value: selectedStudent.identity?.pekerjaanWali },
+                       ].map((row, idx) => {
+                         if (row.isSpacer) return <tr key={`spacer-${idx}`}><td colSpan={4} className="h-4"></td></tr>;
+                         return (
+                           <tr key={idx} className="align-top">
+                             <td className="w-8 py-1.5 font-bold">{(row as any).id || ''}</td>
+                             <td className={`w-[45%] py-1.5 ${row.indent ? 'pl-6' : ''} ${row.isHeader ? 'font-black' : 'font-medium'}`}>
+                               {row.label}
+                             </td>
+                             <td className="w-4 py-1.5 text-center">:</td>
+                             <td className={`py-1.5 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black uppercase' : ''}`}>
+                               {row.value}
+                             </td>
+                           </tr>
+                         );
+                       })}
+                     </tbody>
+                   </table>
+                 </div>
+
+                 <div className="flex justify-between items-end mt-16 px-12">
+                   <div className="w-[3cm] h-[4cm] border-2 border-slate-900 flex items-center justify-center text-center text-[7pt] text-slate-400 font-bold bg-slate-50 uppercase tracking-tighter leading-tight p-3 shrink-0">
+                     Pas Foto<br/>3 x 4 cm
+                   </div>
+                   
+                   <div className="text-center w-80 mb-4">
+                     <p className="mb-1 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
+                     <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
+                     <div className="h-24"></div>
+                     <p className="font-black uppercase text-[10pt]">NIK.</p>
+                   </div>
+                 </div>
+                 
+                 <div className="page-number">Halaman 2</div>
                </section>
 
                {/* PAGE 2-5 same content but with selectedStudent */}
@@ -1062,7 +1300,7 @@ export default function App() {
                      <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
                    </div>
                    <div className="signature-box flex flex-col items-center flex-1 text-center">
-                     <p>Tangerang, 20 Desember 2025</p>
+                     <p>Tangerang, {globalTanggalRaport}</p>
                      <p>Wali Kelas,</p>
                      <div className="h-20 uppercase font-bold text-[8pt] pt-8 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
                       <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
@@ -1171,7 +1409,7 @@ export default function App() {
                       <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
                     </div>
                     <div className="signature-box flex flex-col items-center flex-1 text-center">
-                      <p>Tangerang, 20 Desember 2025</p>
+                      <p>Tangerang, {globalTanggalRaport}</p>
                       <p>Wali Kelas,</p>
                       <div className="h-20 uppercase font-bold text-[8pt] pt-8 opacity-30 tracking-[0.2em]">Stempel Resmi</div>
                       <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base uppercase h-8">
