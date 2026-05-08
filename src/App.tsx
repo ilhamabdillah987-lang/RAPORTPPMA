@@ -758,6 +758,59 @@ export default function App() {
     }
   };
 
+  const handlePasteBulkGrades = (e: React.ClipboardEvent, startStudentId: string, startSubIdx: number, startType: 'tulis' | 'lisan') => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData('text');
+    if (!pasteData) return;
+    
+    const rows = pasteData.split(/\r?\n/).filter(row => row.trim() !== '');
+    if (rows.length === 0) return;
+
+    const allStudents = getStoredStudents();
+    const currentListIds = studentsList.map(s => s.id);
+    
+    let updatedAny = false;
+
+    rows.forEach((row, rowOffset) => {
+      const studentIdxInList = currentListIds.indexOf(startStudentId);
+      const targetStudentIdxInList = studentIdxInList + rowOffset;
+      
+      if (targetStudentIdxInList >= 0 && targetStudentIdxInList < currentListIds.length) {
+        const targetStudentId = currentListIds[targetStudentIdxInList];
+        const studentInAllIdx = allStudents.findIndex(s => s.id === targetStudentId);
+        
+        if (studentInAllIdx !== -1) {
+          const columns = row.split('\t');
+          const student = allStudents[studentInAllIdx];
+          const newSubs = [...student.subjects];
+          
+          columns.forEach((val, colOffset) => {
+            const totalColOffset = (startSubIdx * 2 + (startType === 'lisan' ? 1 : 0)) + colOffset;
+            const targetSubIdx = Math.floor(totalColOffset / 2);
+            const targetType = totalColOffset % 2 === 0 ? 'tulis' : 'lisan';
+
+            if (targetSubIdx < newSubs.length) {
+              const numericVal = Math.min(100, Math.max(0, parseInt(val.replace(/[^\d]/g, '')) || 0));
+              newSubs[targetSubIdx] = {
+                ...newSubs[targetSubIdx],
+                [targetType]: { nilai: numericVal, huruf: getHuruf(numericVal) }
+              };
+              updatedAny = true;
+            }
+          });
+          
+          allStudents[studentInAllIdx] = { ...student, subjects: newSubs };
+        }
+      }
+    });
+
+    if (updatedAny) {
+      saveStoredStudents(allStudents);
+      const filtered = allStudents.filter(s => s.class === selectedClass);
+      setStudentsList(filtered);
+    }
+  };
+
   const handleBulkUpdateIdentity = (studentId: string, key: string, value: string) => {
     const allStudents = getStoredStudents();
     const sIdx = allStudents.findIndex(s => s.id === studentId);
@@ -1278,7 +1331,10 @@ export default function App() {
                         <LayoutDashboard className="text-blue-600" size={24} />
                         INPUT NILAI MASSAL: KELAS {selectedClass}
                       </h2>
-                      <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Gunakan TAB untuk berpindah antar kolom dan ENTER untuk baris berikutnya</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest leading-relaxed">
+                        Gunakan TAB untuk antar kolom, ENTER untuk baris berikutnya. <br/>
+                        <span className="text-blue-600">Tips: Anda bisa Copy data dari Excel/Google Sheets lalu Paste langsung ke kolom nilai.</span>
+                      </p>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="px-4 py-2 bg-amber-50 border border-amber-100 rounded-xl">
@@ -1288,17 +1344,16 @@ export default function App() {
                       <button onClick={() => setIsBulkGradesOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={24} /></button>
                     </div>
                   </div>
-
                   <div className="flex-1 overflow-auto p-4 bg-slate-200/50">
                     <div className="bg-white rounded-2xl shadow-inner border border-slate-200 overflow-hidden">
-                      <table className="w-full text-left border-collapse table-fixed select-none">
+                      <table className="w-full text-left border-collapse table-auto select-none">
                         <thead>
                           <tr className="bg-[#FFFF00] border-b-2 border-black">
-                            <th rowSpan={2} className="border-2 border-black px-4 py-3 text-center uppercase font-black text-[11px] w-[220px] sticky left-0 z-30 bg-[#FFFF00] shadow-[2px_0_5px_rgba(0,0,0,0.1)]">NAMA SANTRI</th>
+                            <th rowSpan={2} className="border-2 border-black px-4 py-3 text-center uppercase font-black text-[11px] min-w-[200px] sticky left-0 z-30 bg-[#FFFF00] shadow-[2px_0_5px_rgba(0,0,0,0.1)] whitespace-nowrap">NAMA SANTRI</th>
                             {studentsList[0]?.subjects.map((sub, i) => (
                               <th key={i} colSpan={2} className="border-2 border-black p-0 bg-[#FFFF00]">
-                                <div className="flex items-center justify-center min-h-[50px] px-1 py-1">
-                                  <span className="font-black text-[10px] uppercase leading-tight tracking-tighter text-slate-900 text-center break-words max-w-[170px]">
+                                <div className="flex items-center justify-center min-h-[50px] px-4 py-1">
+                                  <span className="font-black text-[10px] uppercase leading-tight tracking-tighter text-slate-900 text-center whitespace-nowrap">
                                     {sub.name}
                                   </span>
                                 </div>
@@ -1308,8 +1363,8 @@ export default function App() {
                           <tr className="bg-[#FFFF00] border-b-2 border-black sticky top-0 z-20">
                             {studentsList[0]?.subjects.map((sub, i) => (
                               <React.Fragment key={i}>
-                                <th className="border-2 border-black px-1 py-2 text-center font-black text-[9px] w-[90px] uppercase bg-[#FFFF00] text-slate-800">TULIS</th>
-                                <th className="border-2 border-black px-1 py-2 text-center font-black text-[9px] w-[90px] uppercase bg-[#FFFF00] text-slate-800">LISAN</th>
+                                <th className="border-2 border-black px-1 py-2 text-center font-black text-[9px] min-w-[60px] uppercase bg-[#FFFF00] text-slate-800">TULIS</th>
+                                <th className="border-2 border-black px-1 py-2 text-center font-black text-[9px] min-w-[60px] uppercase bg-[#FFFF00] text-slate-800">LISAN</th>
                               </React.Fragment>
                             ))}
                           </tr>
@@ -1317,7 +1372,7 @@ export default function App() {
                         <tbody>
                           {studentsList.map((s, idx) => (
                             <tr key={s.id} className={`${idx % 2 === 0 ? 'bg-[#E8F5E9]' : 'bg-white'} hover:bg-yellow-50 transition-colors`}>
-                              <td className="border-2 border-black px-4 py-2 text-[11px] font-black text-slate-800 uppercase sticky left-0 z-10 bg-inherit shadow-[2px_0_5px_rgba(0,0,0,0.05)] truncate">
+                              <td className="border-2 border-black px-4 py-2 text-[11px] font-black text-slate-800 uppercase sticky left-0 z-10 bg-inherit shadow-[2px_0_5px_rgba(0,0,0,0.05)] whitespace-nowrap">
                                 {s.name}
                               </td>
                               {s.subjects.map((sub, subIdx) => (
@@ -1328,6 +1383,7 @@ export default function App() {
                                       className="w-full text-center py-2 bg-transparent text-xs font-bold focus:bg-white focus:ring-4 focus:ring-blue-400 focus:z-10 outline-none h-full transition-all"
                                       value={sub.tulis?.nilai === 0 ? '' : sub.tulis?.nilai}
                                       onChange={e => handleBulkUpdateGrades(s.id, subIdx, 'tulis', parseInt(e.target.value) || 0)}
+                                      onPaste={e => handlePasteBulkGrades(e, s.id, subIdx, 'tulis')}
                                     />
                                   </td>
                                   <td className="border-2 border-slate-300 p-0">
@@ -1336,6 +1392,7 @@ export default function App() {
                                       className="w-full text-center py-2 bg-transparent text-xs font-bold focus:bg-white focus:ring-4 focus:ring-emerald-400 focus:z-10 outline-none h-full transition-all"
                                       value={sub.lisan?.nilai === 0 ? '' : sub.lisan?.nilai}
                                       onChange={e => handleBulkUpdateGrades(s.id, subIdx, 'lisan', parseInt(e.target.value) || 0)}
+                                      onPaste={e => handlePasteBulkGrades(e, s.id, subIdx, 'lisan')}
                                     />
                                   </td>
                                 </React.Fragment>
