@@ -567,7 +567,7 @@ export default function App() {
   const [isBulkBehaviorOpen, setIsBulkBehaviorOpen] = useState(false);
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // keep for single student grid if needed, or remove later
-  const [isPrintingAll, setIsPrintingAll] = useState(false);
+  const [studentsToPrint, setStudentsToPrint] = useState<Student[]>([]);
   const [bulkData, setBulkData] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1100,15 +1100,21 @@ export default function App() {
 
   const handlePrint = () => {
     if (!selectedStudent) return;
-    window.print();
+    setStudentsToPrint([selectedStudent]);
+    window.scrollTo(0, 0);
+    setTimeout(() => {
+      window.print();
+      setStudentsToPrint([]);
+    }, 1000);
   };
 
   const handlePrintAll = () => {
     if (filteredStudents.length === 0) return;
-    setIsPrintingAll(true);
+    setStudentsToPrint(filteredStudents);
+    window.scrollTo(0, 0);
     setTimeout(() => {
       window.print();
-      setIsPrintingAll(false);
+      setStudentsToPrint([]);
     }, 1000);
   };
 
@@ -2135,10 +2141,10 @@ export default function App() {
           </AnimatePresence>
         )}
         
-        {isPrintingAll ? (
+        {studentsToPrint.length > 0 ? (
           <div className="flex flex-col items-center bg-white min-h-screen p-0 no-scrollbar print:m-0 print:p-0">
-            {filteredStudents.map(student => (
-              <div key={student.id} className="print:m-0 print:p-0 print:page-break-after-always">
+            {studentsToPrint.map(student => (
+              <div key={student.id} className="print:m-0 print:p-0">
                 <ReportTemplate 
                   student={student}
                   logoUrl={logoUrl}
