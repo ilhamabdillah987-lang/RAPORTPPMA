@@ -384,6 +384,25 @@ const ReportTemplate = ({
             </tr>
           </tbody>
         </table>
+
+        <div className="signature-section mt-auto text-[10pt] flex justify-between items-start px-4 page-break-inside-avoid pb-8">
+          <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
+            <p className="font-medium">Mengetahui,</p>
+            <p className="font-bold">Orang Tua/Wali Santri</p>
+            <div className="h-28"></div>
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 uppercase whitespace-nowrap text-center">
+              {student.identity?.namaAyah || student.identity?.namaWali || '..........................'}
+            </p>
+          </div>
+          <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
+            <p className="font-medium text-right w-full pr-10 italic">Tangerang, {globalTanggalRaport}</p>
+            <p className="font-bold">Wali Kelas,</p>
+            <div className="h-28"></div>
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 uppercase whitespace-nowrap text-center">
+              {globalWaliKelas || '..........................'}
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* PAGE 5: EKSTRA & ABSENSI */}
@@ -987,6 +1006,98 @@ export default function App() {
     setIsModalOpen(true);
   };
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const exportGradesToExcel = () => {
+    if (studentsList.length === 0) return;
+    
+    const subjects = studentsList[0].subjects.map(s => s.name);
+    const data = studentsList.map(s => {
+      const row: any = {
+        'NO URUT': s.noUrut,
+        'NAMA SANTRI': s.name,
+        'NIS/NISN': s.nomorInduk
+      };
+      
+      s.subjects.forEach(sub => {
+        row[`${sub.name} (TULIS)`] = sub.tulis?.nilai || 0;
+        row[`${sub.name} (LISAN)`] = sub.lisan?.nilai || 0;
+      });
+      
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "NILAI");
+    XLSX.writeFile(wb, `NILAI_KELAS_${selectedClass.replace(' ', '_')}.xlsx`);
+  };
+
+  const importGradesFromExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const data = new Uint8Array(event.target?.result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      const updatedStudents = [...studentsList];
+      
+      for (const row of jsonData) {
+        const studentIdx = updatedStudents.findIndex(s => s.name === row['NAMA SANTRI'] || s.nomorInduk === row['NIS/NISN']);
+        if (studentIdx !== -1) {
+          const student = updatedStudents[studentIdx];
+          const newSubs = student.subjects.map(sub => {
+            const tulisVal = row[`${sub.name} (TULIS)`];
+            const lisanVal = row[`${sub.name} (LISAN)`];
+            return {
+              ...sub,
+              tulis: typeof tulisVal !== 'undefined' ? { nilai: parseInt(tulisVal) || 0, huruf: getHuruf(parseInt(tulisVal) || 0) } : sub.tulis,
+              lisan: typeof lisanVal !== 'undefined' ? { nilai: parseInt(lisanVal) || 0, huruf: getHuruf(parseInt(lisanVal) || 0) } : sub.lisan,
+            };
+          });
+          
+          updatedStudents[studentIdx] = { ...student, subjects: newSubs };
+          // Batching saves would be better, but for now we do individual saves or we can implement a batch save
+          await setDoc(doc(db, 'students', student.id), { subjects: newSubs, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+      }
+      
+      setStudentsList(updatedStudents);
+      alert('Berhasil mengimpor nilai dari Excel');
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleSyncSubjects = async () => {
+    if (studentsList.length < 2) return;
+    if (!confirm('Ini akan menyamakan daftar mata pelajaran SEMUA santri mengikuti santri pertama. Data nilai santri lain akan tetap ada jika nama mata pelajarannya sama. Lanjutkan?')) return;
+    
+    setIsSyncing(true);
+    const templateSubjects = studentsList[0].subjects.map(s => ({ ...s, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } }));
+    
+    try {
+      for (const student of studentsList) {
+        const newSubs = templateSubjects.map(ts => {
+          const existing = student.subjects.find(s => s.name === ts.name);
+          return existing ? { ...ts, tulis: existing.tulis, lisan: existing.lisan } : ts;
+        });
+        
+        await setDoc(doc(db, 'students', student.id), { subjects: newSubs, updatedAt: new Date().toISOString() }, { merge: true });
+      }
+      if (selectedClass) fetchStudents(selectedClass);
+      alert('Sinkronisasi Mata Pelajaran Berhasil!');
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'students');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handlePrint = () => {
     if (!selectedStudent) return;
     window.print();
@@ -1333,7 +1444,7 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto w-full">
+      <main className="flex-1 overflow-y-auto w-full print:overflow-visible">
         {/* MULTI STUDENT ADD MODAL */}
         {isBulkAddOpen && (
           <AnimatePresence>
@@ -1384,7 +1495,26 @@ export default function App() {
                         <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase leading-none">INPUT NILAI MASSAL: KELAS {selectedClass}</h2>
                         <p className="text-[10px] font-black text-slate-400 mt-2 uppercase tracking-widest leading-none">SELURUH MATA PELAJARAN (GESER KANAN UNTUK MELIHAT SEMUA)</p>
                       </div>
-                      <button onClick={() => setIsBulkGradesOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-900"><X size={24} /></button>
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={handleSyncSubjects}
+                          disabled={isSyncing}
+                          className="px-4 py-2 bg-amber-50 text-amber-600 border border-amber-100 rounded-xl text-[10px] font-black uppercase hover:bg-amber-100 transition-all flex items-center gap-2"
+                        >
+                          {isSyncing ? 'Sinkronisasi...' : 'SINKRONKAN MAPEL'}
+                        </button>
+                        <button 
+                          onClick={exportGradesToExcel}
+                          className="px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-100 transition-all flex items-center gap-2"
+                        >
+                          EKSPOR EXCEL
+                        </button>
+                        <label className="px-4 py-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all flex items-center gap-2 cursor-pointer">
+                          IMPOR EXCEL
+                          <input type="file" accept=".xlsx, .xls" className="hidden" onChange={importGradesFromExcel} />
+                        </label>
+                        <button onClick={() => setIsBulkGradesOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-900"><X size={24} /></button>
+                      </div>
                     </div>
                   </div>
                   <div className="flex-1 overflow-x-auto overflow-y-auto p-4">
@@ -2000,9 +2130,9 @@ export default function App() {
         )}
         
         {isPrintingAll ? (
-          <div className="flex flex-col items-center bg-white min-h-screen p-0 no-scrollbar">
+          <div className="flex flex-col items-center bg-white min-h-screen p-0 no-scrollbar print:m-0 print:p-0">
             {filteredStudents.map(student => (
-              <div key={student.id} className="print:m-0 print:p-0">
+              <div key={student.id} className="print:m-0 print:p-0 print:page-break-after-always">
                 <ReportTemplate 
                   student={student}
                   logoUrl={logoUrl}

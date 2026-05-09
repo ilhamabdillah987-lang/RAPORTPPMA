@@ -42,9 +42,11 @@
       box-shadow: none !important;
       border: none !important;
       width: 210mm !important;
-      height: 297mm !important;
+      min-height: 297mm !important;
       page-break-after: always !important;
       page-break-inside: avoid !important;
+      position: relative !important;
+      overflow: visible !important;
     }
   }
 }
