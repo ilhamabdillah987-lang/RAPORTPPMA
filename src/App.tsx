@@ -550,7 +550,7 @@ const getHuruf = (nilai: number | string) => {
 };
 
 export default function App() {
-  const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'LULUS'];
+  const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];
 
   const [selectedClass, setSelectedClass] = useState<string>(() => {
     return localStorage.getItem('selected_class') || '10 SMA';
@@ -781,7 +781,7 @@ export default function App() {
     };
 
     const getNextClass = (current: string) => {
-      if (current.includes('9') || current.includes('12')) return 'LULUS';
+      if (current.includes('9') || current.includes('12')) return 'ALUMNI';
       
       const mapping: Record<string, string> = {
         '7 MTs': '8 MTs',
@@ -799,6 +799,7 @@ export default function App() {
       for (const student of studentsList) {
         const nextClass = getNextClass(student.class);
         const nextYear = nextTahunPelajaran(student.tahunPelajaran);
+        const isGraduating = nextClass === 'ALUMNI';
         
         const resetSubjects = student.subjects.map(s => ({
           ...s,
@@ -808,12 +809,12 @@ export default function App() {
 
         const updatedStudent: Partial<Student> = {
           class: nextClass,
-          semester: 'GANJIL',
-          tahunPelajaran: nextYear,
-          subjects: resetSubjects,
-          attendance: { sakit: 0, izin: 0, alpha: 0 },
-          behavior: { spiritual: '', social: '' },
-          extracurriculars: [],
+          semester: isGraduating ? student.semester : 'GANJIL',
+          tahunPelajaran: isGraduating ? student.tahunPelajaran : nextYear,
+          subjects: isGraduating ? student.subjects : resetSubjects,
+          attendance: isGraduating ? student.attendance : { sakit: 0, izin: 0, alpha: 0 },
+          behavior: isGraduating ? student.behavior : { spiritual: '', social: '' },
+          extracurriculars: isGraduating ? student.extracurriculars : [],
           updatedAt: new Date().toISOString()
         };
 
