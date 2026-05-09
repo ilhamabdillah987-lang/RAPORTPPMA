@@ -6,7 +6,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Student, Subject } from './types';
-import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // No server needed, data is stored in LocalStorage
@@ -522,6 +522,8 @@ export default function App() {
   });
   const [isBulkGradesOpen, setIsBulkGradesOpen] = useState(false);
   const [isBulkIdentityOpen, setIsBulkIdentityOpen] = useState(false);
+  const [isBulkExtraOpen, setIsBulkExtraOpen] = useState(false);
+  const [isBulkBehaviorOpen, setIsBulkBehaviorOpen] = useState(false);
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // keep for single student grid if needed, or remove later
   const [isPrintingAll, setIsPrintingAll] = useState(false);
@@ -535,6 +537,15 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'basic' | 'grades' | 'identity' | 'extra'>('basic');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [selectedSubjectIndex, setSelectedSubjectIndex] = useState(0);
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Close sidebar on mobile when student changes
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  }, [currentIndex]);
 
   const [logoUrl, setLogoUrl] = useState<string>(() => {
     return localStorage.getItem('al_hikmah_custom_logo') || '';
@@ -753,6 +764,46 @@ export default function App() {
         [type]: { nilai: value, huruf: getHuruf(value) }
       };
       allStudents[sIdx] = { ...student, subjects: newSubs };
+      saveStoredStudents(allStudents);
+      setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
+    }
+  };
+
+  const handleBulkUpdateExtra = (studentId: string, activityIdx: number, key: 'activity' | 'note', value: string) => {
+    const allStudents = getStoredStudents();
+    const sIdx = allStudents.findIndex(s => s.id === studentId);
+    if (sIdx !== -1) {
+      const student = allStudents[sIdx];
+      const newExtras = [...(student.extracurriculars || [])];
+      
+      // Ensure the activity index exists
+      while (newExtras.length <= activityIdx) {
+        newExtras.push({ activity: '', note: '' });
+      }
+
+      newExtras[activityIdx] = {
+        ...newExtras[activityIdx],
+        [key]: value
+      };
+      
+      allStudents[sIdx] = { ...student, extracurriculars: newExtras };
+      saveStoredStudents(allStudents);
+      setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
+    }
+  };
+
+  const handleBulkUpdateBehavior = (studentId: string, type: 'spiritual' | 'social', value: string) => {
+    const allStudents = getStoredStudents();
+    const sIdx = allStudents.findIndex(s => s.id === studentId);
+    if (sIdx !== -1) {
+      const student = allStudents[sIdx];
+      allStudents[sIdx] = {
+        ...student,
+        behavior: {
+          ...student.behavior,
+          [type]: value
+        }
+      };
       saveStoredStudents(allStudents);
       setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
     }
@@ -1005,13 +1056,29 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row h-screen overflow-hidden">
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 no-print shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg overflow-hidden p-1 bg-slate-50 border border-slate-100 flex items-center justify-center">
+            {logoUrl ? <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" /> : <Settings size={14} className="text-slate-300" />}
+          </div>
+          <span className="text-xs font-black text-slate-700 uppercase">RAPORT {selectedClass}</span>
+        </div>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl">
+          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
       {/* Sidebar Controls */}
-      <motion.aside 
-        initial={{ x: -20, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        className="w-72 bg-white border-r border-slate-200 overflow-y-auto no-print h-screen sticky top-0 shadow-sm flex flex-col pt-6 px-4"
-      >
+      <AnimatePresence>
+        {(isSidebarOpen || (typeof window !== 'undefined' && window.innerWidth >= 768)) && (
+          <motion.aside 
+            initial={{ x: -288 }}
+            animate={{ x: 0 }}
+            exit={{ x: -288 }}
+            className={`fixed inset-y-0 left-0 z-[150] w-72 bg-white border-r border-slate-200 overflow-y-auto no-print h-screen shadow-2xl flex flex-col pt-6 px-4 md:sticky md:block md:shadow-none md:translate-x-0 ${isSidebarOpen ? 'block' : 'hidden md:flex'}`}
+          >
         <div className="flex items-center justify-between mb-8 px-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 overflow-hidden p-1">
@@ -1169,6 +1236,18 @@ export default function App() {
               >
                 <span className="flex items-center gap-2"><UserCircle size={14} /> Input Identitas Massal</span>
               </button>
+              <button 
+                onClick={() => setIsBulkExtraOpen(true)}
+                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
+              >
+                <span className="flex items-center gap-2"><Plus size={14} /> Input Ekstra Massal</span>
+              </button>
+              <button 
+                onClick={() => setIsBulkBehaviorOpen(true)}
+                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
+              >
+                <span className="flex items-center gap-2"><FileText size={14} /> Input Sikap Massal</span>
+              </button>
             </div>
           </div>
 
@@ -1225,9 +1304,22 @@ export default function App() {
           </button>
         </div>
       </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Backdrop */}
+      {isSidebarOpen && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[140] md:hidden"
+        />
+      )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto w-full">
         {/* MULTI STUDENT ADD MODAL */}
         {isBulkAddOpen && (
           <AnimatePresence>
@@ -1292,7 +1384,7 @@ export default function App() {
                     </div>
                     <button onClick={() => setIsBulkGradesOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-8 pt-4">
+                  <div className="flex-1 overflow-x-auto overflow-y-auto p-8 pt-4">
                     <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl mb-6 flex items-center gap-3">
                       <div className="bg-blue-600 text-white p-2 rounded-xl"><LayoutDashboard size={18} /></div>
                       <div>
@@ -1300,11 +1392,11 @@ export default function App() {
                         <p className="text-[10px] font-bold text-blue-600/70 uppercase">Mata Pelajaran: {studentsList[0]?.subjects[selectedSubjectIndex]?.name}</p>
                       </div>
                     </div>
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[600px]">
                       <thead>
                         <tr className="bg-slate-50">
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-center">No</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">Nama Santri</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[150px] sticky left-0 z-20 bg-slate-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Nama Santri</th>
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-40 text-center bg-blue-100/50">Nilai Tulis</th>
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-40 text-center bg-emerald-100/50">Nilai Lisan</th>
                         </tr>
@@ -1313,8 +1405,8 @@ export default function App() {
                         {studentsList.map((s, idx) => (
                           <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
                             <td className="px-6 py-4 text-xs font-bold text-slate-300 text-center">{idx + 1}</td>
-                            <td className="px-6 py-4">
-                              <p className="text-sm font-black text-slate-700 uppercase">{s.name}</p>
+                            <td className="px-6 py-4 sticky left-0 z-10 bg-white border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                              <p className="text-sm font-black text-slate-700 uppercase truncate max-w-[140px]">{s.name}</p>
                               <p className="text-[10px] font-bold text-slate-400">NI: {s.nomorInduk || '-'}</p>
                             </td>
                             <td className="px-6 py-4 bg-blue-50/20 group-hover:bg-blue-50/40">
@@ -1460,6 +1552,128 @@ export default function App() {
           </AnimatePresence>
         )}
 
+        {/* BULK EXTRA MODAL */}
+        {isBulkExtraOpen && (
+          <AnimatePresence>
+            <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
+              <div className="flex min-h-full items-center justify-center p-4">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkExtraOpen(false)} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative w-full max-w-5xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100">
+                    <div>
+                      <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT EKSTRA KELAS: {selectedClass}</h2>
+                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">Sunting data ekstrakurikuler santri</p>
+                    </div>
+                    <button onClick={() => setIsBulkExtraOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
+                  </div>
+                  <div className="flex-1 overflow-x-auto overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-200">
+                    <table className="w-full text-left border-collapse min-w-[800px]">
+                      <thead>
+                        <tr className="bg-slate-50 sticky top-0 z-10">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-12 text-center bg-slate-50 border-b">No</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-48 bg-slate-50 border-b sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Nama Santri</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase bg-slate-50 border-b">Nama Kegiatan (Ekstra 1)</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase bg-slate-50 border-b">Keterangan (Ekstra 1)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {studentsList.map((s, idx) => (
+                          <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-3 text-xs font-bold text-slate-300 text-center">{idx + 1}</td>
+                            <td className="px-4 py-3 bg-white sticky left-0 z-10 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                              <p className="text-xs font-black text-slate-700 uppercase truncate text-nowrap">{s.name}</p>
+                            </td>
+                            <td className="px-2 py-1">
+                              <input 
+                                className="w-full bg-transparent border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none uppercase"
+                                placeholder="..."
+                                value={s.extracurriculars?.[0]?.activity || ''}
+                                onChange={e => handleBulkUpdateExtra(s.id, 0, 'activity', e.target.value.toUpperCase())}
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <input 
+                                className="w-full bg-transparent border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none"
+                                placeholder="..."
+                                value={s.extracurriculars?.[0]?.note || ''}
+                                onChange={e => handleBulkUpdateExtra(s.id, 0, 'note', e.target.value)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
+                    <button onClick={() => setIsBulkExtraOpen(false)} className="px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black tracking-widest transition-all uppercase">Selesai</button>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </AnimatePresence>
+        )}
+
+        {/* BULK BEHAVIOR MODAL */}
+        {isBulkBehaviorOpen && (
+          <AnimatePresence>
+            <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
+              <div className="flex min-h-full items-center justify-center p-4">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkBehaviorOpen(false)} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative w-full max-w-6xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100">
+                    <div>
+                      <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT SIKAP KELAS: {selectedClass}</h2>
+                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">Sunting data deskripsi sikap santri</p>
+                    </div>
+                    <button onClick={() => setIsBulkBehaviorOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
+                  </div>
+                  <div className="flex-1 overflow-x-auto overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-200">
+                    <table className="w-full text-left border-collapse min-w-[1000px]">
+                      <thead>
+                        <tr className="bg-slate-50 sticky top-0 z-10">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-12 text-center bg-slate-50 border-b">No</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-48 bg-slate-50 border-b sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Nama Santri</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase bg-slate-50 border-b">Deskripsi Sikap Spiritual</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase bg-slate-50 border-b">Deskripsi Sikap Sosial</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {studentsList.map((s, idx) => (
+                          <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-3 text-xs font-bold text-slate-300 text-center">{idx + 1}</td>
+                            <td className="px-4 py-3 bg-white sticky left-0 z-10 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                              <p className="text-xs font-black text-slate-700 uppercase truncate text-nowrap">{s.name}</p>
+                            </td>
+                            <td className="px-2 py-1">
+                              <textarea 
+                                className="w-full bg-transparent border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none min-h-[60px] resize-none"
+                                placeholder="..."
+                                value={s.behavior.spiritual || ''}
+                                onChange={e => handleBulkUpdateBehavior(s.id, 'spiritual', e.target.value)}
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <textarea 
+                                className="w-full bg-transparent border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none min-h-[60px] resize-none"
+                                placeholder="..."
+                                value={s.behavior.social || ''}
+                                onChange={e => handleBulkUpdateBehavior(s.id, 'social', e.target.value)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
+                    <button onClick={() => setIsBulkBehaviorOpen(false)} className="px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black tracking-widest transition-all uppercase">Selesai</button>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </AnimatePresence>
+        )}
+
         {isModalOpen && editingStudent && (
           <AnimatePresence>
             <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
@@ -1507,11 +1721,11 @@ export default function App() {
                     </button>
                   </div>
 
-                    <div className="flex gap-1 bg-white p-1 rounded-2xl border border-slate-200">
-                      <button onClick={() => setActiveTab('basic')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'basic' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Informasi Dasar</button>
-                      <button onClick={() => setActiveTab('grades')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'grades' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Nilai Akademik</button>
-                      <button onClick={() => setActiveTab('extra')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'extra' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Ekstrakurikuler</button>
-                      <button onClick={() => setActiveTab('identity')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'identity' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Identitas Santri</button>
+                    <div className="flex gap-1 bg-white p-1 rounded-2xl border border-slate-200 overflow-x-auto no-scrollbar whitespace-nowrap">
+                      <button type="button" onClick={() => setActiveTab('basic')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'basic' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Informasi Dasar</button>
+                      <button type="button" onClick={() => setActiveTab('grades')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'grades' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Nilai Akademik</button>
+                      <button type="button" onClick={() => setActiveTab('extra')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'extra' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Ekstrakurikuler</button>
+                      <button type="button" onClick={() => setActiveTab('identity')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'identity' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Identitas Santri</button>
                     </div>
 
                   <div className="flex-1 overflow-y-auto p-8">
@@ -1770,21 +1984,24 @@ export default function App() {
               </div>
             </div>
           </AnimatePresence>
-        )}        {isPrintingAll ? (
-          <div className="flex flex-col items-center bg-white min-h-screen p-10">
+        )}
+        
+        {isPrintingAll ? (
+          <div className="flex flex-col items-center bg-white min-h-screen p-4 md:p-10">
             {filteredStudents.map(student => (
-              <ReportTemplate 
-                key={student.id}
-                student={student}
-                logoUrl={logoUrl}
-                globalNamaKelas={globalNamaKelas}
-                globalTanggalRaport={globalTanggalRaport}
-                globalWaliKelas={globalWaliKelas}
-                globalKepala={globalKepala}
-                studentRankings={studentRankings}
-                autoSaveStudent={autoSaveStudent}
-                setStudentsList={setStudentsList}
-              />
+              <div key={student.id} className="scale-[0.5] sm:scale-[0.7] md:scale-100 origin-top mb-[-400px] sm:mb-[-200px] md:mb-0">
+                <ReportTemplate 
+                  student={student}
+                  logoUrl={logoUrl}
+                  globalNamaKelas={globalNamaKelas}
+                  globalTanggalRaport={globalTanggalRaport}
+                  globalWaliKelas={globalWaliKelas}
+                  globalKepala={globalKepala}
+                  studentRankings={studentRankings}
+                  autoSaveStudent={autoSaveStudent}
+                  setStudentsList={setStudentsList}
+                />
+              </div>
             ))}
           </div>
         ) : selectedStudent ? (
@@ -1792,10 +2009,10 @@ export default function App() {
             key={selectedStudent.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-8 pb-20 flex flex-col items-center"
+            className="p-4 md:p-8 pb-20 flex flex-col items-center"
           >
              {/* Report Title */}
-             <div className="w-[210mm] mb-6 flex items-center justify-between no-print">
+             <div className="w-full max-w-[210mm] mb-6 flex flex-col sm:flex-row items-center justify-between no-print gap-4">
                <div className="flex items-center gap-3">
                  <FileText className="text-blue-600" />
                  <div>
@@ -1808,17 +2025,19 @@ export default function App() {
                </div>
              </div>
 
-             <ReportTemplate 
-                student={selectedStudent}
-                logoUrl={logoUrl}
-                globalNamaKelas={globalNamaKelas}
-                globalTanggalRaport={globalTanggalRaport}
-                globalWaliKelas={globalWaliKelas}
-                globalKepala={globalKepala}
-                studentRankings={studentRankings}
-                autoSaveStudent={autoSaveStudent}
-                setStudentsList={setStudentsList}
-              />
+             <div className="scale-[0.45] xs:scale-[0.55] sm:scale-[0.75] md:scale-100 origin-top overflow-visible">
+               <ReportTemplate 
+                  student={selectedStudent}
+                  logoUrl={logoUrl}
+                  globalNamaKelas={globalNamaKelas}
+                  globalTanggalRaport={globalTanggalRaport}
+                  globalWaliKelas={globalWaliKelas}
+                  globalKepala={globalKepala}
+                  studentRankings={studentRankings}
+                  autoSaveStudent={autoSaveStudent}
+                  setStudentsList={setStudentsList}
+                />
+             </div>
           </motion.div>
         ) : (
           <div className="h-screen flex flex-col items-center justify-center p-12 text-center bg-slate-50">
