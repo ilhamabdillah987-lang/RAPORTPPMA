@@ -63,6 +63,7 @@ export interface Student {
   attendance: Attendance;
   waliKelas?: string;
   identity?: StudentIdentity;
+  updatedAt?: string;
 }
 
 export interface GlobalSettings {

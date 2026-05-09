@@ -543,14 +543,14 @@ const StudentInfo = ({ student, globalNamaKelas }: { student: Student, globalNam
 
 const getHuruf = (nilai: number | string) => {
   if (typeof nilai !== 'number') return "-";
-  if (nilai >= 90) return "A";
-  if (nilai >= 80) return "B";
-  if (nilai >= 70) return "C";
+  if (nilai >= 80) return "A";
+  if (nilai >= 60) return "B";
+  if (nilai >= 40) return "C";
   return "D";
 };
 
 export default function App() {
-  const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA'];
+  const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'LULUS'];
 
   const [selectedClass, setSelectedClass] = useState<string>(() => {
     return localStorage.getItem('selected_class') || '10 SMA';
@@ -560,6 +560,7 @@ export default function App() {
   const [globalNamaKelas, setGlobalNamaKelas] = useState<string>('');
   const [globalTanggalRaport, setGlobalTanggalRaport] = useState<string>('');
   const [globalKepala, setGlobalKepala] = useState<string>('');
+  const [globalTanggalKenaikan, setGlobalTanggalKenaikan] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [isBulkGradesOpen, setIsBulkGradesOpen] = useState(false);
   const [isBulkIdentityOpen, setIsBulkIdentityOpen] = useState(false);
@@ -596,6 +597,7 @@ export default function App() {
       `nama_kelas_${selectedClass}`,
       `tanggal_raport_${selectedClass}`,
       `kepala_kepasentrenan_${selectedClass}`,
+      `tanggal_kenaikan_${selectedClass}`,
       'al_hikmah_custom_logo'
     ];
 
@@ -607,10 +609,12 @@ export default function App() {
           if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(val);
           if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(val);
           if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(val);
+          if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(val);
           if (key === 'al_hikmah_custom_logo') setLogoUrl(val);
         } else {
           // Defaults if not in Firebase
           if (key.startsWith('tanggal_raport_')) setGlobalTanggalRaport('20 Desember 2025');
+          if (key.startsWith('tanggal_kenaikan_')) setGlobalTanggalKenaikan('21 Juni 2026');
         }
       }, (error) => {
         handleFirestoreError(error, OperationType.GET, `configs/${key}`);
@@ -652,7 +656,24 @@ export default function App() {
     try {
       const q = query(collection(db, 'students'), where('class', '==', className));
       const querySnapshot = await getDocs(q);
-      const students = querySnapshot.docs.map(doc => doc.data() as Student);
+      const students = querySnapshot.docs.map(doc => {
+        const data = doc.data() as Student;
+        // Migration: Rename Dialogue/Speaking to Speaking, Update KKM to 40, & Update Grade Scale
+        if (data.subjects) {
+          data.subjects = data.subjects.map(s => {
+            let updated = s;
+            if (s.name === 'Dialogue/Speaking') updated = { ...updated, name: 'Speaking' };
+            if (updated.kkm !== 40) updated = { ...updated, kkm: 40 };
+            
+            // Recalculate letters based on new scale
+            if (updated.tulis) updated.tulis.huruf = getHuruf(updated.tulis.nilai);
+            if (updated.lisan) updated.lisan.huruf = getHuruf(updated.lisan.nilai);
+            
+            return updated;
+          });
+        }
+        return data;
+      });
       
       // Sort by noUrut
       students.sort((a, b) => (a.noUrut || 0) - (b.noUrut || 0));
@@ -722,6 +743,88 @@ export default function App() {
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, `configs/kepala_kepasentrenan_${selectedClass}`);
       }
+    }
+  };
+
+  const handleUpdateGlobalTanggalKenaikan = async (val: string) => {
+    setGlobalTanggalKenaikan(val);
+    if (selectedClass) {
+      try {
+        await setDoc(doc(db, 'configs', `tanggal_kenaikan_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `configs/tanggal_kenaikan_${selectedClass}`);
+      }
+    }
+  };
+
+  const handleProcessPromotion = async () => {
+    if (!selectedClass || studentsList.length === 0) return;
+    
+    const isEvenSemester = studentsList[0]?.semester === 'GENAP';
+    if (!isEvenSemester) {
+      alert('Proses kenaikan/kelulusan hanya bisa dilakukan di akhir SEMESTER GENAP.');
+      return;
+    }
+
+    if (!confirm(`Apakah Anda yakin ingin memproses kenaikan/kelulusan untuk seluruh santri di kelas ${selectedClass}? \n\nData nilai akan direset dan tahun pelajaran akan diperbarui.`)) {
+      return;
+    }
+
+    const nextTahunPelajaran = (yearStr: string) => {
+      const parts = yearStr.split('/');
+      if (parts.length === 2) {
+        const start = parseInt(parts[0]) + 1;
+        const end = parseInt(parts[1]) + 1;
+        return `${start}/${end}`;
+      }
+      return yearStr;
+    };
+
+    const getNextClass = (current: string) => {
+      if (current.includes('9') || current.includes('12')) return 'LULUS';
+      
+      const mapping: Record<string, string> = {
+        '7 MTs': '8 MTs',
+        '8 MTs': '9 MTs',
+        '7 SMP': '8 SMP',
+        '8 SMP': '9 SMP',
+        '10 SMA': '11 SMA',
+        '11 SMA': '12 SMA'
+      };
+      return mapping[current] || current;
+    };
+
+    setIsLoading(true);
+    try {
+      for (const student of studentsList) {
+        const nextClass = getNextClass(student.class);
+        const nextYear = nextTahunPelajaran(student.tahunPelajaran);
+        
+        const resetSubjects = student.subjects.map(s => ({
+          ...s,
+          tulis: { nilai: 0, huruf: '-' },
+          lisan: { nilai: 0, huruf: '-' }
+        }));
+
+        const updatedStudent: Partial<Student> = {
+          class: nextClass,
+          semester: 'GANJIL',
+          tahunPelajaran: nextYear,
+          subjects: resetSubjects,
+          attendance: { sakit: 0, izin: 0, alpha: 0 },
+          behavior: { spiritual: '', social: '' },
+          extracurriculars: [],
+          updatedAt: new Date().toISOString()
+        };
+
+        await setDoc(doc(db, 'students', student.id), updatedStudent, { merge: true });
+      }
+      alert(`Berhasil memproses kenaikan/kelulusan untuk kelas ${selectedClass}.`);
+      fetchStudents(selectedClass);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'students');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -954,21 +1057,21 @@ export default function App() {
       semester: 'GANJIL',
       tahunPelajaran: '2025/2026',
       subjects: [
-        { name: "Asasul Mubtadiin Fi Ilmi Nahwi", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Mutammimah", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Asasul Mubtadiin Fi Ilmi Shorfi", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Durusullughah", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Qiraatul Kutub", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Imla'", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Al-Qur'an", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Tajwid", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Fiqih Qouliyah", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Fiqih Fi'liyah", category: "AGAMA", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Grammar", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Stories For You", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Dialogue/Speaking", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Dictation", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Vocabularies", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } }
+        { name: "Asasul Mubtadiin Fi Ilmi Nahwi", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Mutammimah", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Asasul Mubtadiin Fi Ilmi Shorfi", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Durusullughah", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Qiraatul Kutub", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Imla'", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Al-Qur'an", category: "AGAMA", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Tajwid", category: "AGAMA", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Fiqih Qouliyah", category: "AGAMA", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Fiqih Fi'liyah", category: "AGAMA", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Grammar", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Stories For You", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Speaking", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Dictation", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
+        { name: "Vocabularies", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } }
       ],
       behavior: { spiritual: '', social: '' },
       attendance: { sakit: 0, izin: 0, alpha: 0 },
@@ -1341,6 +1444,21 @@ export default function App() {
                   onChange={e => handleUpdateGlobalKepala(e.target.value)}
                 />
               </div>
+              <div>
+                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Tgl Kenaikan/Kelulusan</label>
+                <input 
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
+                  placeholder="21 JUNI 2026..."
+                  value={globalTanggalKenaikan}
+                  onChange={e => handleUpdateGlobalTanggalKenaikan(e.target.value)}
+                />
+              </div>
+              <button 
+                onClick={handleProcessPromotion}
+                className="w-full mt-2 py-3 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase hover:bg-red-100 transition-all border border-red-100 shadow-sm"
+              >
+                Proses Kenaikan/Lulus
+              </button>
             </div>
           </div>
 
@@ -1523,20 +1641,24 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      {studentsList[0]?.subjects.map((sub, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setSelectedSubjectIndex(i)}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                            selectedSubjectIndex === i 
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 ring-2 ring-blue-600 ring-offset-2' 
-                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                          }`}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Pilih Mata Pelajaran</label>
+                      <div className="relative group max-w-sm">
+                        <select
+                          value={selectedSubjectIndex}
+                          onChange={(e) => setSelectedSubjectIndex(parseInt(e.target.value))}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-black text-slate-700 appearance-none outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all cursor-pointer uppercase tracking-widest"
                         >
-                          {sub.name}
-                        </button>
-                      ))}
+                          {studentsList[0]?.subjects.map((sub, i) => (
+                            <option key={i} value={i} className="font-sans uppercase">
+                              {sub.name}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                          <ChevronDown size={20} />
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div className="flex-1 overflow-x-auto overflow-y-auto p-8 pt-4">
