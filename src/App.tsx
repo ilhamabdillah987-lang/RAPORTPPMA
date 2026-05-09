@@ -528,9 +528,6 @@ const getHuruf = (nilai: number | string) => {
 export default function App() {
   const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA'];
 
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
   const [selectedClass, setSelectedClass] = useState<string>(() => {
     return localStorage.getItem('selected_class') || '10 SMA';
   });
@@ -560,31 +557,6 @@ export default function App() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Auth listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed:", error);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
-
   // Close sidebar on mobile when student changes
   useEffect(() => {
     if (window.innerWidth < 768) {
@@ -594,8 +566,7 @@ export default function App() {
 
   // Fetch configs from Firebase
   useEffect(() => {
-    if (!user) return;
-
+    // Config keys to listen to
     const configKeys = [
       `wali_kelas_${selectedClass}`,
       `nama_kelas_${selectedClass}`,
@@ -623,7 +594,7 @@ export default function App() {
     });
 
     return () => unsubscribers.forEach(unsub => unsub());
-  }, [user, selectedClass]);
+  }, [selectedClass]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -645,15 +616,14 @@ export default function App() {
 
   // Initialize and fetch students from Firebase
   useEffect(() => {
-    if (user && selectedClass) {
+    if (selectedClass) {
       fetchStudents(selectedClass);
     } else {
       setIsLoading(false);
     }
-  }, [user, selectedClass]);
+  }, [selectedClass]);
 
   const fetchStudents = async (className: string) => {
-    if (!user) return;
     setIsLoading(true);
     try {
       const q = query(collection(db, 'students'), where('class', '==', className));
@@ -671,7 +641,7 @@ export default function App() {
   };
 
   const autoSaveStudent = async (student: Partial<Student>) => {
-    if (!student.id || !user) return;
+    if (!student.id) return;
     setSaveStatus('saving');
     try {
       await setDoc(doc(db, 'students', student.id), { ...student, updatedAt: new Date().toISOString() }, { merge: true });
@@ -733,7 +703,7 @@ export default function App() {
 
   // Auto-save effect: Updates UI in real-time, sinks to server with debounce
   useEffect(() => {
-    if (!editingStudent || !editingStudent.id || !user) return;
+    if (!editingStudent || !editingStudent.id) return;
 
     // REAL-TIME UI UPDATE: Update local list immediately as user types
     setStudentsList(prev => prev.map(s => s.id === editingStudent.id ? { ...s, ...editingStudent } as Student : s));
@@ -743,7 +713,7 @@ export default function App() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [editingStudent, user]);
+  }, [editingStudent]);
 
   const handleCloseModal = async () => {
     if (editingStudent && editingStudent.id && saveStatus === 'saving') {
@@ -755,7 +725,6 @@ export default function App() {
   };
 
   const handleBulkAddStudents = async (namesString: string) => {
-    if (!user) return;
     const names = namesString.split('\n').map(n => n.trim()).filter(n => n !== '');
     if (names.length === 0) return;
 
@@ -793,7 +762,6 @@ export default function App() {
   };
 
   const handleBulkUpdateGrades = async (studentId: string, subIdx: number, type: 'tulis' | 'lisan', value: number) => {
-    if (!user) return;
     const student = studentsList.find(s => s.id === studentId);
     if (student) {
       const newSubs = [...student.subjects];
@@ -813,7 +781,6 @@ export default function App() {
   };
 
   const handleBulkUpdateExtra = async (studentId: string, activityIdx: number, key: 'activity' | 'note', value: string) => {
-    if (!user) return;
     const student = studentsList.find(s => s.id === studentId);
     if (student) {
       const newExtras = [...(student.extracurriculars || [])];
@@ -837,7 +804,6 @@ export default function App() {
   };
 
   const handleBulkUpdateBehavior = async (studentId: string, type: 'spiritual' | 'social', value: string) => {
-    if (!user) return;
     const student = studentsList.find(s => s.id === studentId);
     if (student) {
       const newBehavior = {
@@ -856,7 +822,6 @@ export default function App() {
   };
 
   const handleBulkUpdateIdentity = async (studentId: string, key: string, value: string) => {
-    if (!user) return;
     const student = studentsList.find(s => s.id === studentId);
     if (student) {
       const currentIdentity = student.identity || {
@@ -913,7 +878,7 @@ export default function App() {
 
   const handleSaveStudent = async (e?: React.FormEvent, stayOpen: boolean = false) => {
     if (e) e.preventDefault();
-    if (!editingStudent || !user) return;
+    if (!editingStudent) return;
 
     const isEdit = !!editingStudent.id;
     const studentId = isEdit ? editingStudent.id! : Math.random().toString(36).substr(2, 9);
@@ -946,7 +911,6 @@ export default function App() {
   };
 
   const handleDeleteStudent = async (id: string) => {
-    if (!user) return;
     if (confirm('Apakah Anda yakin ingin menghapus data santri ini?')) {
       try {
         await deleteDoc(doc(db, 'students', id));
@@ -1033,45 +997,11 @@ export default function App() {
   };
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">SINKRONISASI DATA...</p>
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }} 
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-white p-10 md:p-12 rounded-[40px] shadow-2xl shadow-blue-100 border border-slate-100 text-center"
-        >
-          <div className="w-20 h-20 bg-blue-600 rounded-3xl mx-auto flex items-center justify-center shadow-xl shadow-blue-200 mb-8">
-            <LucideUser size={40} className="text-white" />
-          </div>
-          <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight mb-2">PESANTREN AL-HIKMAH</h1>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-10">Sistem Laporan Hasil Belajar Santri</p>
-          
-          <button 
-            onClick={handleLogin}
-            className="w-full py-5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black tracking-widest transition-all flex items-center justify-center gap-4 group"
-          >
-            <LogIn size={20} className="group-hover:translate-x-1 transition-transform" />
-            MASUK DENGAN GOOGLE
-          </button>
-          
-          <p className="mt-8 text-[10px] font-bold text-slate-300 uppercase leading-relaxed">
-            Data tersimpan secara otomatis dan dapat diakses bersama melalui cloud database pesantren.
-          </p>
+          <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Memuat Data...</p>
         </motion.div>
       </div>
     );
@@ -1102,9 +1032,7 @@ export default function App() {
               <p className="text-blue-100/80 text-sm mt-2 font-medium tracking-widest uppercase">Silahkan Pilih Tingkat Kelas</p>
             </div>
             <button 
-              onClick={handleLogout}
-              className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all text-white border border-white/10"
-              title="Logout"
+              className="absolute top-6 right-6 p-3 bg-white/10 opacity-0 pointer-events-none rounded-2xl transition-all text-white border border-white/10"
             >
               <LogOut size={20} />
             </button>
@@ -1181,15 +1109,6 @@ export default function App() {
               title="Ubah Kelas"
             >
               <ChevronLeft size={18} />
-            </motion.button>
-            <motion.button 
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleLogout} 
-              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-              title="Keluar"
-            >
-              <LogOut size={18} />
             </motion.button>
           </div>
         </div>

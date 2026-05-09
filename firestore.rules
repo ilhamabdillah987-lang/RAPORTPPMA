@@ -34,15 +34,11 @@ service cloud.firestore {
     // --- Collections ---
 
     match /students/{studentId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming());
-      allow update: if isSignedIn() && isValidStudent(incoming());
-      allow delete: if isSignedIn();
+      allow read, write: if true;
     }
 
     match /configs/{configId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidConfig(incoming());
+      allow read, write: if true;
     }
   }
 }
