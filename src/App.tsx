@@ -6,23 +6,47 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Student, Subject } from './types';
-import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu } from 'lucide-react';
+import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User as LucideUser, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu, LogIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { db, auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from './firebase';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot } from 'firebase/firestore';
 
-// No server needed, data is stored in LocalStorage
-const STORAGE_KEY = 'al_hikmah_students_data';
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
 
-// Helper to get all students from local storage
-const getStoredStudents = (): Student[] => {
-  const data = localStorage.getItem(STORAGE_KEY);
-  return data ? JSON.parse(data) : [];
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+  }
+}
+
+const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
 };
 
-// Helper to save students to local storage
-const saveStoredStudents = (students: Student[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
-};
-
+// No server needed, data is stored in Firebase
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
@@ -504,22 +528,18 @@ const getHuruf = (nilai: number | string) => {
 export default function App() {
   const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA'];
 
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [selectedClass, setSelectedClass] = useState<string>(() => {
     return localStorage.getItem('selected_class') || '10 SMA';
   });
   const [studentsList, setStudentsList] = useState<Student[]>([]);
-  const [globalWaliKelas, setGlobalWaliKelas] = useState<string>(() => {
-    return localStorage.getItem(`wali_kelas_${selectedClass}`) || '';
-  });
-  const [globalNamaKelas, setGlobalNamaKelas] = useState<string>(() => {
-    return localStorage.getItem(`nama_kelas_${selectedClass}`) || '';
-  });
-  const [globalTanggalRaport, setGlobalTanggalRaport] = useState<string>(() => {
-    return localStorage.getItem(`tanggal_raport_${selectedClass}`) || '20 Desember 2025';
-  });
-  const [globalKepala, setGlobalKepala] = useState<string>(() => {
-    return localStorage.getItem(`kepala_kepasentrenan_${selectedClass}`) || '';
-  });
+  const [globalWaliKelas, setGlobalWaliKelas] = useState<string>('');
+  const [globalNamaKelas, setGlobalNamaKelas] = useState<string>('');
+  const [globalTanggalRaport, setGlobalTanggalRaport] = useState<string>('');
+  const [globalKepala, setGlobalKepala] = useState<string>('');
+  const [logoUrl, setLogoUrl] = useState<string>('');
   const [isBulkGradesOpen, setIsBulkGradesOpen] = useState(false);
   const [isBulkIdentityOpen, setIsBulkIdentityOpen] = useState(false);
   const [isBulkExtraOpen, setIsBulkExtraOpen] = useState(false);
@@ -540,6 +560,31 @@ export default function App() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Auth listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   // Close sidebar on mobile when student changes
   useEffect(() => {
     if (window.innerWidth < 768) {
@@ -547,18 +592,50 @@ export default function App() {
     }
   }, [currentIndex]);
 
-  const [logoUrl, setLogoUrl] = useState<string>(() => {
-    return localStorage.getItem('al_hikmah_custom_logo') || '';
-  });
+  // Fetch configs from Firebase
+  useEffect(() => {
+    if (!user) return;
+
+    const configKeys = [
+      `wali_kelas_${selectedClass}`,
+      `nama_kelas_${selectedClass}`,
+      `tanggal_raport_${selectedClass}`,
+      `kepala_kepasentrenan_${selectedClass}`,
+      'al_hikmah_custom_logo'
+    ];
+
+    const unsubscribers = configKeys.map(key => {
+      return onSnapshot(doc(db, 'configs', key), (snapshot) => {
+        if (snapshot.exists()) {
+          const val = snapshot.data().value;
+          if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(val);
+          if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(val);
+          if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(val);
+          if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(val);
+          if (key === 'al_hikmah_custom_logo') setLogoUrl(val);
+        } else {
+          // Defaults if not in Firebase
+          if (key.startsWith('tanggal_raport_')) setGlobalTanggalRaport('20 Desember 2025');
+        }
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, `configs/${key}`);
+      });
+    });
+
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, [user, selectedClass]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const base64 = reader.result as string;
-        setLogoUrl(base64);
-        localStorage.setItem('al_hikmah_custom_logo', base64);
+        try {
+          await setDoc(doc(db, 'configs', 'al_hikmah_custom_logo'), { value: base64, updatedAt: new Date().toISOString() });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, 'configs/al_hikmah_custom_logo');
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -566,102 +643,26 @@ export default function App() {
 
   const classes = CLASSES;
 
-  // Initialize data with seed data if empty
+  // Initialize and fetch students from Firebase
   useEffect(() => {
-    const existingData = localStorage.getItem(STORAGE_KEY);
-    if (!existingData) {
-      const seedData: Student[] = [
-        {
-          id: '1',
-          name: 'AHMAD ABDULLAH',
-          nomorInduk: '2023001',
-          noUrut: 1,
-          class: '7',
-          semester: 'GANJIL',
-          tahunPelajaran: '2023/2024',
-          subjects: [
-            { name: "Asasul Mubtadiin Fi Ilmi Nahwi", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 85, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
-            { name: "Mutammimah", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 75, huruf: 'C' }, lisan: { nilai: 78, huruf: 'C' } },
-            { name: "Asasul Mubtadiin Fi Ilmi Shorfi", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 90, huruf: 'A' }, lisan: { nilai: 88, huruf: 'B' } },
-            { name: "Durusullughah", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 92, huruf: 'A' }, lisan: { nilai: 95, huruf: 'A' } },
-            { name: "Qiraatul Kutub", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 82, huruf: 'B' }, lisan: { nilai: 84, huruf: 'B' } },
-            { name: "Imla'", category: "BAHASA ARAB", kkm: 70, tulis: { nilai: 80, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
-            { name: "Al-Qur'an", category: "AGAMA", kkm: 70, tulis: { nilai: 95, huruf: 'A' }, lisan: { nilai: 98, huruf: 'A' } },
-            { name: "Tajwid", category: "AGAMA", kkm: 70, tulis: { nilai: 88, huruf: 'B' }, lisan: { nilai: 85, huruf: 'B' } },
-            { name: "Fiqih Qouliyah", category: "AGAMA", kkm: 70, tulis: { nilai: 82, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
-            { name: "Fiqih Fi'liyah", category: "AGAMA", kkm: 70, tulis: { nilai: 78, huruf: 'C' }, lisan: { nilai: 75, huruf: 'C' } },
-            { name: "Grammar", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 85, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
-            { name: "Stories For You", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 88, huruf: 'B' }, lisan: { nilai: 85, huruf: 'B' } },
-            { name: "Dialogue/Speaking", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 90, huruf: 'A' }, lisan: { nilai: 95, huruf: 'A' } },
-            { name: "Dictation", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 82, huruf: 'B' }, lisan: { nilai: 80, huruf: 'B' } },
-            { name: "Vocabularies", category: "BAHASA INGGRIS", kkm: 70, tulis: { nilai: 85, huruf: 'B' }, lisan: { nilai: 88, huruf: 'B' } }
-          ],
-          behavior: { spiritual: 'Sangat baik dalam menjalankan ibadah harian.', social: 'Sangat sopan dan menghargai teman sebaya.' },
-          attendance: { sakit: 1, izin: 0, alpha: 0 },
-          extracurriculars: []
-        }
-      ];
-      saveStoredStudents(seedData);
-    }
-  }, []);
-
-  // Auto-save effect: Updates UI in real-time, sinks to server with debounce
-  useEffect(() => {
-    if (!editingStudent || !editingStudent.id) return;
-
-    // REAL-TIME UI UPDATE: Update local list immediately as user types
-    // This allows background rankings and reports to reflect changes instantly
-    setStudentsList(prev => prev.map(s => s.id === editingStudent.id ? { ...s, ...editingStudent } as Student : s));
-
-    const timer = setTimeout(() => {
-      autoSaveStudent(editingStudent);
-    }, 500); // 500ms debounce for faster server persistence
-
-    return () => clearTimeout(timer);
-  }, [editingStudent]);
-
-  const handleCloseModal = async () => {
-    if (editingStudent && editingStudent.id && saveStatus === 'saving') {
-      // If still saving, wait or trigger immediate save
-      await autoSaveStudent(editingStudent);
-    }
-    setIsModalOpen(false);
-    setEditingStudent(null);
-    setSaveStatus('idle');
-  };
-
-  const autoSaveStudent = async (student: Partial<Student>) => {
-    if (!student.id) return;
-    setSaveStatus('saving');
-    try {
-      const allStudents = getStoredStudents();
-      const idx = allStudents.findIndex(s => s.id === student.id);
-      if (idx !== -1) {
-        allStudents[idx] = { ...allStudents[idx], ...student } as Student;
-        saveStoredStudents(allStudents);
-        setSaveStatus('saved');
-      } else {
-        setSaveStatus('error');
-      }
-    } catch (e) {
-      setSaveStatus('error');
-    }
-  };
-
-  useEffect(() => {
-    if (selectedClass) {
+    if (user && selectedClass) {
       fetchStudents(selectedClass);
     } else {
       setIsLoading(false);
     }
-  }, [selectedClass]);
+  }, [user, selectedClass]);
 
   const fetchStudents = async (className: string) => {
+    if (!user) return;
     setIsLoading(true);
     try {
-      const allStudents = getStoredStudents();
-      const filtered = allStudents.filter(s => s.class === className);
-      setStudentsList(filtered);
+      const q = query(collection(db, 'students'), where('class', '==', className));
+      const querySnapshot = await getDocs(q);
+      const students = querySnapshot.docs.map(doc => doc.data() as Student);
+      
+      // Sort by noUrut
+      students.sort((a, b) => (a.noUrut || 0) - (b.noUrut || 0));
+      setStudentsList(students);
     } catch (e) {
       console.error(e);
     } finally {
@@ -669,51 +670,100 @@ export default function App() {
     }
   };
 
+  const autoSaveStudent = async (student: Partial<Student>) => {
+    if (!student.id || !user) return;
+    setSaveStatus('saving');
+    try {
+      await setDoc(doc(db, 'students', student.id), { ...student, updatedAt: new Date().toISOString() }, { merge: true });
+      setSaveStatus('saved');
+    } catch (e) {
+      setSaveStatus('error');
+    }
+  };
+
   const handleSelectClass = (className: string) => {
     setSelectedClass(className);
     localStorage.setItem('selected_class', className);
-    setGlobalWaliKelas(localStorage.getItem(`wali_kelas_${className}`) || '');
     setCurrentIndex(0);
   };
 
-  const handleUpdateGlobalWaliKelas = (val: string) => {
+  const handleUpdateGlobalWaliKelas = async (val: string) => {
     setGlobalWaliKelas(val);
     if (selectedClass) {
-      localStorage.setItem(`wali_kelas_${selectedClass}`, val);
+      try {
+        await setDoc(doc(db, 'configs', `wali_kelas_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `configs/wali_kelas_${selectedClass}`);
+      }
     }
   };
 
-  const handleUpdateGlobalNamaKelas = (val: string) => {
+  const handleUpdateGlobalNamaKelas = async (val: string) => {
     setGlobalNamaKelas(val);
     if (selectedClass) {
-      localStorage.setItem(`nama_kelas_${selectedClass}`, val);
+      try {
+        await setDoc(doc(db, 'configs', `nama_kelas_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `configs/nama_kelas_${selectedClass}`);
+      }
     }
   };
 
-  const handleUpdateGlobalTanggalRaport = (val: string) => {
+  const handleUpdateGlobalTanggalRaport = async (val: string) => {
     setGlobalTanggalRaport(val);
     if (selectedClass) {
-      localStorage.setItem(`tanggal_raport_${selectedClass}`, val);
+      try {
+        await setDoc(doc(db, 'configs', `tanggal_raport_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `configs/tanggal_raport_${selectedClass}`);
+      }
     }
   };
 
-  const handleUpdateGlobalKepala = (val: string) => {
+  const handleUpdateGlobalKepala = async (val: string) => {
     setGlobalKepala(val);
     if (selectedClass) {
-      localStorage.setItem(`kepala_kepasentrenan_${selectedClass}`, val);
+      try {
+        await setDoc(doc(db, 'configs', `kepala_kepasentrenan_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `configs/kepala_kepasentrenan_${selectedClass}`);
+      }
     }
   };
 
-  const handleBulkAddStudents = (namesString: string) => {
+  // Auto-save effect: Updates UI in real-time, sinks to server with debounce
+  useEffect(() => {
+    if (!editingStudent || !editingStudent.id || !user) return;
+
+    // REAL-TIME UI UPDATE: Update local list immediately as user types
+    setStudentsList(prev => prev.map(s => s.id === editingStudent.id ? { ...s, ...editingStudent } as Student : s));
+
+    const timer = setTimeout(() => {
+      autoSaveStudent(editingStudent);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [editingStudent, user]);
+
+  const handleCloseModal = async () => {
+    if (editingStudent && editingStudent.id && saveStatus === 'saving') {
+      await autoSaveStudent(editingStudent);
+    }
+    setIsModalOpen(false);
+    setEditingStudent(null);
+    setSaveStatus('idle');
+  };
+
+  const handleBulkAddStudents = async (namesString: string) => {
+    if (!user) return;
     const names = namesString.split('\n').map(n => n.trim()).filter(n => n !== '');
     if (names.length === 0) return;
 
-    const allStudents = getStoredStudents();
     const newStudents: Student[] = names.map((name, index) => ({
       id: Math.random().toString(36).substr(2, 9),
       name: name.toUpperCase(),
       nomorInduk: '',
-      noUrut: (allStudents.length + index + 1),
+      noUrut: (studentsList.length + index + 1),
       class: selectedClass || '10 SMA',
       semester: 'GANJIL',
       tahunPelajaran: '2025/2026',
@@ -722,61 +772,51 @@ export default function App() {
       attendance: { sakit: 0, izin: 0, alpha: 0 },
       extracurriculars: [],
       identity: {
-        nisNisn: '',
-        tempatTanggalLahir: '',
-        jenisKelamin: '',
-        agama: 'ISLAM',
-        statusDalamKeluarga: '',
-        anakKe: '',
-        alamatPesertaDidik: '',
-        teleponRumah: '',
-        sekolahAsal: '',
-        diterimaDiKelas: '',
-        diterimaPadaTanggal: '',
-        namaAyah: '',
-        namaIbu: '',
-        alamatOrangTua: '',
-        teleponOrangTua: '',
-        pekerjaanAyah: '',
-        pekerjaanIbu: '',
-        namaWali: '',
-        alamatWali: '',
-        teleponWali: '',
-        pekerjaanWali: ''
+        nisNisn: '', tempatTanggalLahir: '', jenisKelamin: '', agama: 'ISLAM',
+        statusDalamKeluarga: '', anakKe: '', alamatPesertaDidik: '', teleponRumah: '',
+        sekolahAsal: '', diterimaDiKelas: '', diterimaPadaTanggal: '',
+        namaAyah: '', namaIbu: '', alamatOrangTua: '', teleponOrangTua: '',
+        pekerjaanAyah: '', pekerjaanIbu: '', namaWali: '', alamatWali: '',
+        teleponWali: '', pekerjaanWali: ''
       }
     }));
 
-    const updatedData = [...allStudents, ...newStudents];
-    saveStoredStudents(updatedData);
-    if (selectedClass) fetchStudents(selectedClass);
-    setIsBulkAddOpen(false);
-    alert(`Berhasil menambahkan ${newStudents.length} santri.`);
+    try {
+      for (const s of newStudents) {
+        await setDoc(doc(db, 'students', s.id), { ...s, updatedAt: new Date().toISOString() });
+      }
+      if (selectedClass) fetchStudents(selectedClass);
+      setIsBulkAddOpen(false);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, 'students');
+    }
   };
 
-  const handleBulkUpdateGrades = (studentId: string, subIdx: number, type: 'tulis' | 'lisan', value: number) => {
-    const allStudents = getStoredStudents();
-    const sIdx = allStudents.findIndex(s => s.id === studentId);
-    if (sIdx !== -1) {
-      const student = allStudents[sIdx];
+  const handleBulkUpdateGrades = async (studentId: string, subIdx: number, type: 'tulis' | 'lisan', value: number) => {
+    if (!user) return;
+    const student = studentsList.find(s => s.id === studentId);
+    if (student) {
       const newSubs = [...student.subjects];
       newSubs[subIdx] = {
         ...newSubs[subIdx],
         [type]: { nilai: value, huruf: getHuruf(value) }
       };
-      allStudents[sIdx] = { ...student, subjects: newSubs };
-      saveStoredStudents(allStudents);
-      setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
+      
+      const updated = { ...student, subjects: newSubs };
+      setStudentsList(prev => prev.map(s => s.id === studentId ? updated : s));
+      try {
+        await setDoc(doc(db, 'students', studentId), { subjects: newSubs, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (e) {
+        handleFirestoreError(e, OperationType.UPDATE, `students/${studentId}`);
+      }
     }
   };
 
-  const handleBulkUpdateExtra = (studentId: string, activityIdx: number, key: 'activity' | 'note', value: string) => {
-    const allStudents = getStoredStudents();
-    const sIdx = allStudents.findIndex(s => s.id === studentId);
-    if (sIdx !== -1) {
-      const student = allStudents[sIdx];
+  const handleBulkUpdateExtra = async (studentId: string, activityIdx: number, key: 'activity' | 'note', value: string) => {
+    if (!user) return;
+    const student = studentsList.find(s => s.id === studentId);
+    if (student) {
       const newExtras = [...(student.extracurriculars || [])];
-      
-      // Ensure the activity index exists
       while (newExtras.length <= activityIdx) {
         newExtras.push({ activity: '', note: '' });
       }
@@ -786,34 +826,39 @@ export default function App() {
         [key]: value
       };
       
-      allStudents[sIdx] = { ...student, extracurriculars: newExtras };
-      saveStoredStudents(allStudents);
-      setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
+      const updated = { ...student, extracurriculars: newExtras };
+      setStudentsList(prev => prev.map(s => s.id === studentId ? updated : s));
+      try {
+        await setDoc(doc(db, 'students', studentId), { extracurriculars: newExtras, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (e) {
+        handleFirestoreError(e, OperationType.UPDATE, `students/${studentId}`);
+      }
     }
   };
 
-  const handleBulkUpdateBehavior = (studentId: string, type: 'spiritual' | 'social', value: string) => {
-    const allStudents = getStoredStudents();
-    const sIdx = allStudents.findIndex(s => s.id === studentId);
-    if (sIdx !== -1) {
-      const student = allStudents[sIdx];
-      allStudents[sIdx] = {
-        ...student,
-        behavior: {
-          ...student.behavior,
-          [type]: value
-        }
+  const handleBulkUpdateBehavior = async (studentId: string, type: 'spiritual' | 'social', value: string) => {
+    if (!user) return;
+    const student = studentsList.find(s => s.id === studentId);
+    if (student) {
+      const newBehavior = {
+        ...student.behavior,
+        [type]: value
       };
-      saveStoredStudents(allStudents);
-      setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
+      
+      const updated = { ...student, behavior: newBehavior };
+      setStudentsList(prev => prev.map(s => s.id === studentId ? updated : s));
+      try {
+        await setDoc(doc(db, 'students', studentId), { behavior: newBehavior, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (e) {
+        handleFirestoreError(e, OperationType.UPDATE, `students/${studentId}`);
+      }
     }
   };
 
-  const handleBulkUpdateIdentity = (studentId: string, key: string, value: string) => {
-    const allStudents = getStoredStudents();
-    const sIdx = allStudents.findIndex(s => s.id === studentId);
-    if (sIdx !== -1) {
-      const student = allStudents[sIdx];
+  const handleBulkUpdateIdentity = async (studentId: string, key: string, value: string) => {
+    if (!user) return;
+    const student = studentsList.find(s => s.id === studentId);
+    if (student) {
       const currentIdentity = student.identity || {
         nisNisn: '', tempatTanggalLahir: '', jenisKelamin: '', agama: 'ISLAM',
         statusDalamKeluarga: '', anakKe: '', alamatPesertaDidik: '', teleponRumah: '',
@@ -823,20 +868,23 @@ export default function App() {
         teleponWali: '', pekerjaanWali: ''
       };
       
-      allStudents[sIdx] = {
-        ...student,
-        identity: {
-          ...currentIdentity,
-          [key]: value
-        }
+      const newIdentity = {
+        ...currentIdentity,
+        [key]: value
       };
-      saveStoredStudents(allStudents);
-      setStudentsList(prev => prev.map(s => s.id === studentId ? allStudents[sIdx] : s));
+      
+      const updated = { ...student, identity: newIdentity };
+      setStudentsList(prev => prev.map(s => s.id === studentId ? updated : s));
+      try {
+        await setDoc(doc(db, 'students', studentId), { identity: newIdentity, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (e) {
+        handleFirestoreError(e, OperationType.UPDATE, `students/${studentId}`);
+      }
     }
   };
 
   const handleClearClass = () => {
-    setSelectedClass(null);
+    setSelectedClass('');
     localStorage.removeItem('selected_class');
     setStudentsList([]);
   };
@@ -865,32 +913,22 @@ export default function App() {
 
   const handleSaveStudent = async (e?: React.FormEvent, stayOpen: boolean = false) => {
     if (e) e.preventDefault();
-    if (!editingStudent) return;
+    if (!editingStudent || !user) return;
 
     const isEdit = !!editingStudent.id;
+    const studentId = isEdit ? editingStudent.id! : Math.random().toString(36).substr(2, 9);
 
-    const payload = isEdit ? editingStudent : {
+    const payload = {
       ...editingStudent,
-      id: Date.now().toString(),
-      noUrut: studentsList.length + 1
-    } as Student;
+      id: studentId,
+      noUrut: isEdit ? editingStudent.noUrut : (studentsList.length + 1),
+      updatedAt: new Date().toISOString()
+    };
 
     try {
-      const allStudents = getStoredStudents();
-      if (isEdit) {
-        const idx = allStudents.findIndex(s => s.id === editingStudent.id);
-        if (idx !== -1) {
-          allStudents[idx] = payload as Student;
-        }
-      } else {
-        allStudents.push(payload as Student);
-      }
-      saveStoredStudents(allStudents);
-
+      await setDoc(doc(db, 'students', studentId), payload, { merge: true });
+      
       if (!isEdit) {
-        // If it's a new student, update local list instantly and select them
-        const newStudent = payload as Student;
-        setStudentsList(prev => [...prev, newStudent]);
         setSearchTerm('');
         setCurrentIndex(studentsList.length);
       }
@@ -903,25 +941,18 @@ export default function App() {
         setSaveStatus('idle');
       }
     } catch (e) {
-      console.error(e);
+      handleFirestoreError(e, OperationType.WRITE, `students/${studentId}`);
     }
   };
 
   const handleDeleteStudent = async (id: string) => {
+    if (!user) return;
     if (confirm('Apakah Anda yakin ingin menghapus data santri ini?')) {
       try {
-        const allStudents = getStoredStudents();
-        const newList = allStudents.filter(s => s.id !== id);
-        saveStoredStudents(newList);
-        
-        const filteredList = newList.filter(s => s.class === selectedClass);
-        setStudentsList(filteredList);
-        
-        if (currentIndex >= filteredList.length && filteredList.length > 0) {
-          setCurrentIndex(filteredList.length - 1);
-        }
+        await deleteDoc(doc(db, 'students', id));
+        if (selectedClass) fetchStudents(selectedClass);
       } catch (e) {
-        console.error(e);
+        handleFirestoreError(e, OperationType.DELETE, `students/${id}`);
       }
     }
   };
@@ -1005,6 +1036,47 @@ export default function App() {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">SINKRONISASI DATA...</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }} 
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md bg-white p-10 md:p-12 rounded-[40px] shadow-2xl shadow-blue-100 border border-slate-100 text-center"
+        >
+          <div className="w-20 h-20 bg-blue-600 rounded-3xl mx-auto flex items-center justify-center shadow-xl shadow-blue-200 mb-8">
+            <LucideUser size={40} className="text-white" />
+          </div>
+          <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight mb-2">PESANTREN AL-HIKMAH</h1>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-10">Sistem Laporan Hasil Belajar Santri</p>
+          
+          <button 
+            onClick={handleLogin}
+            className="w-full py-5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black tracking-widest transition-all flex items-center justify-center gap-4 group"
+          >
+            <LogIn size={20} className="group-hover:translate-x-1 transition-transform" />
+            MASUK DENGAN GOOGLE
+          </button>
+          
+          <p className="mt-8 text-[10px] font-bold text-slate-300 uppercase leading-relaxed">
+            Data tersimpan secara otomatis dan dapat diakses bersama melalui cloud database pesantren.
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (!selectedClass) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans">
@@ -1029,6 +1101,13 @@ export default function App() {
               <h1 className="text-3xl font-black tracking-tight uppercase">SISTEM RAPORT AL-HIKMAH</h1>
               <p className="text-blue-100/80 text-sm mt-2 font-medium tracking-widest uppercase">Silahkan Pilih Tingkat Kelas</p>
             </div>
+            <button 
+              onClick={handleLogout}
+              className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all text-white border border-white/10"
+              title="Logout"
+            >
+              <LogOut size={20} />
+            </button>
           </div>
           
           <div className="p-12">
@@ -1089,26 +1168,37 @@ export default function App() {
               )}
             </div>
             <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tingkat Kelas</p>
-              <h2 className="text-sm font-bold text-slate-700 uppercase">KELAS {selectedClass}</h2>
+              <h2 className="text-sm font-black text-slate-700 uppercase tracking-tight leading-none mb-1">RA RAPORTS</h2>
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">AL-HIKMAH CLOUD</p>
             </div>
           </div>
-          <motion.button 
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={handleClearClass} 
-            className="text-slate-400 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-blue-50"
-            title="Kembali ke Pilih Kelas"
-          >
-            <X size={18} />
-          </motion.button>
+          <div className="flex items-center gap-1">
+            <motion.button 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleClearClass} 
+              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+              title="Ubah Kelas"
+            >
+              <ChevronLeft size={18} />
+            </motion.button>
+            <motion.button 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleLogout} 
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+              title="Keluar"
+            >
+              <LogOut size={18} />
+            </motion.button>
+          </div>
         </div>
 
         <div className="space-y-6 flex-1">
           {/* Section: Students List */}
           <div>
             <h3 className="text-[10px] uppercase font-black text-slate-400 mb-3 ml-2 flex items-center gap-2">
-              <User size={12} /> Data Santri
+              <LucideUser size={12} /> Data Santri
             </h3>
             
             <div className="relative mb-4">
@@ -1524,13 +1614,11 @@ export default function App() {
                                   value={field.isMain ? (s as any)[field.key] : (s.identity as any)?.[field.key] || ''}
                                   onChange={e => {
                                     if (field.isMain) {
-                                      const all = getStoredStudents();
-                                      const idxx = all.findIndex(stud => stud.id === s.id);
-                                      if (idxx !== -1) {
-                                        (all[idxx] as any)[field.key] = e.target.value.toUpperCase();
-                                        saveStoredStudents(all);
-                                        setStudentsList(prev => prev.map(stud => stud.id === s.id ? all[idxx] : stud));
-                                      }
+                                      const newVal = e.target.value.toUpperCase();
+                                      const updated = { ...s, [field.key]: newVal };
+                                      setStudentsList(prev => prev.map(stud => stud.id === s.id ? updated : stud));
+                                      setDoc(doc(db, 'students', s.id), { [field.key]: newVal, updatedAt: new Date().toISOString() }, { merge: true })
+                                        .catch(err => handleFirestoreError(err, OperationType.UPDATE, `students/${s.id}`));
                                     } else {
                                       handleBulkUpdateIdentity(s.id, field.key, e.target.value);
                                     }
@@ -1919,7 +2007,7 @@ export default function App() {
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                           <div className="flex items-center justify-between mb-6">
                             <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] flex items-center gap-2">
-                               <User size={14} /> KETERANGAN TENTANG DIRI PESERTA DIDIK
+                               <LucideUser size={14} /> KETERANGAN TENTANG DIRI PESERTA DIDIK
                             </h3>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
