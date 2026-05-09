@@ -1373,25 +1373,30 @@ export default function App() {
               <div className="flex min-h-full items-center justify-center p-4">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkGradesOpen(false)} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" />
                 <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative w-full max-w-5xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                  <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100">
-                    <div>
-                      <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT NILAI KELAS: {selectedClass}</h2>
-                      <div className="flex items-center gap-4 mt-2">
-                         <div className="flex items-center gap-2">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilih Mata Pelajaran:</span>
-                           <select 
-                            className="bg-slate-100 border-none rounded-xl px-4 py-2 text-xs font-black text-blue-600 outline-none focus:ring-2 focus:ring-blue-400 uppercase"
-                            value={selectedSubjectIndex}
-                            onChange={e => setSelectedSubjectIndex(parseInt(e.target.value))}
-                           >
-                             {studentsList[0]?.subjects.map((s, i) => (
-                               <option key={i} value={i}>{s.name}</option>
-                             ))}
-                           </select>
-                         </div>
+                  <div className="p-8 pb-4 flex flex-col gap-6 border-b border-slate-100">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase leading-none">INPUT NILAI KELAS: {selectedClass}</h2>
+                        <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest leading-none">PILIH MATA PELAJARAN DI BAWAH UNTUK MULAI INPUT NILAI</p>
                       </div>
+                      <button onClick={() => setIsBulkGradesOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-900"><X size={24} /></button>
                     </div>
-                    <button onClick={() => setIsBulkGradesOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
+
+                    <div className="flex flex-wrap gap-2">
+                      {studentsList[0]?.subjects.map((s, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setSelectedSubjectIndex(i)}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                            selectedSubjectIndex === i 
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 ring-2 ring-blue-600 ring-offset-2' 
+                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                          }`}
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="flex-1 overflow-x-auto overflow-y-auto p-8 pt-4">
                     <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl mb-6 flex items-center gap-3">
