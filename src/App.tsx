@@ -1185,7 +1185,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row h-screen overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row h-screen overflow-hidden print:h-auto print:overflow-visible print:block">
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 no-print shrink-0">
         <div className="flex items-center gap-3">
@@ -1202,12 +1202,12 @@ export default function App() {
       {/* Sidebar Controls */}
       <AnimatePresence>
         {(isSidebarOpen || (typeof window !== 'undefined' && window.innerWidth >= 768)) && (
-          <motion.aside 
-            initial={{ x: -288 }}
-            animate={{ x: 0 }}
-            exit={{ x: -288 }}
-            className={`fixed inset-y-0 left-0 z-[150] w-72 bg-white border-r border-slate-200 overflow-y-auto no-print h-screen shadow-2xl flex flex-col pt-6 px-4 md:sticky md:block md:shadow-none md:translate-x-0 ${isSidebarOpen ? 'block' : 'hidden md:flex'}`}
-          >
+            <motion.aside 
+              initial={{ x: -288 }}
+              animate={{ x: 0 }}
+              exit={{ x: -288 }}
+              className={`fixed inset-y-0 left-0 z-[150] w-72 bg-white border-r border-slate-200 overflow-y-auto no-print h-screen shadow-2xl flex flex-col pt-6 px-4 md:sticky md:block md:shadow-none md:translate-x-0 print:hidden ${isSidebarOpen ? 'block' : 'hidden md:flex'}`}
+            >
         <div className="flex items-center justify-between mb-8 px-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 overflow-hidden p-1">
@@ -1450,7 +1450,7 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto w-full print:overflow-visible">
+      <main className="flex-1 overflow-y-auto w-full print:overflow-visible print:h-auto">
         {/* MULTI STUDENT ADD MODAL */}
         {isBulkAddOpen && (
           <AnimatePresence>
@@ -2142,7 +2142,7 @@ export default function App() {
         )}
         
         {studentsToPrint.length > 0 ? (
-          <div className="flex flex-col items-center bg-white min-h-screen p-0 no-scrollbar print:m-0 print:p-0">
+          <div className="flex flex-col items-center bg-white min-h-screen p-0 no-scrollbar print:m-0 print:p-0 print:block print:h-auto print:overflow-visible">
             {studentsToPrint.map(student => (
               <div key={student.id} className="print:m-0 print:p-0">
                 <ReportTemplate 
@@ -2180,7 +2180,7 @@ export default function App() {
                </div>
              </div>
 
-             <div className="scale-[0.45] xs:scale-[0.55] sm:scale-[0.75] md:scale-100 print:scale-100 origin-top overflow-visible print:m-0 print:p-0">
+             <div className="scale-[0.45] xs:scale-[0.55] sm:scale-[0.75] md:scale-100 print:scale-100 origin-top overflow-visible print:m-0 print:p-0 print:block print:h-auto">
                <ReportTemplate 
                   student={selectedStudent}
                   logoUrl={logoUrl}

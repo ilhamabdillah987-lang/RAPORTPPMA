@@ -15,11 +15,13 @@
   }
 
   @media print {
-    body {
+    html, body {
       background-color: white !important;
       font-family: var(--font-serif) !important;
       margin: 0 !important;
       padding: 0 !important;
+      overflow: visible !important;
+      height: auto !important;
     }
     @page {
       size: A4;
@@ -35,6 +37,8 @@
       display: block !important;
       box-shadow: none !important;
       margin: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
     }
     .page {
       margin: 0 !important;
@@ -43,10 +47,13 @@
       border: none !important;
       width: 210mm !important;
       min-height: 297mm !important;
+      height: auto !important;
       page-break-after: always !important;
       page-break-inside: avoid !important;
       position: relative !important;
       overflow: visible !important;
+      display: flex !important;
+      flex-direction: column !important;
     }
   }
 }
@@ -148,19 +155,6 @@
   min-width: 150px;
 }
 
-@media print {
-  .report-container {
-    margin: 0;
-    box-shadow: none;
-  }
-  .no-print {
-    display: none !important;
-  }
-  .page {
-    margin: 0;
-    border: none;
-  }
-}
 
 /* Custom utilities */
 @utility no-scrollbar {
