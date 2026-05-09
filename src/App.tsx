@@ -159,9 +159,9 @@ const ReportTemplate = ({
       </section>
 
       {/* PAGE 2: IDENTITAS SANTRI */}
-      <section className="page flex flex-col p-12 text-[10.5pt] font-sans">
-        <h1 className="text-center text-[13pt] font-black uppercase mb-12 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
-        <div className="flex-1 space-y-1">
+      <section className="page flex flex-col pt-8 pb-6 px-12 text-[10pt] font-sans">
+        <h1 className="text-center text-[12pt] font-black uppercase mb-8 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
+        <div className="flex-1 space-y-0.5">
           <table className="w-full border-collapse">
             <tbody>
               {[
@@ -193,15 +193,15 @@ const ReportTemplate = ({
                 { label: 'Nomor Telepon Rumah', indent: true, value: student.identity?.teleponWali },
                 { id: "17.", label: 'Pekerjaan Wali Peserta Didik', value: student.identity?.pekerjaanWali },
               ].map((row, idx) => {
-                if (row.isSpacer) return <tr key={`spacer-${idx}`}><td colSpan={4} className="h-4"></td></tr>;
+                if (row.isSpacer) return <tr key={`spacer-${idx}`}><td colSpan={4} className="h-2"></td></tr>;
                 return (
                   <tr key={idx} className="align-top">
-                    <td className="w-8 py-1.5 font-bold">{(row as any).id || ''}</td>
-                    <td className={`w-[45%] py-1.5 ${row.indent ? 'pl-6' : ''} ${row.isHeader ? 'font-black' : 'font-medium'}`}>
+                    <td className="w-8 py-1 font-bold">{(row as any).id || ''}</td>
+                    <td className={`w-[45%] py-1 ${row.indent ? 'pl-6' : ''} ${row.isHeader ? 'font-black' : 'font-medium'}`}>
                       {row.label}
                     </td>
-                    <td className="w-4 py-1.5 text-center">:</td>
-                    <td className={`py-1.5 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black uppercase' : ''}`}>
+                    <td className="w-4 py-1 text-center">:</td>
+                    <td className={`py-1 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black uppercase' : ''}`}>
                       {row.value}
                     </td>
                   </tr>
@@ -210,15 +210,15 @@ const ReportTemplate = ({
             </tbody>
           </table>
         </div>
-        <div className="flex justify-between items-end mt-16 px-12">
+        <div className="flex justify-between items-end mt-8 px-12">
           <div className="w-[3cm] h-[4cm] border-2 border-slate-900 flex items-center justify-center text-center text-[7pt] text-slate-400 font-bold bg-slate-50 uppercase tracking-tighter leading-tight p-3 shrink-0">
             Pas Foto<br/>3 x 4 cm
           </div>
-          <div className="text-center w-80 mb-4">
-            <p className="mb-1 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
+          <div className="text-center w-80 mb-2">
+            <p className="mb-0 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
             <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
-            <div className="h-24"></div>
-            <p className="font-black text-[10pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
+            <div className="h-20"></div>
+            <p className="font-black text-[10pt] border-b-2 border-black inline-block min-w-[200px] uppercase">{globalKepala || ''}</p>
           </div>
         </div>
       </section>
