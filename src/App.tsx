@@ -1373,72 +1373,68 @@ export default function App() {
               <div className="flex min-h-full items-center justify-center p-4">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkGradesOpen(false)} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" />
                 <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative w-full max-w-5xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                  <div className="p-8 pb-4 flex flex-col gap-6 border-b border-slate-100">
+                  <div className="p-8 pb-4 border-b border-slate-100">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase leading-none">INPUT NILAI KELAS: {selectedClass}</h2>
-                        <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest leading-none">PILIH MATA PELAJARAN DI BAWAH UNTUK MULAI INPUT NILAI</p>
+                        <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase leading-none">INPUT NILAI MASSAL: KELAS {selectedClass}</h2>
+                        <p className="text-[10px] font-black text-slate-400 mt-2 uppercase tracking-widest leading-none">SELURUH MATA PELAJARAN (GESER KANAN UNTUK MELIHAT SEMUA)</p>
                       </div>
                       <button onClick={() => setIsBulkGradesOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-900"><X size={24} /></button>
                     </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {studentsList[0]?.subjects.map((s, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setSelectedSubjectIndex(i)}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                            selectedSubjectIndex === i 
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 ring-2 ring-blue-600 ring-offset-2' 
-                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                          }`}
-                        >
-                          {s.name}
-                        </button>
-                      ))}
-                    </div>
                   </div>
-                  <div className="flex-1 overflow-x-auto overflow-y-auto p-8 pt-4">
-                    <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl mb-6 flex items-center gap-3">
-                      <div className="bg-blue-600 text-white p-2 rounded-xl"><LayoutDashboard size={18} /></div>
-                      <div>
-                        <p className="text-sm font-bold text-blue-800">Mode Grid Nilai</p>
-                        <p className="text-[10px] font-bold text-blue-600/70 uppercase">Mata Pelajaran: {studentsList[0]?.subjects[selectedSubjectIndex]?.name}</p>
-                      </div>
-                    </div>
-                    <table className="w-full text-left border-collapse min-w-[600px]">
+                  <div className="flex-1 overflow-x-auto overflow-y-auto p-4">
+                    <table className="text-left border-separate border-spacing-0 min-w-max">
                       <thead>
-                        <tr className="bg-slate-50">
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-center">No</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[150px] sticky left-0 z-20 bg-slate-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Nama Santri</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-40 text-center bg-blue-100/50">Nilai Tulis</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-40 text-center bg-emerald-100/50">Nilai Lisan</th>
+                        <tr className="bg-slate-50 sticky top-0 z-30">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase w-12 text-center border-b border-slate-100 bg-slate-50">No</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase min-w-[200px] sticky left-0 z-40 bg-slate-50 border-b border-slate-100 shadow-[2px_0_5_rgba(0,0,0,0.05)]">Nama Santri</th>
+                          {studentsList[0]?.subjects.map((sub, sIdx) => (
+                            <th key={sIdx} colSpan={2} className={`px-4 py-3 text-[10px] font-black text-center uppercase border-b border-slate-100 border-l border-slate-200 ${sIdx % 2 === 0 ? 'bg-blue-50/50 text-blue-600' : 'bg-emerald-50/50 text-emerald-600'}`}>
+                              {sub.name}
+                            </th>
+                          ))}
+                        </tr>
+                        <tr className="bg-slate-50 sticky top-[45px] z-30">
+                          <th className="border-b border-slate-100 bg-slate-50 h-8"></th>
+                          <th className="sticky left-0 z-40 bg-slate-50 border-b border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.05)] h-8"></th>
+                          {studentsList[0]?.subjects.map((_, sIdx) => (
+                            <React.Fragment key={sIdx}>
+                              <th className="px-2 py-2 text-[8px] font-black text-center uppercase border-b border-slate-100 border-l border-slate-200 bg-slate-50/80 text-slate-400 w-20">Tulis</th>
+                              <th className="px-2 py-2 text-[8px] font-black text-center uppercase border-b border-slate-100 border-l border-slate-100 bg-slate-50/80 text-slate-400 w-20">Lisan</th>
+                            </React.Fragment>
+                          ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody>
                         {studentsList.map((s, idx) => (
-                          <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
-                            <td className="px-6 py-4 text-xs font-bold text-slate-300 text-center">{idx + 1}</td>
-                            <td className="px-6 py-4 sticky left-0 z-10 bg-white border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                              <p className="text-sm font-black text-slate-700 uppercase truncate max-w-[140px]">{s.name}</p>
-                              <p className="text-[10px] font-bold text-slate-400">NI: {s.nomorInduk || '-'}</p>
+                          <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
+                            <td className="px-4 py-3 text-xs font-bold text-slate-300 text-center border-b border-slate-50">{idx + 1}</td>
+                            <td className="px-6 py-3 sticky left-0 z-20 bg-white border-b border-slate-50 shadow-[2px_0_5px_rgba(0,0,0,0.02)] group-hover:bg-slate-50">
+                              <p className="text-xs font-black text-slate-700 uppercase truncate max-w-[180px]">{s.name}</p>
+                              <p className="text-[9px] font-bold text-slate-400">NI: {s.nomorInduk || '-'}</p>
                             </td>
-                            <td className="px-6 py-4 bg-blue-50/20 group-hover:bg-blue-50/40">
-                              <input 
-                                type="number" min="0" max="100"
-                                className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-center text-sm font-black text-blue-600 focus:ring-4 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
-                                value={s.subjects[selectedSubjectIndex]?.tulis?.nilai || ''}
-                                onChange={e => handleBulkUpdateGrades(s.id, selectedSubjectIndex, 'tulis', parseInt(e.target.value) || 0)}
-                              />
-                            </td>
-                            <td className="px-6 py-4 bg-emerald-50/20 group-hover:bg-emerald-50/40">
-                              <input 
-                                type="number" min="0" max="100"
-                                className="w-full bg-white border border-emerald-200 rounded-xl px-4 py-3 text-center text-sm font-black text-emerald-600 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all"
-                                value={s.subjects[selectedSubjectIndex]?.lisan?.nilai || ''}
-                                onChange={e => handleBulkUpdateGrades(s.id, selectedSubjectIndex, 'lisan', parseInt(e.target.value) || 0)}
-                              />
-                            </td>
+                            {s.subjects.map((sub, subIdx) => (
+                              <React.Fragment key={subIdx}>
+                                <td className="px-2 py-2 border-b border-slate-50 border-l border-slate-100 bg-white group-hover:bg-slate-50/50">
+                                  <input 
+                                    type="number" min="0" max="100"
+                                    className="w-full bg-blue-50/30 border-blue-100/50 border rounded-lg px-2 py-1.5 text-xs font-black text-blue-700 text-center outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                                    value={sub.tulis?.nilai || ''}
+                                    onChange={e => handleBulkUpdateGrades(s.id, subIdx, 'tulis', parseInt(e.target.value) || 0)}
+                                    onFocus={e => e.target.select()}
+                                  />
+                                </td>
+                                <td className="px-2 py-2 border-b border-slate-50 border-l border-slate-50 bg-white group-hover:bg-slate-50/50">
+                                  <input 
+                                    type="number" min="0" max="100"
+                                    className="w-full bg-emerald-50/30 border-emerald-100/50 border rounded-lg px-2 py-1.5 text-xs font-black text-emerald-700 text-center outline-none focus:ring-2 focus:ring-emerald-400 transition-all"
+                                    value={sub.lisan?.nilai || ''}
+                                    onChange={e => handleBulkUpdateGrades(s.id, subIdx, 'lisan', parseInt(e.target.value) || 0)}
+                                    onFocus={e => e.target.select()}
+                                  />
+                                </td>
+                              </React.Fragment>
+                            ))}
                           </tr>
                         ))}
                       </tbody>
