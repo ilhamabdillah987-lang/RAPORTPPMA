@@ -151,9 +151,10 @@ const ReportTemplate = ({
           </div>
         </div>
 
-        <div className="mt-12 mb-8 space-y-2 break-inside-avoid">
-          <p className="font-black uppercase text-xl underline underline-offset-8 decoration-2 tracking-[0.2em] text-slate-900">SEMESTER {student.semester}</p>
-          <p className="font-extrabold uppercase text-lg tracking-[0.15em] text-slate-500">TAHUN PELAJARAN {student.tahunPelajaran}</p>
+        <div className="mt-20 mb-8 space-y-4 break-inside-avoid">
+          <p className="font-black uppercase text-2xl underline underline-offset-[12px] decoration-[3px] tracking-[0.3em] text-slate-900">SEMESTER {student.semester}</p>
+          <div className="h-4"></div>
+          <p className="font-extrabold uppercase text-xl tracking-[0.2em] text-slate-500">TAHUN PELAJARAN {student.tahunPelajaran}</p>
         </div>
       </section>
 
@@ -316,20 +317,22 @@ const ReportTemplate = ({
             </tr>
           </tbody>
         </table>
-        <div className="signature-section mt-6 text-[10pt] flex justify-between items-start px-4">
-          <div className="signature-box flex flex-col items-center flex-1">
-            <p>Mengetahui,</p>
-            <p>Orang Tua/Wali Santri</p>
-            <div className="h-16"></div>
-            <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
+        <div className="signature-section mt-12 text-[10pt] flex justify-between items-start px-4 page-break-inside-avoid">
+          <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
+            <p className="font-medium">Mengetahui,</p>
+            <p className="font-bold">Orang Tua/Wali Santri</p>
+            <div className="h-28"></div>
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 uppercase whitespace-nowrap text-center">
+              {student.identity?.namaAyah || student.identity?.namaWali || '..........................'}
+            </p>
           </div>
-          <div className="signature-box flex flex-col items-center flex-1 text-center">
-            <p>Tangerang, {globalTanggalRaport}</p>
-            <p>Wali Kelas,</p>
-            <div className="h-16"></div>
-            <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base h-8">
-              {globalWaliKelas || ''}
-            </div>
+          <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
+            <p className="font-medium text-right w-full pr-10 italic">Tangerang, {globalTanggalRaport}</p>
+            <p className="font-bold">Wali Kelas,</p>
+            <div className="h-28"></div>
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 uppercase whitespace-nowrap text-center">
+              {globalWaliKelas || '..........................'}
+            </p>
           </div>
         </div>
       </section>
@@ -422,21 +425,23 @@ const ReportTemplate = ({
             <tr><td className="pl-4">Tanpa Keterangan</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.alpha} onChange={e => { const updated = {...student, attendance: {...student.attendance, alpha: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{student.attendance.alpha}</span></td></tr>
           </tbody>
         </table>
- 
-        <div className="signature-section mt-6 text-[10pt] flex justify-between items-start px-4">
-          <div className="signature-box flex flex-col items-center flex-1">
-            <p>Mengetahui,</p>
-            <p>Orang Tua/Wali Santri</p>
-            <div className="h-16"></div>
-            <div className="signature-line w-40 border-b-2 border-black font-bold text-center h-8"></div>
+  
+        <div className="signature-section mt-12 text-[10pt] flex justify-between items-start px-4 page-break-inside-avoid">
+          <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
+            <p className="font-medium">Mengetahui,</p>
+            <p className="font-bold">Orang Tua/Wali Santri</p>
+            <div className="h-28"></div>
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 uppercase whitespace-nowrap">
+              {student.identity?.namaAyah || student.identity?.namaWali || '..........................'}
+            </p>
           </div>
-          <div className="signature-box flex flex-col items-center flex-1 text-center">
-            <p>Tangerang, {globalTanggalRaport}</p>
-            <p>Wali Kelas,</p>
-            <div className="h-16"></div>
-            <div className="font-bold border-b-2 border-black inline-block min-w-[170px] text-base h-8">
-              {globalWaliKelas || ''}
-            </div>
+          <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
+            <p className="font-medium text-right w-full pr-10">Tangerang, {globalTanggalRaport}</p>
+            <p className="font-bold">Wali Kelas,</p>
+            <div className="h-28"></div>
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 uppercase whitespace-nowrap">
+              {globalWaliKelas || '..........................'}
+            </p>
           </div>
         </div>
       </section>
@@ -1995,9 +2000,9 @@ export default function App() {
         )}
         
         {isPrintingAll ? (
-          <div className="flex flex-col items-center bg-white min-h-screen p-4 md:p-10">
+          <div className="flex flex-col items-center bg-white min-h-screen p-0 no-scrollbar">
             {filteredStudents.map(student => (
-              <div key={student.id} className="scale-[0.5] sm:scale-[0.7] md:scale-100 origin-top mb-[-400px] sm:mb-[-200px] md:mb-0">
+              <div key={student.id} className="print:m-0 print:p-0">
                 <ReportTemplate 
                   student={student}
                   logoUrl={logoUrl}
@@ -2033,7 +2038,7 @@ export default function App() {
                </div>
              </div>
 
-             <div className="scale-[0.45] xs:scale-[0.55] sm:scale-[0.75] md:scale-100 origin-top overflow-visible">
+             <div className="scale-[0.45] xs:scale-[0.55] sm:scale-[0.75] md:scale-100 print:scale-100 origin-top overflow-visible print:m-0 print:p-0">
                <ReportTemplate 
                   student={selectedStudent}
                   logoUrl={logoUrl}
