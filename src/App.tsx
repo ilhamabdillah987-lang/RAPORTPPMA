@@ -5,7 +5,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Student, Subject } from './types';
+import XLSXStyle from 'xlsx-js-style';
+import { Student, Subject, StudentIdentity } from './types';
 import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User as LucideUser, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu, LogIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from './firebase';
@@ -135,7 +136,7 @@ const ReportTemplate = ({
           <div className="relative py-4 space-y-8">
             <div className="flex flex-col items-center">
               <span className="text-[9pt] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">Nama Santri</span>
-              <span className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{student.name}</span>
+              <span className="text-2xl font-black text-slate-900 tracking-tighter">{student.name}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -201,7 +202,7 @@ const ReportTemplate = ({
                       {row.label}
                     </td>
                     <td className="w-4 py-1 text-center">:</td>
-                    <td className={`py-1 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black uppercase' : ''}`}>
+                    <td className={`py-1 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black' : ''}`}>
                       {row.value}
                     </td>
                   </tr>
@@ -218,7 +219,7 @@ const ReportTemplate = ({
             <p className="mb-0 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
             <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
             <div className="h-20"></div>
-            <p className="font-black text-[10pt] border-b-2 border-black inline-block min-w-[200px] uppercase">{globalKepala || ''}</p>
+            <p className="font-black text-[10pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
           </div>
         </div>
       </section>
@@ -322,7 +323,7 @@ const ReportTemplate = ({
             <p className="font-medium">Mengetahui,</p>
             <p className="font-bold">Orang Tua/Wali Santri</p>
             <div className="h-28"></div>
-            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 uppercase whitespace-nowrap text-center">
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 whitespace-nowrap text-center">
               {student.identity?.namaAyah || student.identity?.namaWali || '..........................'}
             </p>
           </div>
@@ -330,7 +331,7 @@ const ReportTemplate = ({
             <p className="font-medium text-right w-full pr-10 italic">Tangerang, {globalTanggalRaport}</p>
             <p className="font-bold">Wali Kelas,</p>
             <div className="h-28"></div>
-            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 uppercase whitespace-nowrap text-center">
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 whitespace-nowrap text-center">
               {globalWaliKelas || '..........................'}
             </p>
           </div>
@@ -390,7 +391,7 @@ const ReportTemplate = ({
             <p className="font-medium">Mengetahui,</p>
             <p className="font-bold">Orang Tua/Wali Santri</p>
             <div className="h-28"></div>
-            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 uppercase whitespace-nowrap text-center">
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 whitespace-nowrap text-center">
               {student.identity?.namaAyah || student.identity?.namaWali || '..........................'}
             </p>
           </div>
@@ -398,7 +399,7 @@ const ReportTemplate = ({
             <p className="font-medium text-right w-full pr-10 italic">Tangerang, {globalTanggalRaport}</p>
             <p className="font-bold">Wali Kelas,</p>
             <div className="h-28"></div>
-            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 uppercase whitespace-nowrap text-center">
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 whitespace-nowrap text-center">
               {globalWaliKelas || '..........................'}
             </p>
           </div>
@@ -450,7 +451,7 @@ const ReportTemplate = ({
             <p className="font-medium">Mengetahui,</p>
             <p className="font-bold">Orang Tua/Wali Santri</p>
             <div className="h-28"></div>
-            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 uppercase whitespace-nowrap">
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 whitespace-nowrap">
               {student.identity?.namaAyah || student.identity?.namaWali || '..........................'}
             </p>
           </div>
@@ -458,7 +459,7 @@ const ReportTemplate = ({
             <p className="font-medium text-right w-full pr-10">Tangerang, {globalTanggalRaport}</p>
             <p className="font-bold">Wali Kelas,</p>
             <div className="h-28"></div>
-            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 uppercase whitespace-nowrap">
+            <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 whitespace-nowrap">
               {globalWaliKelas || '..........................'}
             </p>
           </div>
@@ -486,7 +487,7 @@ const ReportTemplate = ({
             {studentRankings.map((s: any) => (
               <tr key={s.id} className={s.id === student.id ? 'bg-blue-50/50 font-bold border-x-4 border-blue-600' : 'hover:bg-slate-50/50 transition-colors'}>
                 <td className="text-center font-medium font-mono">{s.rank}</td>
-                <td className="pl-6 uppercase">{s.name}</td>
+                <td className="pl-6">{s.name}</td>
                 <td className="text-center font-mono">{s.avg.toFixed(2)}</td>
                 <td className="text-center">
                   <span className={`inline-block w-8 h-8 leading-8 rounded-full ${s.rank <= 3 ? 'bg-amber-100 text-amber-700 font-black ring-2 ring-amber-200' : 'font-bold text-slate-700'}`}>
@@ -509,7 +510,7 @@ const StudentInfo = ({ student, globalNamaKelas }: { student: Student, globalNam
         <tr>
           <td className="w-[18%]">Nama Santri</td>
           <td className="w-[2%]">:</td>
-          <td className="w-[40%] font-bold uppercase">{student.name}</td>
+          <td className="w-[40%] font-bold">{student.name}</td>
           <td className="w-[15%]">Kelas</td>
           <td className="w-[2%]">:</td>
           <td className="w-[23%] font-bold">{globalNamaKelas || student.class}</td>
@@ -1177,6 +1178,243 @@ export default function App() {
     reader.readAsArrayBuffer(file);
   };
 
+  const exportIdentityToExcel = () => {
+    const fields: { label: string; key?: string; isMain?: boolean; isName?: boolean }[] = [
+      { label: 'NO' },
+      { label: 'NAMA SANTRI', isName: true },
+      { label: 'NIS/NISN (UTAMA)', key: 'nomorInduk', isMain: true },
+      { label: 'NIS / NISN (IDENTITAS)', key: 'nisNisn' },
+      { label: 'Tempat, Tanggal Lahir', key: 'tempatTanggalLahir' },
+      { label: 'Jenis Kelamin', key: 'jenisKelamin' },
+      { label: 'Agama', key: 'agama' },
+      { label: 'Status dalam Keluarga', key: 'statusDalamKeluarga' },
+      { label: 'Anak ke-', key: 'anakKe' },
+      { label: 'Alamat Peserta Didik', key: 'alamatPesertaDidik' },
+      { label: 'Nomor Telepon Rumah', key: 'teleponRumah' },
+      { label: 'Sekolah Asal', key: 'sekolahAsal' },
+      { label: 'Di Pesantren Diterima di Kelas', key: 'diterimaDiKelas' },
+      { label: 'Diterima (Tanggal)', key: 'diterimaPadaTanggal' },
+      { label: 'Nama Ayah', key: 'namaAyah' },
+      { label: 'Nama Ibu', key: 'namaIbu' },
+      { label: 'Alamat Orang Tua', key: 'alamatOrangTua' },
+      { label: 'Nomor Telepon Orang Tua', key: 'teleponOrangTua' },
+      { label: 'Pekerjaan Ayah', key: 'pekerjaanAyah' },
+      { label: 'Pekerjaan Ibu', key: 'pekerjaanIbu' },
+      { label: 'Nama Wali', key: 'namaWali' },
+      { label: 'Alamat Wali', key: 'alamatWali' },
+      { label: 'Telepon Wali', key: 'teleponWali' },
+      { label: 'Pekerjaan Wali', key: 'pekerjaanWali' }
+    ];
+
+    const dataRows = filteredStudents.length > 0 ? filteredStudents.map((s, index) => {
+      const row: any = {};
+      fields.forEach(f => {
+        if (f.label === 'NO') {
+          row[f.label] = index + 1;
+        } else if (f.isName) {
+          row[f.label] = s.name;
+        } else if (f.isMain) {
+          row[f.label] = (s as any)[f.key!] || '';
+        } else {
+          row[f.label] = (s.identity as any)?.[f.key!] || '';
+        }
+      });
+      return row;
+    }) : [fields.reduce((acc: any, f) => ({ ...acc, [f.label]: '' }), {})];
+
+    // Add extra empty rows if it's a template (filteredStudents.length === 0)
+    if (filteredStudents.length === 0) {
+      for (let i = 0; i < 20; i++) {
+        dataRows.push(fields.reduce((acc: any, f) => ({ ...acc, [f.label]: '' }), {}));
+      }
+    }
+
+    const ws = XLSX.utils.json_to_sheet(dataRows);
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+
+    // Define styles
+    const headerStyle = {
+      fill: { fgColor: { rgb: "00B050" } }, // Green
+      font: { color: { rgb: "FFFFFF" }, bold: true },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: {
+        top: { style: "thin", color: { auto: 1 } },
+        bottom: { style: "thin", color: { auto: 1 } },
+        left: { style: "thin", color: { auto: 1 } },
+        right: { style: "thin", color: { auto: 1 } }
+      }
+    };
+
+    const bodyStyle = {
+      fill: { fgColor: { rgb: "FFFF00" } }, // Yellow
+      alignment: { vertical: "center" },
+      border: {
+        top: { style: "thin", color: { auto: 1 } },
+        bottom: { style: "thin", color: { auto: 1 } },
+        left: { style: "thin", color: { auto: 1 } },
+        right: { style: "thin", color: { auto: 1 } }
+      }
+    };
+
+    // Apply styles
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const headerAddress = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+      if (ws[headerAddress]) {
+        ws[headerAddress].s = headerStyle;
+      }
+
+      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[cellAddress]) {
+          ws[cellAddress] = { t: 's', v: '' };
+        }
+        ws[cellAddress].s = bodyStyle;
+      }
+    }
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 5 },  // NO
+      { wch: 30 }, // NAMA SANTRI
+      { wch: 20 }, // NIS/NISN (UTAMA)
+      { wch: 20 }, // NIS / NISN (IDENTITAS)
+      { wch: 25 }, // Tempat, Tanggal Lahir
+      { wch: 15 }, // Jenis Kelamin
+      { wch: 12 }, // Agama
+      { wch: 20 }, // Status dalam Keluarga
+      { wch: 8 },  // Anak ke-
+      { wch: 40 }, // Alamat Peserta Didik
+      { wch: 20 }, // Nomor Telepon Rumah
+      { wch: 25 }, // Sekolah Asal
+      { wch: 25 }, // Di Pesantren Diterima di Kelas
+      { wch: 20 }, // Diterima (Tanggal)
+      { wch: 25 }, // Nama Ayah
+      { wch: 25 }, // Nama Ibu
+      { wch: 40 }, // Alamat Orang Tua
+      { wch: 20 }, // Nomor Telepon Orang Tua
+      { wch: 20 }, // Pekerjaan Ayah
+      { wch: 20 }, // Pekerjaan Ibu
+      { wch: 25 }, // Nama Wali
+      { wch: 40 }, // Alamat Wali
+      { wch: 20 }, // Telepon Wali
+      { wch: 20 }  // Pekerjaan Wali
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "IDENTITAS");
+    XLSXStyle.writeFile(wb, `IDENTITAS_KELAS_${selectedClass.replace(' ', '_')}.xlsx`);
+  };
+
+  const importIdentityFromExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const data = new Uint8Array(event.target?.result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      const updatedStudents = [...studentsList];
+      const newStudentsToFirestore: Student[] = [];
+      
+      const fields: { label: string; key?: keyof StudentIdentity | 'nomorInduk'; isMain?: boolean; isName?: boolean }[] = [
+        { label: 'NIS/NISN (UTAMA)', key: 'nomorInduk', isMain: true },
+        { label: 'NIS / NISN (IDENTITAS)', key: 'nisNisn' },
+        { label: 'Tempat, Tanggal Lahir', key: 'tempatTanggalLahir' },
+        { label: 'Jenis Kelamin', key: 'jenisKelamin' },
+        { label: 'Agama', key: 'agama' },
+        { label: 'Status dalam Keluarga', key: 'statusDalamKeluarga' },
+        { label: 'Anak ke-', key: 'anakKe' },
+        { label: 'Alamat Peserta Didik', key: 'alamatPesertaDidik' },
+        { label: 'Nomor Telepon Rumah', key: 'teleponRumah' },
+        { label: 'Sekolah Asal', key: 'sekolahAsal' },
+        { label: 'Di Pesantren Diterima di Kelas', key: 'diterimaDiKelas' },
+        { label: 'Diterima (Tanggal)', key: 'diterimaPadaTanggal' },
+        { label: 'Nama Ayah', key: 'namaAyah' },
+        { label: 'Nama Ibu', key: 'namaIbu' },
+        { label: 'Alamat Orang Tua', key: 'alamatOrangTua' },
+        { label: 'Nomor Telepon Orang Tua', key: 'teleponOrangTua' },
+        { label: 'Pekerjaan Ayah', key: 'pekerjaanAyah' },
+        { label: 'Pekerjaan Ibu', key: 'pekerjaanIbu' },
+        { label: 'Nama Wali', key: 'namaWali' },
+        { label: 'Alamat Wali', key: 'alamatWali' },
+        { label: 'Telepon Wali', key: 'teleponWali' },
+        { label: 'Pekerjaan Wali', key: 'pekerjaanWali' }
+      ];
+
+      for (const row of jsonData) {
+        const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']) : '';
+        if (!nameInExcel) continue;
+
+        const studentIdx = updatedStudents.findIndex(s => s.name.toUpperCase() === nameInExcel.toUpperCase() || s.nomorInduk === String(row['NIS/NISN (UTAMA)'] || ''));
+        
+        let targetStudent: Student;
+        let isNew = false;
+
+        if (studentIdx !== -1) {
+          targetStudent = { ...updatedStudents[studentIdx], name: nameInExcel }; // Update name with Excel casing
+          updatedStudents[studentIdx] = targetStudent;
+        } else {
+          isNew = true;
+          targetStudent = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: nameInExcel,
+            nomorInduk: '',
+            noUrut: updatedStudents.length + 1,
+            class: selectedClass,
+            semester: 'GANJIL',
+            tahunPelajaran: '2025/2026',
+            subjects: studentsList[0]?.subjects.map(s => ({ ...s, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } })) || [],
+            behavior: { spiritual: '', social: '' },
+            attendance: { sakit: 0, izin: 0, alpha: 0 },
+            extracurriculars: [],
+            identity: {
+              nisNisn: '', tempatTanggalLahir: '', jenisKelamin: '', agama: 'ISLAM',
+              statusDalamKeluarga: '', anakKe: '', alamatPesertaDidik: '', teleponRumah: '',
+              sekolahAsal: '', diterimaDiKelas: '', diterimaPadaTanggal: '',
+              namaAyah: '', namaIbu: '', alamatOrangTua: '', teleponOrangTua: '',
+              pekerjaanAyah: '', pekerjaanIbu: '', namaWali: '', alamatWali: '',
+              teleponWali: '', pekerjaanWali: ''
+            }
+          };
+          updatedStudents.push(targetStudent);
+        }
+
+        const newIdentity = { ...(targetStudent.identity || {}) } as any;
+        let mainNomorInduk = targetStudent.nomorInduk;
+
+        fields.forEach(f => {
+          if (typeof row[f.label] !== 'undefined' && row[f.label] !== null) {
+            if (f.isMain) {
+              mainNomorInduk = String(row[f.label]);
+            } else if (!f.isName && f.key) {
+              newIdentity[f.key] = String(row[f.label]);
+            }
+          }
+        });
+        
+        const finalStudent = { ...targetStudent, nomorInduk: mainNomorInduk, identity: newIdentity, updatedAt: new Date().toISOString() };
+        
+        if (isNew) {
+          await setDoc(doc(db, 'students', finalStudent.id), finalStudent);
+        } else {
+          await setDoc(doc(db, 'students', finalStudent.id), { name: finalStudent.name, nomorInduk: mainNomorInduk, identity: newIdentity, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+        
+        // Update the local list as well
+        const localIdx = updatedStudents.findIndex(s => s.id === finalStudent.id);
+        if (localIdx !== -1) updatedStudents[localIdx] = finalStudent;
+      }
+      
+      setStudentsList(updatedStudents);
+      alert('Berhasil mengimpor identitas dari Excel');
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   const handleSyncSubjects = async () => {
     if (studentsList.length < 2) return;
     if (!confirm('Ini akan menyamakan daftar mata pelajaran SEMUA santri mengikuti santri pertama. Data nilai santri lain akan tetap ada jika nama mata pelajarannya sama. Lanjutkan?')) return;
@@ -1366,7 +1604,7 @@ export default function App() {
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-2 h-2 rounded-full ${currentIndex === idx ? 'bg-white' : 'bg-slate-300'}`}></div>
-                      <span className="text-xs font-bold truncate max-w-[140px] uppercase">{s.name}</span>
+                      <span className="text-xs font-bold truncate max-w-[140px]">{s.name}</span>
                     </div>
                     {currentIndex === idx ? <ChevronRight size={14} /> : <div className="w-1.5 h-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-400 rounded-full"></div>}
                   </button>
@@ -1412,7 +1650,7 @@ export default function App() {
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Nama Kelas</label>
                 <input 
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
                   placeholder="X (SEPULUH)..."
                   value={globalNamaKelas}
                   onChange={e => handleUpdateGlobalNamaKelas(e.target.value)}
@@ -1421,7 +1659,7 @@ export default function App() {
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Tanggal Raport</label>
                 <input 
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
                   placeholder="20 DESEMBER 2025..."
                   value={globalTanggalRaport}
                   onChange={e => handleUpdateGlobalTanggalRaport(e.target.value)}
@@ -1448,7 +1686,7 @@ export default function App() {
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Tgl Kenaikan/Kelulusan</label>
                 <input 
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 uppercase"
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
                   placeholder="21 JUNI 2026..."
                   value={globalTanggalKenaikan}
                   onChange={e => handleUpdateGlobalTanggalKenaikan(e.target.value)}
@@ -1729,9 +1967,21 @@ export default function App() {
                   <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100">
                     <div>
                       <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT IDENTITAS KELAS: {selectedClass}</h2>
-                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">Sunting data identitas santri dalam satu tabel</p>
+                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">Sunting data identitas santri dalam satu tabel atau via Excel</p>
                     </div>
-                    <button onClick={() => setIsBulkIdentityOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={exportIdentityToExcel}
+                        className="px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-100 transition-all flex items-center gap-2"
+                      >
+                        UNDUH TEMPLATE
+                      </button>
+                      <label className="px-4 py-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all flex items-center gap-2 cursor-pointer">
+                        IMPOR EXCEL
+                        <input type="file" accept=".xlsx, .xls" className="hidden" onChange={importIdentityFromExcel} />
+                      </label>
+                      <button onClick={() => setIsBulkIdentityOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
+                    </div>
                   </div>
                   <div className="flex-1 overflow-x-auto overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-slate-200">
                     <table className="w-full text-left border-collapse table-fixed min-w-[3000px]">
@@ -1772,7 +2022,7 @@ export default function App() {
                           <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-4 py-3 text-xs font-bold text-slate-300 text-center">{idx + 1}</td>
                             <td className="px-4 py-3 bg-white sticky left-0 z-10 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                              <p className="text-xs font-black text-slate-700 uppercase truncate">{s.name}</p>
+                              <p className="text-xs font-black text-slate-700 truncate">{s.name}</p>
                             </td>
                             {[
                               { key: 'nomorInduk', isMain: true },
@@ -1800,11 +2050,11 @@ export default function App() {
                             ].map(field => (
                               <td key={field.key} className="px-2 py-1">
                                 <input 
-                                  className="w-full bg-transparent border-none px-2 py-1.5 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none uppercase"
+                                  className="w-full bg-transparent border-none px-2 py-1.5 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none"
                                   value={field.isMain ? (s as any)[field.key] : (s.identity as any)?.[field.key] || ''}
                                   onChange={e => {
                                     if (field.isMain) {
-                                      const newVal = e.target.value.toUpperCase();
+                                      const newVal = e.target.value;
                                       const updated = { ...s, [field.key]: newVal };
                                       setStudentsList(prev => prev.map(stud => stud.id === s.id ? updated : stud));
                                       setDoc(doc(db, 'students', s.id), { [field.key]: newVal, updatedAt: new Date().toISOString() }, { merge: true })
@@ -2018,7 +2268,7 @@ export default function App() {
                             <div className="space-y-4">
                               <div className="form-group col-span-2">
                                 <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Lengkap</label>
-                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 uppercase" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
+                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
                               </div>
                               <div className="form-group col-span-2">
                                 <label className="text-xs font-bold text-slate-500 mb-1.5 block">NIS/NISN</label>
@@ -2068,8 +2318,8 @@ export default function App() {
                                <div key={idx} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all">
                                  <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200">{idx + 1}</div>
                                  <div className="flex-1">
-                                   <p className="text-xs font-black text-slate-400 uppercase tracking-wider">{sub.category}</p>
-                                   <p className="text-sm font-bold text-slate-700 uppercase">{sub.name}</p>
+                                   <p className="text-xs font-black text-slate-400 tracking-wider">{sub.category}</p>
+                                   <p className="text-sm font-bold text-slate-700">{sub.name}</p>
                                  </div>
                                  <div className="flex items-center gap-4">
                                    <div className="text-center">
