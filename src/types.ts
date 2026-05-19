@@ -64,6 +64,7 @@ export interface Student {
   waliKelas?: string;
   identity?: StudentIdentity;
   updatedAt?: string;
+  photoUrl?: string;
 }
 
 export interface GlobalSettings {
