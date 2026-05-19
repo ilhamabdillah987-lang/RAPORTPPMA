@@ -545,6 +545,24 @@ const StudentInfo = ({ student, globalNamaKelas }: { student: Student, globalNam
   </div>
 );
 
+const DEFAULT_AVAILABLE_SUBJECTS = [
+  { name: "Asasul Mubtadiin Fi Ilmi Nahwi", category: "BAHASA ARAB", kkm: 40 },
+  { name: "Mutammimah", category: "BAHASA ARAB", kkm: 40 },
+  { name: "Asasul Mubtadiin Fi Ilmi Shorfi", category: "BAHASA ARAB", kkm: 40 },
+  { name: "Durusullughah", category: "BAHASA ARAB", kkm: 40 },
+  { name: "Qiraatul Kutub", category: "BAHASA ARAB", kkm: 40 },
+  { name: "Imla'", category: "BAHASA ARAB", kkm: 40 },
+  { name: "Al-Qur'an", category: "AGAMA", kkm: 40 },
+  { name: "Tajwid", category: "AGAMA", kkm: 40 },
+  { name: "Fiqih Qouliyah", category: "AGAMA", kkm: 40 },
+  { name: "Fiqih Fi'liyah", category: "AGAMA", kkm: 40 },
+  { name: "Grammar", category: "BAHASA INGGRIS", kkm: 40 },
+  { name: "Stories For You", category: "BAHASA INGGRIS", kkm: 40 },
+  { name: "Speaking", category: "BAHASA INGGRIS", kkm: 40 },
+  { name: "Dictation", category: "BAHASA INGGRIS", kkm: 40 },
+  { name: "Vocabularies", category: "BAHASA INGGRIS", kkm: 40 }
+];
+
 const StudentDashboard = ({ student, studentRankings, onEdit, onPrint, onShowSheet }: { 
   student: Student, 
   studentRankings: any[], 
@@ -991,7 +1009,13 @@ export default function App() {
       class: selectedClass || '10 SMA',
       semester: 'GANJIL',
       tahunPelajaran: '2025/2026',
-      subjects: studentsList[0]?.subjects.map(s => ({ ...s, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } })) || [],
+      subjects: (studentsList.length > 0 ? studentsList[0].subjects : DEFAULT_AVAILABLE_SUBJECTS).map(s => ({ 
+        name: s.name, 
+        category: s.category, 
+        kkm: s.kkm, 
+        tulis: { nilai: 0, huruf: '-' }, 
+        lisan: { nilai: 0, huruf: '-' } 
+      })),
       behavior: { spiritual: '', social: '' },
       attendance: { sakit: 0, izin: 0, alpha: 0 },
       extracurriculars: [],
@@ -1184,23 +1208,11 @@ export default function App() {
       class: selectedClass || '7',
       semester: 'GANJIL',
       tahunPelajaran: '2025/2026',
-      subjects: [
-        { name: "Asasul Mubtadiin Fi Ilmi Nahwi", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Mutammimah", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Asasul Mubtadiin Fi Ilmi Shorfi", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Durusullughah", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Qiraatul Kutub", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Imla'", category: "BAHASA ARAB", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Al-Qur'an", category: "AGAMA", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Tajwid", category: "AGAMA", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Fiqih Qouliyah", category: "AGAMA", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Fiqih Fi'liyah", category: "AGAMA", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Grammar", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Stories For You", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Speaking", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Dictation", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } },
-        { name: "Vocabularies", category: "BAHASA INGGRIS", kkm: 40, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } }
-      ],
+      subjects: DEFAULT_AVAILABLE_SUBJECTS.map(s => ({
+        ...s,
+        tulis: { nilai: 0, huruf: '-' },
+        lisan: { nilai: 0, huruf: '-' }
+      })),
       behavior: { spiritual: '', social: '' },
       attendance: { sakit: 0, izin: 0, alpha: 0 },
       extracurriculars: [],
@@ -1493,7 +1505,13 @@ export default function App() {
             class: selectedClass,
             semester: 'GANJIL',
             tahunPelajaran: '2025/2026',
-            subjects: studentsList[0]?.subjects.map(s => ({ ...s, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } })) || [],
+            subjects: (updatedStudents.length > 0 ? updatedStudents[0].subjects : DEFAULT_AVAILABLE_SUBJECTS).map(s => ({ 
+              name: s.name, 
+              category: s.category, 
+              kkm: s.kkm, 
+              tulis: { nilai: 0, huruf: '-' }, 
+              lisan: { nilai: 0, huruf: '-' } 
+            })),
             behavior: { spiritual: '', social: '' },
             attendance: { sakit: 0, izin: 0, alpha: 0 },
             extracurriculars: [],
@@ -2470,6 +2488,48 @@ export default function App() {
                                  <p className="text-xs text-amber-700/80 mt-0.5">Nilai yang Anda masukkan di sini akan langsung disimpan ke profil santri.</p>
                                </div>
                              </div>
+                           </div>
+                           <div className="flex items-center justify-between mb-4 px-1">
+                              <h3 className="text-[10px] uppercase font-black text-blue-600 tracking-[0.2em] flex items-center gap-2">
+                                 <FileText size={14} /> NILAI AKADEMIK
+                              </h3>
+                              <div className="flex items-center gap-2">
+                                <select 
+                                  className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-all outline-none border-none cursor-pointer"
+                                  value=""
+                                  onChange={e => {
+                                    const selectedName = e.target.value;
+                                    if (!selectedName) return;
+                                    const sub = DEFAULT_AVAILABLE_SUBJECTS.find(s => s.name === selectedName);
+                                    if (sub && editingStudent) {
+                                      const exists = (editingStudent.subjects || []).some(s => s.name === sub.name);
+                                      if (!exists) {
+                                        const newSubs = [...(editingStudent.subjects || []), { ...sub, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } }];
+                                        setEditingStudent({ ...editingStudent, subjects: newSubs });
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <option value="">+ TAMBAH MATA PELAJARAN</option>
+                                  {DEFAULT_AVAILABLE_SUBJECTS.map(s => (
+                                    <option key={s.name} value={s.name}>{s.name} ({s.category})</option>
+                                  ))}
+                                </select>
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    if (editingStudent) {
+                                      setEditingStudent({
+                                        ...editingStudent,
+                                        subjects: DEFAULT_AVAILABLE_SUBJECTS.map(s => ({ ...s, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } }))
+                                      });
+                                    }
+                                  }}
+                                  className="text-[10px] font-black text-amber-600 uppercase bg-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-all"
+                                >
+                                  RESET
+                                </button>
+                              </div>
                            </div>
                            <div className="grid grid-cols-1 gap-6">
                              {editingStudent.subjects?.map((sub, idx) => (
