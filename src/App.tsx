@@ -1674,12 +1674,15 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row h-screen overflow-hidden print:h-auto print:overflow-visible print:block">
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 no-print shrink-0">
-        <div className="flex items-center gap-3">
+        <button 
+          onClick={handleClearClass}
+          className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+        >
           <div className="w-8 h-8 rounded-lg overflow-hidden p-1 bg-slate-50 border border-slate-100 flex items-center justify-center">
             {logoUrl ? <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" /> : <Settings size={14} className="text-slate-300" />}
           </div>
           <span className="text-xs font-black text-slate-700 uppercase">RAPORT {selectedClass}</span>
-        </div>
+        </button>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl">
           {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -1695,7 +1698,10 @@ export default function App() {
               className={`fixed inset-y-0 left-0 z-[150] w-72 bg-white border-r border-slate-200 overflow-y-auto no-print h-screen shadow-2xl flex flex-col pt-6 px-4 md:sticky md:block md:shadow-none md:translate-x-0 print:hidden ${isSidebarOpen ? 'block' : 'hidden md:flex'}`}
             >
         <div className="flex items-center justify-between mb-8 px-2">
-          <div className="flex items-center gap-3">
+          <button 
+            onClick={handleClearClass}
+            className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+          >
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 overflow-hidden p-1">
               {logoUrl ? (
                 <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
@@ -1707,7 +1713,7 @@ export default function App() {
               <h2 className="text-sm font-black text-slate-700 uppercase tracking-tight leading-none mb-1">RA RAPORTS</h2>
               <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">AL-HIKMAH CLOUD</p>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-1">
             <motion.button 
               whileHover={{ scale: 1.1 }}
