@@ -72,7 +72,7 @@ const Header = ({ logoUrl }: { logoUrl: string }) => (
         <h1 className="text-[12pt] font-black uppercase leading-tight tracking-tight">YAYASAN PENDIDIKAN ISLAM AL-HIKMAH</h1>
         <h2 className="text-[14.5pt] font-black uppercase leading-tight tracking-tight">PESANTREN MODERN AL-HIKMAH</h2>
         <p className="text-[8.5pt] font-bold mt-1 text-slate-700">Jl. Al-Hikmah Kp. Pondok Jaya RT.05/01 Desa Pondok Jaya Kecamatan Sepatan</p>
-        <p className="text-[8.5pt] font-bold text-slate-700">Kabupaten Tangerang Provinsi Banten</p>
+        <p className="text-[8.5pt] font-bold text-slate-700">Kabupaten Tangerang Provinsi Banten Kode Pos : 15520</p>
       </div>
     </div>
   </div>
