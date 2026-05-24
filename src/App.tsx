@@ -70,9 +70,9 @@ const Header = ({ logoUrl }: { logoUrl: string }) => (
       </div>
       <div className="flex-1 text-center pr-[119px]">
         <h1 className="text-[12pt] font-black uppercase leading-tight tracking-tight">YAYASAN PENDIDIKAN ISLAM AL-HIKMAH</h1>
-        <h2 className="text-[14.5pt] font-black uppercase leading-tight tracking-tight">PONDOK PESANTREN MODERN AL-HIKMAH</h2>
+        <h2 className="text-[14.5pt] font-black uppercase leading-tight tracking-tight">PESANTREN MODERN AL-HIKMAH</h2>
         <p className="text-[8.5pt] font-bold mt-1 text-slate-700">Jl. Al-Hikmah Kp. Pondok Jaya RT.05/01 Desa Pondok Jaya Kecamatan Sepatan</p>
-        <p className="text-[8.5pt] font-bold text-slate-700">Kabupaten Tangerang Provinsi Banten Kode Pos : 15520</p>
+        <p className="text-[8.5pt] font-bold text-slate-700">Kabupaten Tangerang Provinsi Banten</p>
       </div>
     </div>
   </div>
@@ -85,6 +85,8 @@ interface ReportTemplateProps {
   globalNamaKelas: string;
   globalTanggalRaport: string;
   globalWaliKelas: string;
+  globalWaliKelasPutra?: string;
+  globalWaliKelasPutri?: string;
   globalKepala: string;
   studentRankings: any[];
   autoSaveStudent: (s: Partial<Student>) => void | Promise<void>;
@@ -93,9 +95,19 @@ interface ReportTemplateProps {
 
 const ReportTemplate = ({ 
   student, logoUrl, globalNamaKelas, globalTanggalRaport, 
-  globalWaliKelas, globalKepala, studentRankings, 
+  globalWaliKelas, globalWaliKelasPutra = '', globalWaliKelasPutri = '', globalKepala, studentRankings, 
   autoSaveStudent, setStudentsList 
 }: ReportTemplateProps) => {
+  const waliKelasToPrint = useMemo(() => {
+    const jk = (student.identity?.jenisKelamin || '').trim().toUpperCase();
+    const isPutra = jk.startsWith('L') || jk.startsWith('PUTRA');
+    if (isPutra) {
+      return globalWaliKelasPutra || globalWaliKelas || '..........................';
+    } else {
+      return globalWaliKelasPutri || globalWaliKelas || '..........................';
+    }
+  }, [student, globalWaliKelas, globalWaliKelasPutra, globalWaliKelasPutri]);
+
   const stats = useMemo(() => {
     const tulisTotal = student.subjects.reduce((sum, sub) => sum + (typeof sub.tulis?.nilai === 'number' ? sub.tulis.nilai : 0), 0);
     const lisanTotal = student.subjects.reduce((sum, sub) => sum + (typeof sub.lisan?.nilai === 'number' ? sub.lisan.nilai : 0), 0);
@@ -336,7 +348,7 @@ const ReportTemplate = ({
             <p className="font-bold">Wali Kelas,</p>
             <div className="h-28"></div>
             <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 whitespace-nowrap text-center">
-              {globalWaliKelas || '..........................'}
+              {waliKelasToPrint}
             </p>
           </div>
         </div>
@@ -404,7 +416,7 @@ const ReportTemplate = ({
             <p className="font-bold">Wali Kelas,</p>
             <div className="h-28"></div>
             <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 whitespace-nowrap text-center">
-              {globalWaliKelas || '..........................'}
+              {waliKelasToPrint}
             </p>
           </div>
         </div>
@@ -464,7 +476,7 @@ const ReportTemplate = ({
             <p className="font-bold">Wali Kelas,</p>
             <div className="h-28"></div>
             <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 whitespace-nowrap">
-              {globalWaliKelas || '..........................'}
+              {waliKelasToPrint}
             </p>
           </div>
         </div>
@@ -680,6 +692,8 @@ export default function App() {
   });
   const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [globalWaliKelas, setGlobalWaliKelas] = useState<string>('');
+  const [globalWaliKelasPutra, setGlobalWaliKelasPutra] = useState<string>('');
+  const [globalWaliKelasPutri, setGlobalWaliKelasPutri] = useState<string>('');
   const [globalNamaKelas, setGlobalNamaKelas] = useState<string>('');
   const [globalTanggalRaport, setGlobalTanggalRaport] = useState<string>('');
   const [globalKepala, setGlobalKepala] = useState<string>('');
@@ -739,6 +753,8 @@ export default function App() {
     // Config keys to listen to
     const configKeys = [
       `wali_kelas_${selectedClass}`,
+      `wali_kelas_putra_${selectedClass}`,
+      `wali_kelas_putri_${selectedClass}`,
       `nama_kelas_${selectedClass}`,
       `tanggal_raport_${selectedClass}`,
       `kepala_kepasentrenan_${selectedClass}`,
@@ -751,6 +767,8 @@ export default function App() {
         if (snapshot.exists()) {
           const val = snapshot.data().value;
           if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(val);
+          if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(val);
+          if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(val);
           if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(val);
           if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(val);
           if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(val);
@@ -854,6 +872,28 @@ export default function App() {
         await setDoc(doc(db, 'configs', `wali_kelas_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, `configs/wali_kelas_${selectedClass}`);
+      }
+    }
+  };
+
+  const handleUpdateGlobalWaliKelasPutra = async (val: string) => {
+    setGlobalWaliKelasPutra(val);
+    if (selectedClass) {
+      try {
+        await setDoc(doc(db, 'configs', `wali_kelas_putra_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `configs/wali_kelas_putra_${selectedClass}`);
+      }
+    }
+  };
+
+  const handleUpdateGlobalWaliKelasPutri = async (val: string) => {
+    setGlobalWaliKelasPutri(val);
+    if (selectedClass) {
+      try {
+        await setDoc(doc(db, 'configs', `wali_kelas_putri_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `configs/wali_kelas_putri_${selectedClass}`);
       }
     }
   };
@@ -1291,7 +1331,16 @@ export default function App() {
       const updatedStudents = [...studentsList];
       
       for (const row of jsonData) {
-        const studentIdx = updatedStudents.findIndex(s => s.name === row['NAMA SANTRI'] || s.nomorInduk === row['NIS/NISN']);
+        const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']).trim() : '';
+        if (!nameInExcel) continue;
+
+        const excelNis = row['NIS/NISN'] ? String(row['NIS/NISN']).trim() : '';
+        const studentIdx = updatedStudents.findIndex(s => {
+          const matchByName = s.name.trim().toUpperCase() === nameInExcel.toUpperCase();
+          const matchByNis = excelNis !== '' && s.nomorInduk && s.nomorInduk.trim() === excelNis;
+          return matchByNis || matchByName;
+        });
+
         if (studentIdx !== -1) {
           const student = updatedStudents[studentIdx];
           const newSubs = student.subjects.map(sub => {
@@ -1484,10 +1533,15 @@ export default function App() {
       ];
 
       for (const row of jsonData) {
-        const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']) : '';
+        const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']).trim() : '';
         if (!nameInExcel) continue;
 
-        const studentIdx = updatedStudents.findIndex(s => s.name.toUpperCase() === nameInExcel.toUpperCase() || s.nomorInduk === String(row['NIS/NISN (UTAMA)'] || ''));
+        const excelNis = row['NIS/NISN (UTAMA)'] ? String(row['NIS/NISN (UTAMA)']).trim() : '';
+        const studentIdx = updatedStudents.findIndex(s => {
+          const matchByName = s.name.trim().toUpperCase() === nameInExcel.toUpperCase();
+          const matchByNis = excelNis !== '' && s.nomorInduk && s.nomorInduk.trim() === excelNis;
+          return matchByNis || matchByName;
+        });
         
         let targetStudent: Student;
         let isNew = false;
@@ -1815,13 +1869,22 @@ export default function App() {
                   onChange={e => handleUpdateGlobalTanggalRaport(e.target.value)}
                 />
               </div>
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Wali Kelas</label>
+               <div>
+                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Wali Kelas Santri Putra</label>
                 <input 
                   className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
-                  placeholder="NAMA WALI KELAS..."
-                  value={globalWaliKelas}
-                  onChange={e => handleUpdateGlobalWaliKelas(e.target.value)}
+                  placeholder="NAMA WALI PUTRA..."
+                  value={globalWaliKelasPutra}
+                  onChange={e => handleUpdateGlobalWaliKelasPutra(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Wali Kelas Santri Putri</label>
+                <input 
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+                  placeholder="NAMA WALI PUTRI..."
+                  value={globalWaliKelasPutri}
+                  onChange={e => handleUpdateGlobalWaliKelasPutri(e.target.value)}
                 />
               </div>
               <div>
@@ -2748,6 +2811,8 @@ export default function App() {
                   globalNamaKelas={globalNamaKelas}
                   globalTanggalRaport={globalTanggalRaport}
                   globalWaliKelas={globalWaliKelas}
+                  globalWaliKelasPutra={globalWaliKelasPutra}
+                  globalWaliKelasPutri={globalWaliKelasPutri}
                   globalKepala={globalKepala}
                   studentRankings={studentRankings}
                   autoSaveStudent={autoSaveStudent}
@@ -2800,6 +2865,8 @@ export default function App() {
                   globalNamaKelas={globalNamaKelas}
                   globalTanggalRaport={globalTanggalRaport}
                   globalWaliKelas={globalWaliKelas}
+                  globalWaliKelasPutra={globalWaliKelasPutra}
+                  globalWaliKelasPutri={globalWaliKelasPutri}
                   globalKepala={globalKepala}
                   studentRankings={studentRankings}
                   autoSaveStudent={autoSaveStudent}
