@@ -796,6 +796,7 @@ export default function App() {
       return onSnapshot(doc(db, 'configs', key), (snapshot) => {
         if (snapshot.exists()) {
           const val = snapshot.data().value;
+          localStorage.setItem(`raport_config_cache_${key}`, val);
           if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(val);
           if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(val);
           if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(val);
@@ -805,12 +806,38 @@ export default function App() {
           if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(val);
           if (key === 'al_hikmah_custom_logo') setLogoUrl(val);
         } else {
-          // Defaults if not in Firebase
-          if (key.startsWith('tanggal_raport_')) setGlobalTanggalRaport('20 Desember 2025');
-          if (key.startsWith('tanggal_kenaikan_')) setGlobalTanggalKenaikan('21 Juni 2026');
+          // Defaults if not in Firebase - check cache first
+          const cachedVal = localStorage.getItem(`raport_config_cache_${key}`);
+          if (cachedVal !== null) {
+            if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(cachedVal);
+            if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(cachedVal);
+            if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(cachedVal);
+            if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(cachedVal);
+            if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(cachedVal);
+            if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(cachedVal);
+            if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(cachedVal);
+            if (key === 'al_hikmah_custom_logo') setLogoUrl(cachedVal);
+          } else {
+            if (key.startsWith('tanggal_raport_')) setGlobalTanggalRaport('20 Desember 2025');
+            if (key.startsWith('tanggal_kenaikan_')) setGlobalTanggalKenaikan('21 Juni 2026');
+          }
         }
       }, (error) => {
         handleFirestoreError(error, OperationType.GET, `configs/${key}`);
+        const cachedVal = localStorage.getItem(`raport_config_cache_${key}`);
+        if (cachedVal !== null) {
+          if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(cachedVal);
+          if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(cachedVal);
+          if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(cachedVal);
+          if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(cachedVal);
+          if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(cachedVal);
+          if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(cachedVal);
+          if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(cachedVal);
+          if (key === 'al_hikmah_custom_logo') setLogoUrl(cachedVal);
+        } else {
+          if (key.startsWith('tanggal_raport_')) setGlobalTanggalRaport('20 Desember 2025');
+          if (key.startsWith('tanggal_kenaikan_')) setGlobalTanggalKenaikan('21 Juni 2026');
+        }
       });
     });
 
@@ -871,8 +898,19 @@ export default function App() {
       // Sort by noUrut
       students.sort((a, b) => (a.noUrut || 0) - (b.noUrut || 0));
       setStudentsList(students);
+      localStorage.setItem(`raport_students_cache_${className}`, JSON.stringify(students));
     } catch (e) {
       handleFirestoreError(e, OperationType.GET, 'students');
+      const cached = localStorage.getItem(`raport_students_cache_${className}`);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          console.log('Restored students due to Firestore limit:', parsed);
+          setStudentsList(parsed);
+        } catch (err) {
+          console.error('Failed to parse cached students:', err);
+        }
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1057,6 +1095,13 @@ export default function App() {
 
     return () => clearTimeout(timer);
   }, [editingStudent]);
+
+  // Synchronize student list to client-side localStorage cache in real-time
+  useEffect(() => {
+    if (selectedClass && studentsList.length > 0) {
+      localStorage.setItem(`raport_students_cache_${selectedClass}`, JSON.stringify(studentsList));
+    }
+  }, [studentsList, selectedClass]);
 
   const handleCloseModal = async () => {
     if (editingStudent && editingStudent.id && saveStatus === 'saving') {
