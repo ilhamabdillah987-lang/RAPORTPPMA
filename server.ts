@@ -171,6 +171,36 @@ async function startServer() {
     }
   });
 
+  // Status Summary API
+  app.get("/api/status-summary", (req, res) => {
+    try {
+      const predefinedClasses = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];
+      const backups = db.data?.classesBackup || {};
+      
+      const classSummary = predefinedClasses.map(cls => {
+        const backup = backups[cls];
+        const hasData = !!(backup && backup.students && backup.students.length > 0);
+        return {
+          name: cls,
+          hasData,
+          studentCount: hasData ? backup.students.length : 0,
+          waliKelas: backup?.waliKelas || "-",
+          updatedAt: backup?.updatedAt || null
+        };
+      });
+
+      res.json({
+        classes: classSummary,
+        totalClasses: predefinedClasses.length,
+        filledClasses: classSummary.filter(c => c.hasData).length,
+        totalStudents: classSummary.reduce((sum, c) => sum + c.studentCount, 0),
+        serverTime: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Server Portal - Monitor Pengisian Kelas Raport Al-Hikmah
   app.get("/status", async (req, res) => {
     const predefinedClasses = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];

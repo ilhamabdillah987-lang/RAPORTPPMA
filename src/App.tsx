@@ -718,6 +718,10 @@ export default function App() {
   const [isBulkExtraOpen, setIsBulkExtraOpen] = useState(false);
   const [isBulkBehaviorOpen, setIsBulkBehaviorOpen] = useState(false);
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
+  const [isMonitorModalOpen, setIsMonitorModalOpen] = useState(false);
+  const [monitorStats, setMonitorStats] = useState<any>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [monitorSearchQuery, setMonitorSearchQuery] = useState('');
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // keep for single student grid if needed, or remove later
   const [studentsToPrint, setStudentsToPrint] = useState<Student[]>([]);
   const [bulkData, setBulkData] = useState('');
@@ -1112,6 +1116,51 @@ export default function App() {
     }
   }, [studentsList, selectedClass, globalWaliKelas, globalWaliKelasPutra, globalWaliKelasPutri]);
 
+  const fetchStatusSummary = async () => {
+    setIsStatsLoading(true);
+    try {
+      const res = await fetch('/api/status-summary');
+      if (res.ok) {
+        const data = await res.json();
+        setMonitorStats(data);
+      } else {
+        throw new Error('STATUS API NOT OK');
+      }
+    } catch (err) {
+      console.warn('Gagal memuat status server, beralih ke cache lokal:', err);
+      // Fallback: Generate statistics from localStorage
+      const predefinedClasses = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];
+      let filled = 0;
+      let total = 0;
+      const classesData = predefinedClasses.map(cls => {
+        const cached = localStorage.getItem(`raport_students_cache_${cls}`);
+        const students = cached ? JSON.parse(cached) : [];
+        const hasData = students.length > 0;
+        if (hasData) {
+          filled++;
+          total += students.length;
+        }
+        return {
+          name: cls,
+          hasData,
+          studentCount: students.length,
+          waliKelas: "-",
+          updatedAt: null
+        };
+      });
+      setMonitorStats({
+        classes: classesData,
+        totalClasses: predefinedClasses.length,
+        filledClasses: filled,
+        totalStudents: total,
+        serverTime: new Date().toISOString(),
+        isLocalFallback: true
+      });
+    } finally {
+      setIsStatsLoading(false);
+    }
+  };
+
   const handleCloseModal = async () => {
     if (editingStudent && editingStudent.id && saveStatus === 'saving') {
       await autoSaveStudent(editingStudent);
@@ -1269,6 +1318,37 @@ export default function App() {
     return filteredStudents[currentIndex] || filteredStudents[0];
   }, [filteredStudents, currentIndex]);
 
+  const monitorSearchResults = useMemo(() => {
+    if (!monitorSearchQuery || monitorSearchQuery.length < 2) return [];
+    
+    const predefinedClasses = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];
+    const results: any[] = [];
+    
+    predefinedClasses.forEach(cls => {
+      const cached = localStorage.getItem(`raport_students_cache_${cls}`);
+      if (cached) {
+        try {
+          const students = JSON.parse(cached) as Student[];
+          students.forEach(st => {
+            if (
+              String(st.name || '').toLowerCase().includes(monitorSearchQuery.toLowerCase()) ||
+              String(st.nomorInduk || '').includes(monitorSearchQuery)
+            ) {
+              results.push({
+                ...st,
+                className: cls
+              });
+            }
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    });
+    
+    return results;
+  }, [monitorSearchQuery]);
+
   const studentRankings = useMemo(() => {
     const list = studentsList.map(s => {
       const tulisSum = s.subjects.reduce((sum, sub) => sum + (typeof sub.tulis?.nilai === 'number' ? sub.tulis.nilai : 0), 0);
@@ -1315,9 +1395,38 @@ export default function App() {
 
   const handleDeleteStudent = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus data santri ini?')) {
+      // 1. Optimistic Local State Update
+      setStudentsList(prev => {
+        const updated = prev.filter(s => s.id !== id);
+        
+        // 2. Persist to client-side localStorage cache immediately
+        if (selectedClass) {
+          localStorage.setItem(`raport_students_cache_${selectedClass}`, JSON.stringify(updated));
+          
+          // 3. Back up to local Express server
+          fetch('/api/backup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              className: selectedClass, 
+              students: updated,
+              waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+            })
+          }).catch(err => console.warn('Pencatatan backup lokal tertunda:', err));
+        }
+        return updated;
+      });
+
+      // Adjust index gracefully
+      if (currentIndex > 0) {
+        setCurrentIndex(prev => Math.min(prev - 1, Math.max(0, studentsList.length - 2)));
+      } else {
+        setCurrentIndex(0);
+      }
+
+      // 4. Try to delete from cloud database (handled gracefully if quota is exceeded)
       try {
         await deleteDoc(doc(db, 'students', id));
-        if (selectedClass) fetchStudents(selectedClass);
       } catch (e) {
         handleFirestoreError(e, OperationType.DELETE, `students/${id}`);
       }
@@ -2071,14 +2180,26 @@ export default function App() {
             <p className="text-[9px] text-indigo-200/70 leading-relaxed mb-4 font-semibold uppercase tracking-wider">
               Cek real-time status pengisian semua kelas & unduh cadangan raport.
             </p>
-            <a 
-              href="/status" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-[10px] font-black uppercase text-center block transition-all shadow-md shadow-indigo-950 flex items-center justify-center gap-2"
-            >
-              📊 Buka Dashboard Monitor
-            </a>
+            <div className="flex flex-col gap-2.5">
+              <button 
+                onClick={() => {
+                  fetchStatusSummary();
+                  setIsMonitorModalOpen(true);
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-[10px] font-black uppercase text-center block transition-all shadow-md shadow-indigo-950 hover:translate-y-[-1px] cursor-pointer"
+              >
+                📊 LIHAT LIVE MONITORING
+              </button>
+              <a 
+                href="/status" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="w-full bg-slate-800/60 hover:bg-slate-800/90 text-slate-200 border border-slate-700/50 py-2.5 rounded-xl text-[9px] font-bold uppercase text-center block transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>🌐 Buka di Tab Baru</span>
+                <span className="text-[8px]">↗</span>
+              </a>
+            </div>
           </div>
         </div>
 
@@ -2122,6 +2243,204 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto w-full print:overflow-visible print:h-auto">
+        {/* LIVE STATUS MONITOR MODAL */}
+        {isMonitorModalOpen && (
+          <AnimatePresence>
+            <div className="fixed inset-0 z-[250] overflow-y-auto no-print">
+              <div className="flex min-h-full items-center justify-center p-4 sm:p-6 md:p-8">
+                <motion.div 
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }} 
+                  onClick={() => setIsMonitorModalOpen(false)} 
+                  className="fixed inset-0 bg-slate-900/70 backdrop-blur-md" 
+                />
+                
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95, y: 30 }} 
+                  animate={{ opacity: 1, scale: 1, y: 0 }} 
+                  className="relative w-full max-w-5xl bg-slate-50 rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                >
+                  {/* Decorative Banner Header */}
+                  <div className="p-8 bg-gradient-to-r from-blue-700 via-indigo-800 to-slate-900 text-white flex justify-between items-center shrink-0 border-b border-indigo-950/20">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-inner">
+                        <span className="text-2xl">📊</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] bg-emerald-500/35 border border-emerald-400/20 px-2 py-0.5 rounded-full font-black tracking-widest uppercase leading-none text-emerald-100">Live Monitor</span>
+                          {monitorStats?.isLocalFallback && (
+                            <span className="text-[9px] bg-amber-500/35 border border-amber-400/20 px-2 py-0.5 rounded-full font-black tracking-widest uppercase leading-none text-amber-100">Lokal</span>
+                          )}
+                        </div>
+                        <h2 className="text-xl md:text-2xl font-black tracking-tight uppercase mt-1 leading-none">PEMANTAUAN PENGISIAN RAPORT</h2>
+                        <p className="text-xs text-indigo-200/80 font-bold mt-1.5 uppercase leading-none">Status Penginputan Kelas & Cadangan Berkas Al-Hikmah</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setIsMonitorModalOpen(false)} 
+                      className="p-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-full transition-all cursor-pointer border border-white/10"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Body Wrapper */}
+                  <div className="p-8 overflow-y-auto flex-1 space-y-8">
+                    {isStatsLoading ? (
+                      <div className="py-24 flex flex-col items-center justify-center gap-4">
+                        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Sinkronisasi Database Live...</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Summary Widget Numbers */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="bg-white p-6 rounded-2xl border border-blue-50 shadow-sm flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl font-bold">📂</div>
+                            <div>
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">KELAS TERKOMPILASI</p>
+                              <h3 className="text-xl font-black text-slate-800">{monitorStats?.filledClasses || 0} <span className="text-xs font-medium text-slate-400">dari {monitorStats?.totalClasses || 10} Kelas</span></h3>
+                            </div>
+                          </div>
+
+                          <div className="bg-white p-6 rounded-2xl border border-emerald-50 shadow-sm flex items-center gap-4">
+                            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold">👥</div>
+                            <div>
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">TOTAL SANTRI DIINPUT</p>
+                              <h3 className="text-xl font-black text-slate-800">{monitorStats?.totalStudents || 0} <span className="text-xs font-medium text-slate-400">Orang</span></h3>
+                            </div>
+                          </div>
+
+                          <div className="bg-white p-6 rounded-2xl border border-indigo-50 shadow-sm flex items-center gap-4">
+                            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl font-bold">⚡</div>
+                            <div>
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">METODE KOORDINASI</p>
+                              <h3 className={`text-xs font-black flex items-center gap-1.5 ${monitorStats?.isLocalFallback ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                <span className={`w-2.5 h-2.5 rounded-full inline-block animate-ping ${monitorStats?.isLocalFallback ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+                                {monitorStats?.isLocalFallback ? 'OFFLINE CACHE (MANDIRI)' : 'SERVER CENTRAL PORTAL'}
+                              </h3>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Search Bar inside Monitor Dashboard */}
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                              <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">🔍 Cari Santri di Semua Kelas</h4>
+                              <p className="text-[11px] text-slate-400 font-semibold uppercase">Mencari nama dikoordinatkan di semua tingkat kelas yang sudah terisi</p>
+                            </div>
+                            <div className="w-full md:max-w-md">
+                              <input 
+                                type="text" 
+                                placeholder="Ketik nama santri/NISN disini..." 
+                                value={monitorSearchQuery}
+                                onChange={(e) => setMonitorSearchQuery(e.target.value)}
+                                className="w-full px-5 py-3 outline-none border border-slate-200 focus:border-blue-500 rounded-2xl text-xs font-bold transition-all focus:ring-4 focus:ring-blue-50 bg-slate-50 focus:bg-white"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Search Results */}
+                          {monitorSearchResults.length > 0 && (
+                            <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 space-y-3">
+                              <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest">🔍 HASIL PENCARIAN DI SEMUA KELAS ({monitorSearchResults.length}):</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 max-h-48 overflow-y-auto">
+                                {monitorSearchResults.map((st: any) => (
+                                  <div key={st.id} className="bg-white p-3.5 rounded-xl border border-blue-100 shadow-sm flex flex-col justify-center">
+                                    <span className="text-xs font-black text-slate-800 uppercase">{st.name}</span>
+                                    <span className="text-[9px] text-slate-400 font-semibold font-mono mt-0.5">NISN/NI: {st.nomorInduk || '-'}</span>
+                                    <span className="mt-2 inline-block self-start text-[8px] font-extrabold tracking-widest text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md uppercase border border-blue-100/50 leading-none">💻 KELAS {st.className}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {monitorSearchQuery.length >= 2 && monitorSearchResults.length === 0 && (
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
+                              <p className="text-xs font-semibold text-slate-400 uppercase">Tidak ada santri yang cocok dari kelas yang tersimpan lokal</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Classes Grid Layout */}
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-extrabold text-slate-500 uppercase tracking-widest">Detail Tingkat Kelas</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {monitorStats?.classes?.map((cls: any) => (
+                              <div 
+                                key={cls.name} 
+                                className={`bg-white rounded-3xl p-6 border ${cls.hasData ? 'border-emerald-100 shadow-lg shadow-emerald-50/40' : 'border-slate-200'} transition-all hover:translate-y-[-2px] flex flex-col justify-between`}
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between mb-4">
+                                    <span className="px-3.5 py-1.5 bg-slate-900 text-white rounded-xl text-[10px] font-black tracking-widest uppercase">{cls.name}</span>
+                                    {cls.hasData ? (
+                                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-wider rounded-lg border border-emerald-100 flex items-center gap-1.5 leading-none">🟢 TERISI</span>
+                                    ) : (
+                                      <span className="px-2.5 py-1 bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-wider rounded-lg border border-slate-200/60 flex items-center gap-1.5 leading-none">❌ KOSONG</span>
+                                    )}
+                                  </div>
+
+                                  <div className="space-y-2 py-4 border-y border-slate-100/80 my-4 text-xs">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-slate-400 font-bold uppercase text-[9px]">Wali Kelas:</span>
+                                      <span className="text-slate-700 font-black uppercase max-w-[150px] truncate">{cls.waliKelas || '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-slate-400 font-bold uppercase text-[9px]">Santri Terinput:</span>
+                                      <span className="text-slate-800 font-black">{cls.studentCount} Santri</span>
+                                    </div>
+                                    {cls.updatedAt && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-slate-400 font-bold uppercase text-[9px]">Pembaruan:</span>
+                                        <span className="text-slate-500 font-bold font-mono text-[9px]">{new Date(cls.updatedAt).toLocaleString('id-ID')}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="mt-2">
+                                  {cls.hasData ? (
+                                    <button
+                                      onClick={() => {
+                                        window.open(`/api/classes-download/${encodeURIComponent(cls.name)}`, '_blank');
+                                      }}
+                                      className="w-full text-center py-2.5 bg-blue-50 text-blue-600 font-black text-[9px] tracking-wider uppercase rounded-xl border border-blue-100 hover:bg-blue-100 transition-all cursor-pointer"
+                                    >
+                                      📥 Unduh Cadangan JSON
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      disabled 
+                                      className="w-full py-2.5 bg-slate-50 text-slate-300 font-black text-[9px] tracking-wider uppercase rounded-xl border border-slate-200/40 cursor-not-allowed"
+                                    >
+                                      Belum Diinput
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between font-bold text-slate-400 uppercase text-[9px] tracking-widest shrink-0">
+                    <span>Yayasan Pendidikan Islam Al-Hikmah</span>
+                    <span>Monitoring & Kontrol Terintegrasi</span>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </AnimatePresence>
+        )}
+
         {/* MULTI STUDENT ADD MODAL */}
         {isBulkAddOpen && (
           <AnimatePresence>
