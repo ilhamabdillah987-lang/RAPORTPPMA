@@ -44,7 +44,11 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  
+  if (typeof window !== 'undefined') {
+    const event = new CustomEvent('firestore-error', { detail: errInfo });
+    window.dispatchEvent(event);
+  }
 };
 
 // No server needed, data is stored in Firebase
@@ -709,6 +713,7 @@ export default function App() {
   const [bulkData, setBulkData] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dbError, setDbError] = useState<string | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -747,6 +752,21 @@ export default function App() {
     // Also reset sheet preview when changing student
     setShowSheetPreview(false);
   }, [currentIndex]);
+
+  useEffect(() => {
+    const handleErr = (event: Event) => {
+      const customEv = event as CustomEvent<FirestoreErrorInfo>;
+      const errMsg = customEv.detail?.error || '';
+      if (errMsg.toLowerCase().includes('quota') || errMsg.toLowerCase().includes('limit exceeded')) {
+        setDbError('Kuota harian database (Firebase) telah habis hari ini. Perubahan baru mungkin tidak tersimpan ke cloud, tetapi aplikasi tetap dapat digunakan secara lokal.');
+      } else {
+        setDbError(`Kesalahan database: ${errMsg}`);
+      }
+    };
+
+    window.addEventListener('firestore-error', handleErr);
+    return () => window.removeEventListener('firestore-error', handleErr);
+  }, []);
 
   // Fetch configs from Firebase
   useEffect(() => {
@@ -2021,6 +2041,16 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto w-full print:overflow-visible print:h-auto">
+        {dbError && (
+          <div className="bg-amber-500 text-white font-bold p-3 px-6 flex items-center justify-between shadow-md text-xs sm:text-sm animate-pulse sticky top-0 z-[190] no-print">
+            <span className="flex items-center gap-2">
+              <span className="text-lg">⚠️</span> {dbError}
+            </span>
+            <button onClick={() => setDbError(null)} className="ml-4 p-1 hover:bg-amber-600 rounded transition-colors" title="Sembunyikan">
+              <X size={16} />
+            </button>
+          </div>
+        )}
         {/* MULTI STUDENT ADD MODAL */}
         {isBulkAddOpen && (
           <AnimatePresence>
