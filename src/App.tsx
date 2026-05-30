@@ -43,7 +43,17 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  const isQuotaError = errInfo.error.toLowerCase().includes('quota') || 
+                       errInfo.error.toLowerCase().includes('limit exceeded') ||
+                       errInfo.error.toLowerCase().includes('exhausted') ||
+                       errInfo.error.toLowerCase().includes('billing');
+
+  if (isQuotaError) {
+    console.warn('Firestore Quota/Limit (Handled Gracefully): ', JSON.stringify(errInfo));
+  } else {
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+  }
   
   if (typeof window !== 'undefined') {
     const event = new CustomEvent('firestore-error', { detail: errInfo });
@@ -862,7 +872,7 @@ export default function App() {
       students.sort((a, b) => (a.noUrut || 0) - (b.noUrut || 0));
       setStudentsList(students);
     } catch (e) {
-      console.error(e);
+      handleFirestoreError(e, OperationType.GET, 'students');
     } finally {
       setIsLoading(false);
     }
@@ -2041,16 +2051,6 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto w-full print:overflow-visible print:h-auto">
-        {dbError && (
-          <div className="bg-amber-500 text-white font-bold p-3 px-6 flex items-center justify-between shadow-md text-xs sm:text-sm animate-pulse sticky top-0 z-[190] no-print">
-            <span className="flex items-center gap-2">
-              <span className="text-lg">⚠️</span> {dbError}
-            </span>
-            <button onClick={() => setDbError(null)} className="ml-4 p-1 hover:bg-amber-600 rounded transition-colors" title="Sembunyikan">
-              <X size={16} />
-            </button>
-          </div>
-        )}
         {/* MULTI STUDENT ADD MODAL */}
         {isBulkAddOpen && (
           <AnimatePresence>
