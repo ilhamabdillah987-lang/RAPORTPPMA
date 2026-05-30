@@ -13,6 +13,7 @@ const PORT = 3000;
 interface Data {
   students: any[];
   classesBackup?: Record<string, { students: any[]; updatedAt: string; waliKelas?: string }>;
+  configs?: Record<string, any>;
 }
 
 async function startServer() {
@@ -29,16 +30,53 @@ async function startServer() {
 
   // Explicit lowdb setup
   const adapter = new JSONFile<Data>(path.join(process.cwd(), 'db.json'));
-  const defaultData: Data = { students: [], classesBackup: {} };
+  const defaultData: Data = { students: [], classesBackup: {}, configs: {} };
   const db = new Low<Data>(adapter, defaultData);
   
   await db.read();
   if (!db.data) {
     db.data = defaultData;
     await db.write();
-  } else if (!db.data.classesBackup) {
-    db.data.classesBackup = {};
+  } else {
+    let changed = false;
+    if (!db.data.classesBackup) {
+      db.data.classesBackup = {};
+      changed = true;
+    }
+    if (!db.data.configs) {
+      db.data.configs = {};
+      changed = true;
+    }
+    if (!db.data.students) {
+      db.data.students = [];
+      changed = true;
+    }
+    if (changed) {
+      await db.write();
+    }
+  }
+
+  // Dynamic migration: If students list is empty but backups are populated, populate students primary array
+  if (db.data && db.data.classesBackup && (!db.data.students || db.data.students.length === 0)) {
+    console.log("Migrasi data backup ke data utama...");
+    const migratedStudents: any[] = [];
+    const seenIds = new Set<string>();
+    
+    for (const className of Object.keys(db.data.classesBackup)) {
+      const backupInfo = db.data.classesBackup[className];
+      if (backupInfo && backupInfo.students) {
+        for (const student of backupInfo.students) {
+          if (student && student.id && !seenIds.has(student.id)) {
+            seenIds.add(student.id);
+            migratedStudents.push(student);
+          }
+        }
+      }
+    }
+    
+    db.data.students = migratedStudents;
     await db.write();
+    console.log(`Berhasil memigrasi ${migratedStudents.length} santri ke array utama.`);
   }
 
   app.get("/api/health", (req, res) => {
@@ -86,20 +124,51 @@ async function startServer() {
     
     try {
       if (!db.data) throw new Error("Database not initialized");
+      if (!db.data.students) db.data.students = [];
+
       const index = db.data.students.findIndex(s => s.id === id);
       
+      let finalStudent;
       if (index === -1) {
-        return res.status(404).json({ message: "Student not found" });
+        // Upsert if not found
+        finalStudent = {
+          ...studentUpdate,
+          id,
+          updatedAt: new Date().toISOString()
+        };
+        db.data.students.push(finalStudent);
+      } else {
+        // Merge with existing
+        finalStudent = {
+          ...db.data.students[index],
+          ...studentUpdate,
+          id, // ensure ID doesn't change
+          updatedAt: new Date().toISOString()
+        };
+        db.data.students[index] = finalStudent;
       }
 
-      db.data.students[index] = {
-        ...db.data.students[index],
-        ...studentUpdate,
-        id // ensure ID doesn't change
-      };
+      // Also let's update this student in db.data.classesBackup directory
+      if (finalStudent.class) {
+        const cls = finalStudent.class;
+        if (!db.data.classesBackup) db.data.classesBackup = {};
+        if (!db.data.classesBackup[cls]) {
+          db.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString() };
+        }
+        
+        const clsStudents = db.data.classesBackup[cls].students || [];
+        const sIndex = clsStudents.findIndex(s => s.id === id);
+        if (sIndex === -1) {
+          clsStudents.push(finalStudent);
+        } else {
+          clsStudents[sIndex] = finalStudent;
+        }
+        db.data.classesBackup[cls].students = clsStudents;
+        db.data.classesBackup[cls].updatedAt = new Date().toISOString();
+      }
 
       await db.write();
-      res.json(db.data.students[index]);
+      res.json(finalStudent);
     } catch (error: any) {
       console.error("Update Student Error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -116,12 +185,50 @@ async function startServer() {
         return res.status(404).json({ message: "Student not found" });
       }
 
+      const classLabel = db.data.students[index].class;
       db.data.students.splice(index, 1);
+
+      // Also clean up from classesBackup
+      if (classLabel && db.data.classesBackup && db.data.classesBackup[classLabel]) {
+        db.data.classesBackup[classLabel].students = (db.data.classesBackup[classLabel].students || []).filter(s => s.id !== id);
+        db.data.classesBackup[classLabel].updatedAt = new Date().toISOString();
+      }
+
       await db.write();
       res.status(204).send();
     } catch (error: any) {
       console.error("Delete Student Error:", error);
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get configuration key
+  app.get("/api/configs/:key", (req, res) => {
+    try {
+      const { key } = req.params;
+      const value = db.data?.configs?.[key] || "";
+      res.json({ value });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Set configuration key
+  app.post("/api/configs/:key", async (req, res) => {
+    try {
+      const { key } = req.params;
+      const { value } = req.body;
+      if (!db.data) {
+        db.data = { students: [], classesBackup: {}, configs: {} };
+      }
+      if (!db.data.configs) {
+        db.data.configs = {};
+      }
+      db.data.configs[key] = value;
+      await db.write();
+      res.json({ success: true, key, value });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -134,7 +241,7 @@ async function startServer() {
       }
 
       if (!db.data) {
-        db.data = { students: [], classesBackup: {} };
+        db.data = { students: [], classesBackup: {}, configs: {} };
       }
       if (!db.data.classesBackup) {
         db.data.classesBackup = {};
@@ -147,10 +254,44 @@ async function startServer() {
         waliKelas: waliKelas || db.data.classesBackup[className]?.waliKelas || ""
       };
 
+      // Also synchronize into db.data.students to ensure they match perfectly
+      if (students && Array.isArray(students)) {
+        if (!db.data.students) db.data.students = [];
+        // Filtering out other students of this class
+        db.data.students = db.data.students.filter(s => s.class !== className);
+        // Pushing all current students of this class
+        db.data.students.push(...students);
+      }
+
       await db.write();
       res.json({ success: true, className, count: (students || []).length });
     } catch (err: any) {
       console.error("Backup error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get Class-Specific Backup JSON Data (for client sync)
+  app.get("/api/backup/:className", async (req, res) => {
+    try {
+      const { className } = req.params;
+      if (!db.data || !db.data.classesBackup || !db.data.classesBackup[className] || !db.data.classesBackup[className].students || db.data.classesBackup[className].students.length === 0) {
+        // Fallback: search main students list
+        const classStudents = db.data?.students?.filter(s => s.class === className) || [];
+        if (classStudents.length > 0) {
+          if (!db.data.classesBackup) db.data.classesBackup = {};
+          db.data.classesBackup[className] = {
+            students: classStudents,
+            updatedAt: new Date().toISOString(),
+            waliKelas: ""
+          };
+          await db.write();
+          return res.json(db.data.classesBackup[className]);
+        }
+        return res.status(404).json({ error: "Backup data kelas tidak ditemukan" });
+      }
+      res.json(db.data.classesBackup[className]);
+    } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });

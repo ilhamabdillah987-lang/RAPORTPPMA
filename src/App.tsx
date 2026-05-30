@@ -9,8 +9,7 @@ import XLSXStyle from 'xlsx-js-style';
 import { Student, Subject, StudentIdentity } from './types';
 import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User as LucideUser, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu, LogIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from './firebase';
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { db, auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot } from './firebase';
 
 enum OperationType {
   CREATE = 'create',
@@ -722,6 +721,45 @@ export default function App() {
   const [monitorStats, setMonitorStats] = useState<any>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
   const [monitorSearchQuery, setMonitorSearchQuery] = useState('');
+  
+  // Custom Confirmation Modal State & Handler (Bypasses iframe alert/confirm limitations)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    confirmText: 'Ya, Lanjutkan',
+    cancelText: 'Batal',
+    isDanger: false
+  });
+
+  const showConfirm = (options: {
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+  }) => {
+    setConfirmModal({
+      isOpen: true,
+      confirmText: 'Ya, Lanjutkan',
+      cancelText: 'Batal',
+      isDanger: false,
+      ...options
+    });
+  };
+
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // keep for single student grid if needed, or remove later
   const [studentsToPrint, setStudentsToPrint] = useState<Student[]>([]);
   const [bulkData, setBulkData] = useState('');
@@ -905,6 +943,26 @@ export default function App() {
       localStorage.setItem(`raport_students_cache_${className}`, JSON.stringify(students));
     } catch (e) {
       handleFirestoreError(e, OperationType.GET, 'students');
+      
+      // Secondary fallback: Try to pull the server-side backup (so we can see other people's inputs)
+      try {
+        console.log('Mencoba memulihkan data dari backup server untuk kelas:', className);
+        const res = await fetch(`/api/backup/${encodeURIComponent(className)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.students && data.students.length > 0) {
+            console.log('Berhasil membuat cadangan dari data server:', data.students.length);
+            setStudentsList(data.students);
+            localStorage.setItem(`raport_students_cache_${className}`, JSON.stringify(data.students));
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (backupError) {
+        console.warn('Gagal memuat backup server otomatis:', backupError);
+      }
+
+      // Tertiary fallback: localStorage cache
       const cached = localStorage.getItem(`raport_students_cache_${className}`);
       if (cached) {
         try {
@@ -1019,71 +1077,87 @@ export default function App() {
     
     const isEvenSemester = studentsList[0]?.semester === 'GENAP';
     if (!isEvenSemester) {
-      alert('Proses kenaikan/kelulusan hanya bisa dilakukan di akhir SEMESTER GENAP.');
+      showConfirm({
+        title: 'Peringatan',
+        message: 'Proses kenaikan/kelulusan hanya bisa dilakukan di akhir SEMESTER GENAP.',
+        cancelText: 'Tutup',
+        confirmText: 'Selesai',
+        onConfirm: () => {}
+      });
       return;
     }
 
-    if (!confirm(`Apakah Anda yakin ingin memproses kenaikan/kelulusan untuk seluruh santri di kelas ${selectedClass}? \n\nData nilai akan direset dan tahun pelajaran akan diperbarui.`)) {
-      return;
-    }
-
-    const nextTahunPelajaran = (yearStr: string) => {
-      const parts = yearStr.split('/');
-      if (parts.length === 2) {
-        const start = parseInt(parts[0]) + 1;
-        const end = parseInt(parts[1]) + 1;
-        return `${start}/${end}`;
-      }
-      return yearStr;
-    };
-
-    const getNextClass = (current: string) => {
-      if (current.includes('9') || current.includes('12')) return 'ALUMNI';
-      
-      const mapping: Record<string, string> = {
-        '7 MTs': '8 MTs',
-        '8 MTs': '9 MTs',
-        '7 SMP': '8 SMP',
-        '8 SMP': '9 SMP',
-        '10 SMA': '11 SMA',
-        '11 SMA': '12 SMA'
-      };
-      return mapping[current] || current;
-    };
-
-    setIsLoading(true);
-    try {
-      for (const student of studentsList) {
-        const nextClass = getNextClass(student.class);
-        const nextYear = nextTahunPelajaran(student.tahunPelajaran);
-        const isGraduating = nextClass === 'ALUMNI';
-        
-        const resetSubjects = student.subjects.map(s => ({
-          ...s,
-          tulis: { nilai: 0, huruf: '-' },
-          lisan: { nilai: 0, huruf: '-' }
-        }));
-
-        const updatedStudent: Partial<Student> = {
-          class: nextClass,
-          semester: isGraduating ? student.semester : 'GANJIL',
-          tahunPelajaran: isGraduating ? student.tahunPelajaran : nextYear,
-          subjects: isGraduating ? student.subjects : resetSubjects,
-          attendance: isGraduating ? student.attendance : { sakit: 0, izin: 0, alpha: 0 },
-          behavior: isGraduating ? student.behavior : { spiritual: '', social: '' },
-          extracurriculars: isGraduating ? student.extracurriculars : [],
-          updatedAt: new Date().toISOString()
+    showConfirm({
+      title: 'Proses Kenaikan / Kelulusan',
+      message: `Apakah Anda yakin ingin memproses kenaikan/kelulusan untuk seluruh santri di kelas ${selectedClass}? Data nilai akan direset dan tahun pelajaran akan diperbarui.`,
+      isDanger: true,
+      confirmText: 'YA, PROSES SEKARANG',
+      onConfirm: async () => {
+        const nextTahunPelajaran = (yearStr: string) => {
+          const parts = yearStr.split('/');
+          if (parts.length === 2) {
+            const start = parseInt(parts[0]) + 1;
+            const end = parseInt(parts[1]) + 1;
+            return `${start}/${end}`;
+          }
+          return yearStr;
         };
 
-        await setDoc(doc(db, 'students', student.id), updatedStudent, { merge: true });
+        const getNextClass = (current: string) => {
+          if (current.includes('9') || current.includes('12')) return 'ALUMNI';
+          
+          const mapping: Record<string, string> = {
+            '7 MTs': '8 MTs',
+            '8 MTs': '9 MTs',
+            '7 SMP': '8 SMP',
+            '8 SMP': '9 SMP',
+            '10 SMA': '11 SMA',
+            '11 SMA': '12 SMA'
+          };
+          return mapping[current] || current;
+        };
+
+        setIsLoading(true);
+        try {
+          for (const student of studentsList) {
+            const nextClass = getNextClass(student.class);
+            const nextYear = nextTahunPelajaran(student.tahunPelajaran);
+            const isGraduating = nextClass === 'ALUMNI';
+            
+            const resetSubjects = student.subjects.map(s => ({
+              ...s,
+              tulis: { nilai: 0, huruf: '-' },
+              lisan: { nilai: 0, huruf: '-' }
+            }));
+
+            const updatedStudent: Partial<Student> = {
+              class: nextClass,
+              semester: isGraduating ? student.semester : 'GANJIL',
+              tahunPelajaran: isGraduating ? student.tahunPelajaran : nextYear,
+              subjects: isGraduating ? student.subjects : resetSubjects,
+              attendance: isGraduating ? student.attendance : { sakit: 0, izin: 0, alpha: 0 },
+              behavior: isGraduating ? student.behavior : { spiritual: '', social: '' },
+              extracurriculars: isGraduating ? student.extracurriculars : [],
+              updatedAt: new Date().toISOString()
+            };
+
+            await setDoc(doc(db, 'students', student.id), updatedStudent, { merge: true });
+          }
+          showConfirm({
+            title: 'Sukses',
+            message: `Berhasil memproses kenaikan/kelulusan untuk kelas ${selectedClass}.`,
+            cancelText: 'Tutup',
+            confirmText: 'Selesai',
+            onConfirm: () => {}
+          });
+          fetchStudents(selectedClass);
+        } catch (e) {
+          handleFirestoreError(e, OperationType.UPDATE, 'students');
+        } finally {
+          setIsLoading(false);
+        }
       }
-      alert(`Berhasil memproses kenaikan/kelulusan untuk kelas ${selectedClass}.`);
-      fetchStudents(selectedClass);
-    } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'students');
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   // Auto-save effect: Updates UI in real-time, sinks to server with debounce
@@ -1115,6 +1189,36 @@ export default function App() {
       }).catch(err => console.warn('Pencatatan backup lokal tertunda:', err));
     }
   }, [studentsList, selectedClass, globalWaliKelas, globalWaliKelasPutra, globalWaliKelasPutri]);
+
+  const pullBackupFromServer = async (classNameStr: string, quiet = false) => {
+    if (!classNameStr) return;
+    if (!quiet) setSyncStatus('syncing');
+    try {
+      const res = await fetch(`/api/backup/${encodeURIComponent(classNameStr)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.students && data.students.length > 0) {
+          setStudentsList(data.students);
+          localStorage.setItem(`raport_students_cache_${classNameStr}`, JSON.stringify(data.students));
+          if (!quiet) {
+            setSyncStatus('success');
+            setTimeout(() => setSyncStatus('idle'), 3000);
+          }
+          return data.students;
+        } else {
+          throw new Error('Data backup masih kosong di server');
+        }
+      } else {
+        throw new Error('Data backup tidak ditemukan di server');
+      }
+    } catch (err: any) {
+      console.warn('Gagal sinkronisasi data server:', err);
+      if (!quiet) {
+        setSyncStatus('error');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+      }
+    }
+  };
 
   const fetchStatusSummary = async () => {
     setIsStatsLoading(true);
@@ -1394,43 +1498,50 @@ export default function App() {
   };
 
   const handleDeleteStudent = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus data santri ini?')) {
-      // 1. Optimistic Local State Update
-      setStudentsList(prev => {
-        const updated = prev.filter(s => s.id !== id);
-        
-        // 2. Persist to client-side localStorage cache immediately
-        if (selectedClass) {
-          localStorage.setItem(`raport_students_cache_${selectedClass}`, JSON.stringify(updated));
+    if (!id) return;
+    showConfirm({
+      title: 'Hapus Data Santri',
+      message: 'Apakah Anda yakin ingin menghapus data santri ini? Seluruh data nilai, sikap dan presensi akan dihapus permanen dari server dan local storage.',
+      isDanger: true,
+      confirmText: 'YA, HAPUS DATA',
+      onConfirm: async () => {
+        // 1. Optimistic Local State Update
+        setStudentsList(prev => {
+          const updated = prev.filter(s => s.id !== id);
           
-          // 3. Back up to local Express server
-          fetch('/api/backup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              className: selectedClass, 
-              students: updated,
-              waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
-            })
-          }).catch(err => console.warn('Pencatatan backup lokal tertunda:', err));
+          // 2. Persist to client-side localStorage cache immediately
+          if (selectedClass) {
+            localStorage.setItem(`raport_students_cache_${selectedClass}`, JSON.stringify(updated));
+            
+            // 3. Back up to local Express server
+            fetch('/api/backup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                className: selectedClass, 
+                students: updated,
+                waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+              })
+            }).catch(err => console.warn('Pencatatan backup lokal tertunda:', err));
+          }
+          return updated;
+        });
+
+        // Adjust index gracefully
+        if (currentIndex > 0) {
+          setCurrentIndex(prev => Math.min(prev - 1, Math.max(0, studentsList.length - 2)));
+        } else {
+          setCurrentIndex(0);
         }
-        return updated;
-      });
 
-      // Adjust index gracefully
-      if (currentIndex > 0) {
-        setCurrentIndex(prev => Math.min(prev - 1, Math.max(0, studentsList.length - 2)));
-      } else {
-        setCurrentIndex(0);
+        // 4. Try to delete from cloud database (handled gracefully if quota is exceeded)
+        try {
+          await deleteDoc(doc(db, 'students', id));
+        } catch (e) {
+          handleFirestoreError(e, OperationType.DELETE, `students/${id}`);
+        }
       }
-
-      // 4. Try to delete from cloud database (handled gracefully if quota is exceeded)
-      try {
-        await deleteDoc(doc(db, 'students', id));
-      } catch (e) {
-        handleFirestoreError(e, OperationType.DELETE, `students/${id}`);
-      }
-    }
+    });
   };
 
   const openAddModal = () => {
@@ -1553,7 +1664,13 @@ export default function App() {
       }
       
       setStudentsList(updatedStudents);
-      alert('Berhasil mengimpor nilai dari Excel');
+      showConfirm({
+        title: 'Sukses',
+        message: 'Berhasil mengimpor nilai seluruh santri dari file Excel!',
+        cancelText: 'Tutup',
+        confirmText: 'Selesai',
+        onConfirm: () => {}
+      });
     };
     reader.readAsArrayBuffer(file);
   };
@@ -1801,34 +1918,52 @@ export default function App() {
       }
       
       setStudentsList(updatedStudents);
-      alert('Berhasil mengimpor identitas dari Excel');
+      showConfirm({
+        title: 'Sukses',
+        message: 'Berhasil mengimpor identitas seluruh santri dari file Excel!',
+        cancelText: 'Tutup',
+        confirmText: 'Selesai',
+        onConfirm: () => {}
+      });
     };
     reader.readAsArrayBuffer(file);
   };
 
   const handleSyncSubjects = async () => {
     if (studentsList.length < 2) return;
-    if (!confirm('Ini akan menyamakan daftar mata pelajaran SEMUA santri mengikuti santri pertama. Data nilai santri lain akan tetap ada jika nama mata pelajarannya sama. Lanjutkan?')) return;
     
-    setIsSyncing(true);
-    const templateSubjects = studentsList[0].subjects.map(s => ({ ...s, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } }));
-    
-    try {
-      for (const student of studentsList) {
-        const newSubs = templateSubjects.map(ts => {
-          const existing = student.subjects.find(s => s.name === ts.name);
-          return existing ? { ...ts, tulis: existing.tulis, lisan: existing.lisan } : ts;
-        });
+    showConfirm({
+      title: 'Sinkronisasi Mata Pelajaran',
+      message: 'Ini akan menyamakan daftar mata pelajaran SEMUA santri mengikuti santri pertama. Data nilai santri lain akan tetap aman jika nama mata pelajarannya sama. Lanjutkan?',
+      confirmText: 'YA, SINKRONKAN',
+      onConfirm: async () => {
+        setIsSyncing(true);
+        const templateSubjects = studentsList[0].subjects.map(s => ({ ...s, tulis: { nilai: 0, huruf: '-' }, lisan: { nilai: 0, huruf: '-' } }));
         
-        await setDoc(doc(db, 'students', student.id), { subjects: newSubs, updatedAt: new Date().toISOString() }, { merge: true });
+        try {
+          for (const student of studentsList) {
+            const newSubs = templateSubjects.map(ts => {
+              const existing = student.subjects.find(s => s.name === ts.name);
+              return existing ? { ...ts, tulis: existing.tulis, lisan: existing.lisan } : ts;
+            });
+            
+            await setDoc(doc(db, 'students', student.id), { subjects: newSubs, updatedAt: new Date().toISOString() }, { merge: true });
+          }
+          if (selectedClass) fetchStudents(selectedClass);
+          showConfirm({
+            title: 'Berhasil',
+            message: 'Sinkronisasi Mata Pelajaran Berhasil disinkronkan untuk seluruh santri!',
+            cancelText: 'Tutup',
+            confirmText: 'Selesai',
+            onConfirm: () => {}
+          });
+        } catch (e) {
+          handleFirestoreError(e, OperationType.UPDATE, 'students');
+        } finally {
+          setIsSyncing(false);
+        }
       }
-      if (selectedClass) fetchStudents(selectedClass);
-      alert('Sinkronisasi Mata Pelajaran Berhasil!');
-    } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'students');
-    } finally {
-      setIsSyncing(false);
-    }
+    });
   };
 
   const handlePrint = () => {
@@ -2029,9 +2164,13 @@ export default function App() {
             </button>
 
             <button 
-              onClick={() => handleDeleteStudent(selectedStudent.id)} 
-              disabled={filteredStudents.length === 0}
-              className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              onClick={() => {
+                if (selectedStudent && selectedStudent.id) {
+                  handleDeleteStudent(selectedStudent.id);
+                }
+              }} 
+              disabled={filteredStudents.length === 0 || !selectedStudent}
+              className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 lg:cursor-pointer"
             >
               <Trash2 size={16} /> HAPUS DATA
             </button>
@@ -2161,10 +2300,15 @@ export default function App() {
               </label>
               <button 
                 onClick={() => {
-                  if(confirm('Hapus logo kustom?')) {
-                    setLogoUrl('');
-                    localStorage.removeItem('al_hikmah_custom_logo');
-                  }
+                  showConfirm({
+                    title: 'Hapus Logo Kustom',
+                    message: 'Apakah Anda yakin ingin menghapus logo kustom Anda dan kembali ke logo default?',
+                    confirmText: 'YA, HAPUS LOGO',
+                    onConfirm: () => {
+                      setLogoUrl('');
+                      localStorage.removeItem('al_hikmah_custom_logo');
+                    }
+                  });
                 }}
                 className="text-[9px] text-slate-400 hover:text-slate-600 transition-colors font-bold text-center underline underline-offset-2"
               >
@@ -2173,34 +2317,25 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-indigo-950 to-slate-900 p-5 rounded-[24px] text-white shadow-xl shadow-blue-50/20 border border-indigo-800/20">
-            <h3 className="text-[10px] font-black tracking-[0.25em] uppercase text-indigo-300 mb-2 flex items-center gap-2">
-              <span className="text-sm">📊</span> SERVER MONITOR
-            </h3>
-            <p className="text-[9px] text-indigo-200/70 leading-relaxed mb-4 font-semibold uppercase tracking-wider">
-              Cek real-time status pengisian semua kelas & unduh cadangan raport.
-            </p>
-            <div className="flex flex-col gap-2.5">
+          {selectedClass && (
+            <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 p-5 rounded-[24px] text-white shadow-xl shadow-blue-50/20 border border-indigo-800/10">
+              <h3 className="text-[10px] font-black tracking-[0.25em] uppercase text-indigo-300 mb-2 flex items-center gap-2">
+                <span className="text-sm">🔁</span> DATA SERVER
+              </h3>
+              <p className="text-[9px] text-indigo-200/70 leading-relaxed mb-4 font-semibold uppercase tracking-wider">
+                Ambil dan sinkronkan data inputan guru/user lain dari server.
+              </p>
               <button 
-                onClick={() => {
-                  fetchStatusSummary();
-                  setIsMonitorModalOpen(true);
-                }}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-[10px] font-black uppercase text-center block transition-all shadow-md shadow-indigo-950 hover:translate-y-[-1px] cursor-pointer"
+                onClick={() => pullBackupFromServer(selectedClass)}
+                disabled={syncStatus === 'syncing'}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-[10px] font-black uppercase text-center block transition-all shadow-md shadow-indigo-950 hover:translate-y-[-1px] disabled:opacity-50 cursor-pointer"
               >
-                📊 LIHAT LIVE MONITORING
+                {syncStatus === 'syncing' ? '🔄 SINKRONISASI...' : 
+                 syncStatus === 'success' ? '✅ BERHASIL SINKRON!' : 
+                 syncStatus === 'error' ? '❌ GAGAL SINKRON' : '🔁 SINKRONKAN SEKARANG'}
               </button>
-              <a 
-                href="/status" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-full bg-slate-800/60 hover:bg-slate-800/90 text-slate-200 border border-slate-700/50 py-2.5 rounded-xl text-[9px] font-bold uppercase text-center block transition-all flex items-center justify-center gap-1.5"
-              >
-                <span>🌐 Buka di Tab Baru</span>
-                <span className="text-[8px]">↗</span>
-              </a>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="pb-6 pt-4 border-t border-slate-100 flex flex-col gap-3">
@@ -3320,6 +3455,62 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* CUSTOM CONFIRMATION DIALOG MODAL */}
+      {confirmModal.isOpen && (
+        <AnimatePresence>
+          <div className="fixed inset-0 z-[1000] overflow-y-auto no-print">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} 
+                className="fixed inset-0 bg-slate-900/45 backdrop-blur-sm" 
+              />
+              
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl p-6 overflow-hidden border border-slate-100 flex flex-col gap-4 text-center z-10"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${confirmModal.isDanger ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
+                    {confirmModal.isDanger ? '⚠️' : 'ℹ️'}
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight mt-2">{confirmModal.title}</h3>
+                  <p className="text-xs text-slate-500 font-bold leading-relaxed">{confirmModal.message}</p>
+                </div>
+
+                <div className="flex gap-3.5 mt-2">
+                  <button 
+                    onClick={() => {
+                      setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                    }} 
+                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-600 font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all cursor-pointer border border-slate-200/50"
+                  >
+                    {confirmModal.cancelText || 'Batal'}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                      confirmModal.onConfirm();
+                    }} 
+                    className={`flex-1 py-3 active:scale-95 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all shadow-md cursor-pointer ${
+                      confirmModal.isDanger 
+                        ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-200' 
+                        : 'bg-blue-600 hover:bg-blue-500 shadow-blue-200'
+                    }`}
+                  >
+                    {confirmModal.confirmText || 'Konfirmasi'}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </AnimatePresence>
+      )}
     </div>
   );
 }
