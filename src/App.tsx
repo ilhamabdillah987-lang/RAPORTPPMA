@@ -820,7 +820,7 @@ export default function App() {
       const q = query(collection(db, 'students'), where('class', '==', className));
       const querySnapshot = await getDocs(q);
       const students = querySnapshot.docs.map(doc => {
-        const data = doc.data() as Student;
+        const data = { id: doc.id, ...doc.data() as Student };
         // Migration: Rename Dialogue/Speaking to Speaking, Update KKM to 40, & Update Grade Scale
         if (data.subjects) {
           data.subjects = data.subjects.map(s => {
@@ -1176,8 +1176,8 @@ export default function App() {
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return studentsList;
     return studentsList.filter(s => 
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.nomorInduk.includes(searchTerm)
+      String(s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+      String(s.nomorInduk || '').includes(searchTerm)
     );
   }, [studentsList, searchTerm]);
 
@@ -1336,8 +1336,8 @@ export default function App() {
 
         const excelNis = row['NIS/NISN'] ? String(row['NIS/NISN']).trim() : '';
         const studentIdx = updatedStudents.findIndex(s => {
-          const matchByName = s.name.trim().toUpperCase() === nameInExcel.toUpperCase();
-          const matchByNis = excelNis !== '' && s.nomorInduk && s.nomorInduk.trim() === excelNis;
+          const matchByName = String(s.name || '').trim().toUpperCase() === nameInExcel.toUpperCase();
+          const matchByNis = excelNis !== '' && s.nomorInduk && String(s.nomorInduk).trim() === excelNis;
           return matchByNis || matchByName;
         });
 
@@ -1538,8 +1538,8 @@ export default function App() {
 
         const excelNis = row['NIS/NISN (UTAMA)'] ? String(row['NIS/NISN (UTAMA)']).trim() : '';
         const studentIdx = updatedStudents.findIndex(s => {
-          const matchByName = s.name.trim().toUpperCase() === nameInExcel.toUpperCase();
-          const matchByNis = excelNis !== '' && s.nomorInduk && s.nomorInduk.trim() === excelNis;
+          const matchByName = String(s.name || '').trim().toUpperCase() === nameInExcel.toUpperCase();
+          const matchByNis = excelNis !== '' && s.nomorInduk && String(s.nomorInduk).trim() === excelNis;
           return matchByNis || matchByName;
         });
         
