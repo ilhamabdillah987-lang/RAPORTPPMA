@@ -1,26 +1,39 @@
-// Customized Unlimited Database Adapter
+// Customized Unlimited Database Adapter with Firebase Google Authentication
 // Replaces Google Cloud Firestore with zero-quota local Express companion server backend storage!
+// Maintains actual Firebase Google Auth so that administrative accounts can sign in.
 
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup as firebaseSignInWithPopup, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged as firebaseOnAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+
+const firebaseConfig = {
+  projectId: "gen-lang-client-0907548714",
+  appId: "1:864220989117:web:c5ffa3931f909b9f8099d4",
+  apiKey: "AIzaSyCbuFxxnKZQu0MikWoinMpokR1DYkpuGvc",
+  authDomain: "gen-lang-client-0907548714.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-d25c6ecd-70a5-4eaf-ba09-7b9e3261718b",
+  storageBucket: "gen-lang-client-0907548714.firebasestorage.app",
+  messagingSenderId: "864220989117"
+};
+
+// Initialize Firebase App & Auth
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
+
+export const signInWithPopup = firebaseSignInWithPopup;
+export const signOut = firebaseSignOut;
+export const onAuthStateChanged = firebaseOnAuthStateChanged;
+export type User = FirebaseUser;
+
+// Local Database Adapters
 export const db = { type: 'local_database' };
-
-export const auth = {
-  currentUser: {
-    uid: 'local_teacher',
-    email: 'guru@alhikmah.id',
-    emailVerified: true
-  }
-};
-
-export const googleProvider = { providerId: 'google.com' };
-
-export const signInWithPopup = async () => ({ user: auth.currentUser });
-export const signOut = async () => {};
-export const onAuthStateChanged = (authInstance: any, callback: (user: any) => void) => {
-  callback(auth.currentUser);
-  return () => {};
-};
-
-export type User = typeof auth.currentUser;
 
 export function collection(dbInstance: any, name: string) {
   return { type: 'collection', name };
@@ -153,6 +166,6 @@ export function onSnapshot(docRef: any, callback: (snapshot: any) => void, onErr
   };
   
   fetchRef();
-  const interval = setInterval(fetchRef, 4000);
+  const interval = setInterval(fetchRef, 5000);
   return () => clearInterval(interval);
 }

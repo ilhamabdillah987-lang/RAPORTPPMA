@@ -722,6 +722,126 @@ export default function App() {
   const [isStatsLoading, setIsStatsLoading] = useState(false);
   const [monitorSearchQuery, setMonitorSearchQuery] = useState('');
   
+  // Admin Dashboard States
+  const [isAdminViewActive, setIsAdminViewActive] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [adminAuthInputEmail, setAdminAuthInputEmail] = useState('');
+  const [adminClassesStats, setAdminClassesStats] = useState<any[]>([]);
+  const [isAdminDataLoading, setIsAdminDataLoading] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [selectedAdminClassDetail, setSelectedAdminClassDetail] = useState<string | null>(null);
+  const [adminSelectedClassStudents, setAdminSelectedClassStudents] = useState<any[]>([]);
+
+  // Listen for real Firebase auth state changes
+  useEffect(() => {
+    return onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUserEmail(user.email);
+      } else {
+        setCurrentUserEmail(null);
+      }
+    });
+  }, []);
+
+  const fetchAdminStats = async () => {
+    setIsAdminDataLoading(true);
+    try {
+      const res = await fetch('/api/status-summary');
+      if (res.ok) {
+        const data = await res.json();
+        setAdminClassesStats(data.classes || []);
+      }
+    } catch (err) {
+      console.error("Gagal mengambil data monitoring admin:", err);
+    } finally {
+      setIsAdminDataLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdminViewActive) {
+      fetchAdminStats();
+    }
+  }, [isAdminViewActive]);
+
+  const handleViewAdminClassDetail = async (classNameStr: string) => {
+    if (selectedAdminClassDetail === classNameStr) {
+      setSelectedAdminClassDetail(null);
+      setAdminSelectedClassStudents([]);
+      return;
+    }
+    
+    setSelectedAdminClassDetail(classNameStr);
+    try {
+      const res = await fetch(`/api/backup/${encodeURIComponent(classNameStr)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAdminSelectedClassStudents(data.students || []);
+      } else {
+        setAdminSelectedClassStudents([]);
+      }
+    } catch (err) {
+      console.error("Gagal mengambil data detil kelas:", err);
+      setAdminSelectedClassStudents([]);
+    }
+  };
+
+  const handleOpenAdminMenu = () => {
+    if (currentUserEmail === 'ilhamabdillah987@gmail.com') {
+      setIsAdminViewActive(true);
+    } else {
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result && result.user) {
+        const email = result.user.email;
+        if (email === 'ilhamabdillah987@gmail.com') {
+          setCurrentUserEmail(email);
+          setIsAuthModalOpen(false);
+          setIsAdminViewActive(true);
+        } else {
+          showConfirm({
+            title: 'Akses Ditolak',
+            message: `Akses khusus Administrator. Email '${email}' bukan email admin terdaftar. Silakan login sebagai ilhamabdillah987@gmail.com.`,
+            cancelText: 'Tutup',
+            confirmText: 'Selesai',
+            onConfirm: () => {}
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Google Sign-In Error. Fallback support active.", err);
+      showConfirm({
+        title: 'Sign-In Tertunda',
+        message: 'Google Sign-In tidak dapat membuka popup di dalam sandbox. Silakan gunakan metode "Masuk Instan (Simulasi)" untuk pengujian gratis.',
+        cancelText: 'Mengerti',
+        confirmText: 'Lanjutkan',
+        onConfirm: () => {}
+      });
+    }
+  };
+
+  const handleManualEmailLogin = () => {
+    const trimmed = adminAuthInputEmail.trim().toLowerCase();
+    if (trimmed === 'ilhamabdillah987@gmail.com') {
+      setCurrentUserEmail(trimmed);
+      setIsAuthModalOpen(false);
+      setIsAdminViewActive(true);
+    } else {
+      showConfirm({
+        title: 'Akses Ditolak',
+        message: `Silakan ketik email administrator yang valid: ilhamabdillah987@gmail.com`,
+        cancelText: 'Tutup',
+        confirmText: 'Selesai',
+        onConfirm: () => {}
+      });
+    }
+  };
+  
   // Custom Confirmation Modal State & Handler (Bypasses iframe alert/confirm limitations)
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -1997,6 +2117,261 @@ export default function App() {
     );
   }
 
+  if (isAdminViewActive) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+        {/* Admin Navigation Bar */}
+        <header className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white py-6 px-8 flex items-center justify-between no-print shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-white/15 rounded-2xl flex items-center justify-center text-2xl border border-white/20">
+              👑
+            </div>
+            <div>
+              <h1 className="text-sm font-black uppercase tracking-wider">DASBOR ADMINISTRATOR AL-HIKMAH</h1>
+              <p className="text-[10px] text-blue-200/80 font-bold uppercase tracking-widest mt-0.5">Pemantauan Pengisian Data Raport Terpusat</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex flex-col text-right">
+              <span className="text-[9px] text-blue-200/60 font-black uppercase tracking-wider">Sudah Masuk Sebagai:</span>
+              <span className="text-[11px] font-black text-amber-400">{currentUserEmail}</span>
+            </div>
+            
+            <button 
+              onClick={() => {
+                setIsAdminViewActive(false);
+                setSelectedAdminClassDetail(null);
+                setAdminSelectedClassStudents([]);
+              }}
+              className="px-5 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all border border-white/10 cursor-pointer flex items-center gap-2"
+            >
+              <LogOut size={14} /> Keluar Dasbor
+            </button>
+          </div>
+        </header>
+
+        {/* Main Dashboard Workspace */}
+        <main className="flex-grow p-6 md:p-10 max-w-7xl w-full mx-auto space-y-8 animate-in fade-in duration-300">
+          
+          {/* Quick Statistics Overview Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-5">
+              <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                🏫
+              </div>
+              <div>
+                <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Total Kelas</p>
+                <p className="text-2xl font-black text-slate-800 leading-tight">10 Kelas</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-5">
+              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                ✅
+              </div>
+              <div>
+                <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Kelas Sudah Mengisi</p>
+                <p className="text-2xl font-black text-slate-800 leading-tight">
+                  {adminClassesStats.filter(c => c.hasData).length} Kelas
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-5">
+              <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                ⏳
+              </div>
+              <div>
+                <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Kelas Belum Mengisi</p>
+                <p className="text-2xl font-black text-slate-800 leading-tight">
+                  {adminClassesStats.filter(c => !c.hasData).length} Kelas
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-5">
+              <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                👨‍🎓
+              </div>
+              <div>
+                <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Total Santri Terdata</p>
+                <p className="text-2xl font-black text-slate-800 leading-tight">
+                  {adminClassesStats.reduce((acc, c) => acc + (c.studentCount || 0), 0)} Santri
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Classes Status List */}
+          <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-6 md:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Status Pengisian Lintas Kelas</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Daftar kelas beserta Wali Kelas dan jumlah input data.</p>
+              </div>
+
+              <button 
+                onClick={fetchAdminStats}
+                disabled={isAdminDataLoading}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-2"
+              >
+                🔄 Refresh Data
+              </button>
+            </div>
+
+            {isAdminDataLoading ? (
+              <div className="py-20 flex flex-col items-center justify-center">
+                <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4">Menghubungkan ke Database...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {adminClassesStats.map(cls => (
+                  <div 
+                    key={cls.name}
+                    className="border border-slate-100 hover:border-slate-200 hover:bg-slate-50/40 rounded-[24px] p-5 transition-all space-y-4 text-slate-700"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        {/* Class Identifier Icon */}
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm uppercase ${
+                          cls.hasData ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-105 text-slate-400'
+                        }`}>
+                          {cls.name.split(' ')[0]}
+                        </div>
+                        
+                        <div>
+                          <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight">KELAS {cls.name}</h4>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                            Wali Kelas: <span className="text-slate-600 font-extrabold">{cls.waliKelas || '-'}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status Badges & Quick Details */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="text-right hidden sm:block mr-2">
+                          <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Terakhir Diperbarui</p>
+                          <p className="text-[10px] font-extrabold text-slate-500 uppercase mt-0.5">
+                            {cls.updatedAt ? new Date(cls.updatedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB' : '-'}
+                          </p>
+                        </div>
+
+                        {cls.hasData ? (
+                          <span className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full text-[9px] font-black tracking-wider uppercase border border-emerald-100 flex items-center gap-1.5 shadow-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            SUDAH MENGISI ({cls.studentCount} Santri)
+                          </span>
+                        ) : (
+                          <span className="px-4 py-2 bg-slate-50 text-slate-500 rounded-full text-[9px] font-black tracking-wider uppercase border border-slate-200/50 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            BELUM MENGISI
+                          </span>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => handleViewAdminClassDetail(cls.name)}
+                            className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all cursor-pointer text-xs font-bold uppercase flex items-center gap-1.5"
+                            title="Tampilkan Santri"
+                          >
+                            <span>🔍</span> {selectedAdminClassDetail === cls.name ? 'TUTUP' : 'PENGISI'}
+                          </button>
+                          
+                          <a 
+                            href={`/api/classes-download/${encodeURIComponent(cls.name)}`}
+                            className={`p-2.5 rounded-xl transition-all text-xs text-center flex items-center justify-center font-bold uppercase ${
+                              cls.hasData 
+                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-100 cursor-pointer' 
+                                : 'bg-slate-50 opacity-40 pointer-events-none text-slate-300'
+                            }`}
+                            title="Unduh Backup"
+                          >
+                            📥 JSON
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Class Students Details Panel */}
+                    {selectedAdminClassDetail === cls.name && (
+                      <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <h5 className="text-[10px] uppercase font-black text-slate-500 tracking-wider">
+                            Daftar Santri Kelas {cls.name} ({adminSelectedClassStudents.length} Santri)
+                          </h5>
+                        </div>
+
+                        {adminSelectedClassStudents.length === 0 ? (
+                          <p className="text-[10px] font-black text-slate-400 uppercase py-6 text-center tracking-widest">
+                            Belum ada santri yang dimasukkan di kelas ini.
+                          </p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-[11px] font-bold text-slate-600 border-collapse">
+                              <thead>
+                                <tr className="border-b border-slate-100 text-slate-400 uppercase text-[9px] tracking-wider font-extrabold bg-slate-50/50">
+                                  <th className="py-2.5 px-3 w-10">No</th>
+                                  <th className="py-2.5 px-3">Nama Santri</th>
+                                  <th className="py-2.5 px-3">Nomor Induk</th>
+                                  <th className="py-2.5 px-3">Kehadiran (S/I/A)</th>
+                                  <th className="py-2.5 px-3">Status Rapor</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {adminSelectedClassStudents.map((s, idx) => {
+                                  const subjectsCount = s.subjects ? s.subjects.length : 0;
+                                  const hasIdentity = s.identity && s.identity.fullName;
+                                  return (
+                                    <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50/30">
+                                      <td className="py-2 px-3 text-slate-400 font-extrabold">{idx + 1}</td>
+                                      <td className="py-2 px-3 text-slate-800 font-black uppercase text-[10px]">{s.name}</td>
+                                      <td className="py-2 px-3 text-slate-500 font-mono text-[10px]">{s.nomorInduk || '-'}</td>
+                                      <td className="py-2 px-3 text-slate-600 text-[10px]">
+                                        {s.behavior?.sick || 0}S / {s.behavior?.permission || 0}I / {s.behavior?.alfa || 0}A
+                                      </td>
+                                      <td className="py-2 px-3">
+                                        <div className="flex gap-1.5 flex-wrap">
+                                          {subjectsCount > 0 ? (
+                                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[8px] uppercase tracking-wider font-black border border-emerald-100">
+                                              {subjectsCount} Nilai
+                                            </span>
+                                          ) : (
+                                            <span className="px-2 py-0.5 bg-rose-50 text-rose-500 rounded text-[8px] uppercase tracking-wider font-black border border-rose-100">
+                                              Nilai Kosong
+                                            </span>
+                                          )}
+                                          {hasIdentity ? (
+                                            <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[8px] uppercase tracking-wider font-black border border-purple-100">
+                                              Identitas OK
+                                            </span>
+                                          ) : (
+                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-400 rounded text-[8px] uppercase tracking-wider font-black">
+                                              Id Kosong
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   if (!selectedClass) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans">
@@ -2045,9 +2420,100 @@ export default function App() {
                   <div className="absolute top-0 right-0 w-12 h-12 bg-blue-600/5 rounded-bl-full translate-x-6 -translate-y-6 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform"></div>
                 </motion.button>
               ))}
+
+              {/* SPECIAL MENU ADMIN CARD */}
+              <motion.button
+                whileHover={{ scale: 1.05, translateY: -4 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleOpenAdminMenu}
+                className="group relative overflow-hidden bg-gradient-to-br from-amber-500/15 via-orange-500/5 to-amber-500/10 border-2 border-amber-200 hover:border-amber-500 hover:bg-white p-8 rounded-[32px] transition-all flex flex-col items-center gap-4 shadow-sm hover:shadow-xl hover:shadow-amber-100"
+              >
+                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl font-black text-amber-500 group-hover:text-amber-655 transition-colors shadow-sm group-hover:shadow-md border border-amber-100">
+                  🔑
+                </div>
+                <span className="text-xs font-black text-amber-600 group-hover:text-amber-700 uppercase tracking-widest transition-colors text-center">MENU ADMIN</span>
+                <div className="absolute top-0 right-0 w-12 h-12 bg-amber-600/5 rounded-bl-full translate-x-6 -translate-y-6 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform"></div>
+              </motion.button>
             </div>
           </div>
         </motion.div>
+
+        {/* ADMIN AUTHENTICATION DIALOG MODAL */}
+        {isAuthModalOpen && (
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+            <div 
+              onClick={() => setIsAuthModalOpen(false)} 
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" 
+            />
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl p-8 overflow-hidden border border-slate-100 flex flex-col gap-6 z-10 text-slate-700"
+            >
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-3xl shadow-sm border border-amber-100">
+                  🔑
+                </div>
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight mt-2">OTORISASI ADMINISTRATOR</h3>
+                <p className="text-xs text-slate-500 font-bold leading-relaxed max-w-xs">
+                  Halaman ini dilindungi. Silakan masuk menggunakan akun Google resmi <span className="text-amber-600 font-extrabold">ilhamabdillah987@gmail.com</span> untuk memantau data.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleGoogleSignIn}
+                  className="w-full py-4 bg-white hover:bg-slate-50 border border-slate-200 active:scale-95 text-slate-700 font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all flex items-center justify-center gap-3 shadow-sm cursor-pointer"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.58 14.99 1 12 1 7.24 1 3.2 3.74 1.25 7.75l3.85 2.99C6.01 7.29 8.78 5.04 12 5.04z"/>
+                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.72 2.88c2.18-2 3.71-4.96 3.71-8.61z"/>
+                    <path fill="#FBBC05" d="M5.1 14.74c-.24-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29L1.25 7.16C.45 8.76 0 10.56 0 12.5s.45 3.74 1.25 5.34l3.85-3.1z"/>
+                    <path fill="#34A853" d="M12 23c3.24 0 5.95-1.08 7.93-2.91l-3.72-2.88c-1.11.75-2.53 1.2-4.21 1.2-3.22 0-5.99-2.25-6.91-5.7L1.16 15.8C3.1 19.81 7.14 23 12 23z"/>
+                  </svg>
+                  MASUK DENGAN GOOGLE
+                </button>
+
+                <div className="relative my-2 flex items-center justify-center">
+                  <span className="absolute bg-white px-3 text-[8px] font-black tracking-widest text-slate-400 uppercase">ATAU MASUK INSTAN (SIMULASI)</span>
+                  <div className="w-full border-b border-slate-100"></div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Ketik Email Admin Untuk Pengujian:</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="email"
+                      value={adminAuthInputEmail}
+                      onChange={(e) => setAdminAuthInputEmail(e.target.value)}
+                      placeholder="ilhamabdillah987@gmail.com"
+                      className="flex-grow px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white transition-all placeholder:text-slate-300"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleManualEmailLogin();
+                      }}
+                    />
+                    <button 
+                      onClick={handleManualEmailLogin}
+                      className="px-5 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all shadow-md shadow-amber-100 cursor-pointer"
+                    >
+                      MASUK
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setIsAuthModalOpen(false)} 
+                  className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-500 font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all cursor-pointer text-center"
+                >
+                  BATAL
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     );
   }
@@ -2317,25 +2783,7 @@ export default function App() {
             </div>
           </div>
 
-          {selectedClass && (
-            <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 p-5 rounded-[24px] text-white shadow-xl shadow-blue-50/20 border border-indigo-800/10">
-              <h3 className="text-[10px] font-black tracking-[0.25em] uppercase text-indigo-300 mb-2 flex items-center gap-2">
-                <span className="text-sm">🔁</span> DATA SERVER
-              </h3>
-              <p className="text-[9px] text-indigo-200/70 leading-relaxed mb-4 font-semibold uppercase tracking-wider">
-                Ambil dan sinkronkan data inputan guru/user lain dari server.
-              </p>
-              <button 
-                onClick={() => pullBackupFromServer(selectedClass)}
-                disabled={syncStatus === 'syncing'}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-[10px] font-black uppercase text-center block transition-all shadow-md shadow-indigo-950 hover:translate-y-[-1px] disabled:opacity-50 cursor-pointer"
-              >
-                {syncStatus === 'syncing' ? '🔄 SINKRONISASI...' : 
-                 syncStatus === 'success' ? '✅ BERHASIL SINKRON!' : 
-                 syncStatus === 'error' ? '❌ GAGAL SINKRON' : '🔁 SINKRONKAN SEKARANG'}
-              </button>
-            </div>
-          )}
+
         </div>
 
         <div className="pb-6 pt-4 border-t border-slate-100 flex flex-col gap-3">
