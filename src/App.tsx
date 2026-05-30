@@ -1427,11 +1427,39 @@ export default function App() {
     }));
 
     try {
-      for (const s of newStudents) {
-        await setDoc(doc(db, 'students', s.id), { ...s, updatedAt: new Date().toISOString() });
+      // Optimistically update React state immediately
+      setStudentsList(prev => [...prev, ...newStudents]);
+      
+      // Perform bulk backup saving in a single request instead of multiple sequential writes!
+      if (selectedClass) {
+        const fullList = [...studentsList, ...newStudents];
+        await fetch('/api/backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            className: selectedClass, 
+            students: fullList,
+            waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+          })
+        });
       }
-      if (selectedClass) fetchStudents(selectedClass);
+
+      // Also save individual records asynchronously
+      for (const s of newStudents) {
+        setDoc(doc(db, 'students', s.id), { ...s, updatedAt: new Date().toISOString() }).catch(err => {
+          console.warn(`Gagal menulis individual student detail untuk ${s.name}:`, err);
+        });
+      }
+
+      setBulkData(''); // Clear the text input
       setIsBulkAddOpen(false);
+      
+      showConfirm({
+        title: 'Berhasil',
+        message: `Berhasil menambahkan ${newStudents.length} santri baru ke Kelas ${selectedClass}!`,
+        cancelText: 'Tutup',
+        onConfirm: () => {}
+      });
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'students');
     }
@@ -1595,9 +1623,21 @@ export default function App() {
       id: studentId,
       noUrut: isEdit ? editingStudent.noUrut : (studentsList.length + 1),
       updatedAt: new Date().toISOString()
-    };
+    } as Student;
 
     try {
+      // Optimistically update local UI state immediately
+      setStudentsList(prev => {
+        const nextList = [...prev];
+        const existIdx = nextList.findIndex(s => s.id === studentId);
+        if (existIdx !== -1) {
+          nextList[existIdx] = payload;
+        } else {
+          nextList.push(payload);
+        }
+        return nextList;
+      });
+
       await setDoc(doc(db, 'students', studentId), payload, { merge: true });
       
       if (!isEdit) {
@@ -1605,7 +1645,9 @@ export default function App() {
         setCurrentIndex(studentsList.length);
       }
       
-      if (selectedClass) fetchStudents(selectedClass);
+      if (selectedClass) {
+        fetchStudents(selectedClass);
+      }
       
       if (!stayOpen) {
         setIsModalOpen(false);
@@ -1745,52 +1787,94 @@ export default function App() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
-      const data = new Uint8Array(event.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-      const updatedStudents = [...studentsList];
-      
-      for (const row of jsonData) {
-        const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']).trim() : '';
-        if (!nameInExcel) continue;
-
-        const excelNis = row['NIS/NISN'] ? String(row['NIS/NISN']).trim() : '';
-        const studentIdx = updatedStudents.findIndex(s => {
-          const matchByName = String(s.name || '').trim().toUpperCase() === nameInExcel.toUpperCase();
-          const matchByNis = excelNis !== '' && s.nomorInduk && String(s.nomorInduk).trim() === excelNis;
-          return matchByNis || matchByName;
-        });
-
-        if (studentIdx !== -1) {
-          const student = updatedStudents[studentIdx];
-          const newSubs = student.subjects.map(sub => {
-            const tulisVal = row[`${sub.name} (TULIS)`];
-            const lisanVal = row[`${sub.name} (LISAN)`];
-            return {
-              ...sub,
-              tulis: typeof tulisVal !== 'undefined' ? { nilai: parseInt(tulisVal) || 0, huruf: getHuruf(parseInt(tulisVal) || 0) } : sub.tulis,
-              lisan: typeof lisanVal !== 'undefined' ? { nilai: parseInt(lisanVal) || 0, huruf: getHuruf(parseInt(lisanVal) || 0) } : sub.lisan,
-            };
-          });
-          
-          updatedStudents[studentIdx] = { ...student, subjects: newSubs };
-          // Batching saves would be better, but for now we do individual saves or we can implement a batch save
-          await setDoc(doc(db, 'students', student.id), { subjects: newSubs, updatedAt: new Date().toISOString() }, { merge: true });
-        }
-      }
-      
-      setStudentsList(updatedStudents);
+    reader.onerror = (err) => {
       showConfirm({
-        title: 'Sukses',
-        message: 'Berhasil mengimpor nilai seluruh santri dari file Excel!',
+        title: 'Gagal Membaca File',
+        message: 'Tidak dapat membaca file Excel tersebut. Pastikan file tidak rusak.',
         cancelText: 'Tutup',
-        confirmText: 'Selesai',
         onConfirm: () => {}
       });
+    };
+
+    reader.onload = async (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        if (!worksheet) {
+          throw new Error('Lembar kerja pertama Excel kosong atau tidak ditemukan.');
+        }
+        
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+        if (jsonData.length === 0) {
+          throw new Error('Tidak ada baris data terdeteksi di dalam file Excel.');
+        }
+
+        const updatedStudents = [...studentsList];
+        let matchCount = 0;
+        
+        for (const row of jsonData) {
+          const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']).trim() : '';
+          if (!nameInExcel) continue;
+
+          const excelNis = row['NIS/NISN'] ? String(row['NIS/NISN']).trim() : '';
+          const studentIdx = updatedStudents.findIndex(s => {
+            const matchByName = String(s.name || '').trim().toUpperCase() === nameInExcel.toUpperCase();
+            const matchByNis = excelNis !== '' && s.nomorInduk && String(s.nomorInduk).trim() === excelNis;
+            return matchByNis || matchByName;
+          });
+
+          if (studentIdx !== -1) {
+            matchCount++;
+            const student = updatedStudents[studentIdx];
+            const newSubs = student.subjects.map(sub => {
+              const tulisVal = row[`${sub.name} (TULIS)`];
+              const lisanVal = row[`${sub.name} (LISAN)`];
+              return {
+                ...sub,
+                tulis: typeof tulisVal !== 'undefined' ? { nilai: parseInt(tulisVal) || 0, huruf: getHuruf(parseInt(tulisVal) || 0) } : sub.tulis,
+                lisan: typeof lisanVal !== 'undefined' ? { nilai: parseInt(lisanVal) || 0, huruf: getHuruf(parseInt(lisanVal) || 0) } : sub.lisan,
+              };
+            });
+            
+            updatedStudents[studentIdx] = { ...student, subjects: newSubs, updatedAt: new Date().toISOString() };
+          }
+        }
+        
+        setStudentsList(updatedStudents);
+
+        // Bulk network update in a single request instead of sequential setDoc in loop!
+        if (selectedClass && updatedStudents.length > 0) {
+          await fetch('/api/backup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              className: selectedClass, 
+              students: updatedStudents,
+              waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+            })
+          });
+        }
+        
+        showConfirm({
+          title: 'Sukses Impor',
+          message: `Berhasil mencocokkan & mengimpor nilai untuk ${matchCount} dari ${jsonData.length} baris data santri!`,
+          cancelText: 'Tutup',
+          confirmText: 'Selesai',
+          onConfirm: () => {
+            if (selectedClass) fetchStudents(selectedClass);
+          }
+        });
+      } catch (excelError: any) {
+        console.error('Import error:', excelError);
+        showConfirm({
+          title: 'Gagal Impor Excel',
+          message: `Gagal memproses file Excel: ${excelError.message || excelError}. Silakan gunakan template ekspor mapel resmi.`,
+          cancelText: 'Tutup',
+          onConfirm: () => {}
+        });
+      }
     };
     reader.readAsArrayBuffer(file);
   };
@@ -1927,124 +2011,164 @@ export default function App() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
-      const data = new Uint8Array(event.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-      const updatedStudents = [...studentsList];
-      const newStudentsToFirestore: Student[] = [];
-      
-      const fields: { label: string; key?: keyof StudentIdentity | 'nomorInduk'; isMain?: boolean; isName?: boolean }[] = [
-        { label: 'NIS/NISN (UTAMA)', key: 'nomorInduk', isMain: true },
-        { label: 'NIS / NISN (IDENTITAS)', key: 'nisNisn' },
-        { label: 'Tempat, Tanggal Lahir', key: 'tempatTanggalLahir' },
-        { label: 'Jenis Kelamin', key: 'jenisKelamin' },
-        { label: 'Agama', key: 'agama' },
-        { label: 'Status dalam Keluarga', key: 'statusDalamKeluarga' },
-        { label: 'Anak ke-', key: 'anakKe' },
-        { label: 'Alamat Peserta Didik', key: 'alamatPesertaDidik' },
-        { label: 'Nomor Telepon Rumah', key: 'teleponRumah' },
-        { label: 'Sekolah Asal', key: 'sekolahAsal' },
-        { label: 'Di Pesantren Diterima di Kelas', key: 'diterimaDiKelas' },
-        { label: 'Diterima (Tanggal)', key: 'diterimaPadaTanggal' },
-        { label: 'Nama Ayah', key: 'namaAyah' },
-        { label: 'Nama Ibu', key: 'namaIbu' },
-        { label: 'Alamat Orang Tua', key: 'alamatOrangTua' },
-        { label: 'Nomor Telepon Orang Tua', key: 'teleponOrangTua' },
-        { label: 'Pekerjaan Ayah', key: 'pekerjaanAyah' },
-        { label: 'Pekerjaan Ibu', key: 'pekerjaanIbu' },
-        { label: 'Nama Wali', key: 'namaWali' },
-        { label: 'Alamat Wali', key: 'alamatWali' },
-        { label: 'Telepon Wali', key: 'teleponWali' },
-        { label: 'Pekerjaan Wali', key: 'pekerjaanWali' }
-      ];
-
-      for (const row of jsonData) {
-        const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']).trim() : '';
-        if (!nameInExcel) continue;
-
-        const excelNis = row['NIS/NISN (UTAMA)'] ? String(row['NIS/NISN (UTAMA)']).trim() : '';
-        const studentIdx = updatedStudents.findIndex(s => {
-          const matchByName = String(s.name || '').trim().toUpperCase() === nameInExcel.toUpperCase();
-          const matchByNis = excelNis !== '' && s.nomorInduk && String(s.nomorInduk).trim() === excelNis;
-          return matchByNis || matchByName;
-        });
-        
-        let targetStudent: Student;
-        let isNew = false;
-
-        if (studentIdx !== -1) {
-          targetStudent = { ...updatedStudents[studentIdx], name: nameInExcel }; // Update name with Excel casing
-          updatedStudents[studentIdx] = targetStudent;
-        } else {
-          isNew = true;
-          targetStudent = {
-            id: Math.random().toString(36).substr(2, 9),
-            name: nameInExcel,
-            nomorInduk: '',
-            noUrut: updatedStudents.length + 1,
-            class: selectedClass,
-            semester: 'GANJIL',
-            tahunPelajaran: '2025/2026',
-            subjects: (updatedStudents.length > 0 ? updatedStudents[0].subjects : DEFAULT_AVAILABLE_SUBJECTS).map(s => ({ 
-              name: s.name, 
-              category: s.category, 
-              kkm: s.kkm, 
-              tulis: { nilai: 0, huruf: '-' }, 
-              lisan: { nilai: 0, huruf: '-' } 
-            })),
-            behavior: { spiritual: '', social: '' },
-            attendance: { sakit: 0, izin: 0, alpha: 0 },
-            extracurriculars: [],
-            identity: {
-              nisNisn: '', tempatTanggalLahir: '', jenisKelamin: '', agama: 'ISLAM',
-              statusDalamKeluarga: '', anakKe: '', alamatPesertaDidik: '', teleponRumah: '',
-              sekolahAsal: '', diterimaDiKelas: '', diterimaPadaTanggal: '',
-              namaAyah: '', namaIbu: '', alamatOrangTua: '', teleponOrangTua: '',
-              pekerjaanAyah: '', pekerjaanIbu: '', namaWali: '', alamatWali: '',
-              teleponWali: '', pekerjaanWali: ''
-            }
-          };
-          updatedStudents.push(targetStudent);
-        }
-
-        const newIdentity = { ...(targetStudent.identity || {}) } as any;
-        let mainNomorInduk = targetStudent.nomorInduk;
-
-        fields.forEach(f => {
-          if (typeof row[f.label] !== 'undefined' && row[f.label] !== null) {
-            if (f.isMain) {
-              mainNomorInduk = String(row[f.label]);
-            } else if (!f.isName && f.key) {
-              newIdentity[f.key] = String(row[f.label]);
-            }
-          }
-        });
-        
-        const finalStudent = { ...targetStudent, nomorInduk: mainNomorInduk, identity: newIdentity, updatedAt: new Date().toISOString() };
-        
-        if (isNew) {
-          await setDoc(doc(db, 'students', finalStudent.id), finalStudent);
-        } else {
-          await setDoc(doc(db, 'students', finalStudent.id), { name: finalStudent.name, nomorInduk: mainNomorInduk, identity: newIdentity, updatedAt: new Date().toISOString() }, { merge: true });
-        }
-        
-        // Update the local list as well
-        const localIdx = updatedStudents.findIndex(s => s.id === finalStudent.id);
-        if (localIdx !== -1) updatedStudents[localIdx] = finalStudent;
-      }
-      
-      setStudentsList(updatedStudents);
+    reader.onerror = (err) => {
       showConfirm({
-        title: 'Sukses',
-        message: 'Berhasil mengimpor identitas seluruh santri dari file Excel!',
+        title: 'Gagal Membaca File',
+        message: 'Tidak dapat membaca file Excel tersebut. Pastikan file tidak rusak.',
         cancelText: 'Tutup',
-        confirmText: 'Selesai',
         onConfirm: () => {}
       });
+    };
+
+    reader.onload = async (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        if (!worksheet) {
+          throw new Error('Lembar kerja pertama Excel kosong atau tidak ditemukan.');
+        }
+
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+        if (jsonData.length === 0) {
+          throw new Error('Tidak ada baris data terdeteksi di dalam file Excel.');
+        }
+
+        const updatedStudents = [...studentsList];
+        
+        const fields: { label: string; key?: keyof StudentIdentity | 'nomorInduk'; isMain?: boolean; isName?: boolean }[] = [
+          { label: 'NIS/NISN (UTAMA)', key: 'nomorInduk', isMain: true },
+          { label: 'NIS / NISN (IDENTITAS)', key: 'nisNisn' },
+          { label: 'Tempat, Tanggal Lahir', key: 'tempatTanggalLahir' },
+          { label: 'Jenis Kelamin', key: 'jenisKelamin' },
+          { label: 'Agama', key: 'agama' },
+          { label: 'Status dalam Keluarga', key: 'statusDalamKeluarga' },
+          { label: 'Anak ke-', key: 'anakKe' },
+          { label: 'Alamat Peserta Didik', key: 'alamatPesertaDidik' },
+          { label: 'Nomor Telepon Rumah', key: 'teleponRumah' },
+          { label: 'Sekolah Asal', key: 'sekolahAsal' },
+          { label: 'Di Pesantren Diterima di Kelas', key: 'diterimaDiKelas' },
+          { label: 'Diterima (Tanggal)', key: 'diterimaPadaTanggal' },
+          { label: 'Nama Ayah', key: 'namaAyah' },
+          { label: 'Nama Ibu', key: 'namaIbu' },
+          { label: 'Alamat Orang Tua', key: 'alamatOrangTua' },
+          { label: 'Nomor Telepon Orang Tua', key: 'teleponOrangTua' },
+          { label: 'Pekerjaan Ayah', key: 'pekerjaanAyah' },
+          { label: 'Pekerjaan Ibu', key: 'pekerjaanIbu' },
+          { label: 'Nama Wali', key: 'namaWali' },
+          { label: 'Alamat Wali', key: 'alamatWali' },
+          { label: 'Telepon Wali', key: 'teleponWali' },
+          { label: 'Pekerjaan Wali', key: 'pekerjaanWali' }
+        ];
+
+        let importCount = 0;
+        let updateCount = 0;
+
+        for (const row of jsonData) {
+          const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']).trim() : '';
+          if (!nameInExcel) continue;
+
+          const excelNis = row['NIS/NISN (UTAMA)'] ? String(row['NIS/NISN (UTAMA)']).trim() : '';
+          const studentIdx = updatedStudents.findIndex(s => {
+            const matchByName = String(s.name || '').trim().toUpperCase() === nameInExcel.toUpperCase();
+            const matchByNis = excelNis !== '' && s.nomorInduk && String(s.nomorInduk).trim() === excelNis;
+            return matchByNis || matchByName;
+          });
+          
+          let targetStudent: Student;
+          let isNew = false;
+
+          if (studentIdx !== -1) {
+            updateCount++;
+            targetStudent = { ...updatedStudents[studentIdx], name: nameInExcel }; // Update name with Excel casing
+            updatedStudents[studentIdx] = targetStudent;
+          } else {
+            isNew = true;
+            importCount++;
+            targetStudent = {
+              id: Math.random().toString(36).substr(2, 9),
+              name: nameInExcel,
+              nomorInduk: '',
+              noUrut: updatedStudents.length + 1,
+              class: selectedClass,
+              semester: 'GANJIL',
+              tahunPelajaran: '2025/2026',
+              subjects: (updatedStudents.length > 0 ? updatedStudents[0].subjects : DEFAULT_AVAILABLE_SUBJECTS).map(s => ({ 
+                name: s.name, 
+                category: s.category, 
+                kkm: s.kkm, 
+                tulis: { nilai: 0, huruf: '-' }, 
+                lisan: { nilai: 0, huruf: '-' } 
+              })),
+              behavior: { spiritual: '', social: '' },
+              attendance: { sakit: 0, izin: 0, alpha: 0 },
+              extracurriculars: [],
+              identity: {
+                nisNisn: '', tempatTanggalLahir: '', jenisKelamin: '', agama: 'ISLAM',
+                statusDalamKeluarga: '', anakKe: '', alamatPesertaDidik: '', teleponRumah: '',
+                sekolahAsal: '', diterimaDiKelas: '', diterimaPadaTanggal: '',
+                namaAyah: '', namaIbu: '', alamatOrangTua: '', teleponOrangTua: '',
+                pekerjaanAyah: '', pekerjaanIbu: '', namaWali: '', alamatWali: '',
+                teleponWali: '', pekerjaanWali: ''
+              }
+            };
+            updatedStudents.push(targetStudent);
+          }
+
+          const newIdentity = { ...(targetStudent.identity || {}) } as any;
+          let mainNomorInduk = targetStudent.nomorInduk;
+
+          fields.forEach(f => {
+            if (typeof row[f.label] !== 'undefined' && row[f.label] !== null) {
+              if (f.isMain) {
+                mainNomorInduk = String(row[f.label]);
+              } else if (!f.isName && f.key) {
+                newIdentity[f.key] = String(row[f.label]);
+              }
+            }
+          });
+          
+          const finalStudent = { ...targetStudent, nomorInduk: mainNomorInduk, identity: newIdentity, updatedAt: new Date().toISOString() };
+          
+          // Update the local list as well
+          const localIdx = updatedStudents.findIndex(s => s.id === finalStudent.id);
+          if (localIdx !== -1) updatedStudents[localIdx] = finalStudent;
+        }
+        
+        setStudentsList(updatedStudents);
+
+        // Save everything at once to backend in a single request instead of sequential setDoc loops!
+        if (selectedClass && updatedStudents.length > 0) {
+          await fetch('/api/backup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              className: selectedClass, 
+              students: updatedStudents,
+              waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+            })
+          });
+        }
+        
+        showConfirm({
+          title: 'Sukses Impor Identitas',
+          message: `Berhasil mengimpor identitas! Terbuat ${importCount} santri baru dan terupdate ${updateCount} santri terdaftar dari file Excel.`,
+          cancelText: 'Tutup',
+          confirmText: 'Selesai',
+          onConfirm: () => {
+            if (selectedClass) fetchStudents(selectedClass);
+          }
+        });
+      } catch (excelError: any) {
+        console.error('Import error:', excelError);
+        showConfirm({
+          title: 'Gagal Impor Excel',
+          message: `Gagal memproses file Excel: ${excelError.message || excelError}. Silakan gunakan template ekspor identitas resmi.`,
+          cancelText: 'Tutup',
+          onConfirm: () => {}
+        });
+      }
     };
     reader.readAsArrayBuffer(file);
   };
@@ -2117,7 +2241,7 @@ export default function App() {
     );
   }
 
-  if (isAdminViewActive) {
+  if (false) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
         {/* Admin Navigation Bar */}
@@ -2420,100 +2544,9 @@ export default function App() {
                   <div className="absolute top-0 right-0 w-12 h-12 bg-blue-600/5 rounded-bl-full translate-x-6 -translate-y-6 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform"></div>
                 </motion.button>
               ))}
-
-              {/* SPECIAL MENU ADMIN CARD */}
-              <motion.button
-                whileHover={{ scale: 1.05, translateY: -4 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleOpenAdminMenu}
-                className="group relative overflow-hidden bg-gradient-to-br from-amber-500/15 via-orange-500/5 to-amber-500/10 border-2 border-amber-200 hover:border-amber-500 hover:bg-white p-8 rounded-[32px] transition-all flex flex-col items-center gap-4 shadow-sm hover:shadow-xl hover:shadow-amber-100"
-              >
-                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl font-black text-amber-500 group-hover:text-amber-655 transition-colors shadow-sm group-hover:shadow-md border border-amber-100">
-                  🔑
-                </div>
-                <span className="text-xs font-black text-amber-600 group-hover:text-amber-700 uppercase tracking-widest transition-colors text-center">MENU ADMIN</span>
-                <div className="absolute top-0 right-0 w-12 h-12 bg-amber-600/5 rounded-bl-full translate-x-6 -translate-y-6 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform"></div>
-              </motion.button>
             </div>
           </div>
         </motion.div>
-
-        {/* ADMIN AUTHENTICATION DIALOG MODAL */}
-        {isAuthModalOpen && (
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
-            <div 
-              onClick={() => setIsAuthModalOpen(false)} 
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" 
-            />
-            
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl p-8 overflow-hidden border border-slate-100 flex flex-col gap-6 z-10 text-slate-700"
-            >
-              <div className="flex flex-col items-center text-center gap-3">
-                <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-3xl shadow-sm border border-amber-100">
-                  🔑
-                </div>
-                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight mt-2">OTORISASI ADMINISTRATOR</h3>
-                <p className="text-xs text-slate-500 font-bold leading-relaxed max-w-xs">
-                  Halaman ini dilindungi. Silakan masuk menggunakan akun Google resmi <span className="text-amber-600 font-extrabold">ilhamabdillah987@gmail.com</span> untuk memantau data.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <button 
-                  onClick={handleGoogleSignIn}
-                  className="w-full py-4 bg-white hover:bg-slate-50 border border-slate-200 active:scale-95 text-slate-700 font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all flex items-center justify-center gap-3 shadow-sm cursor-pointer"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.58 14.99 1 12 1 7.24 1 3.2 3.74 1.25 7.75l3.85 2.99C6.01 7.29 8.78 5.04 12 5.04z"/>
-                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.72 2.88c2.18-2 3.71-4.96 3.71-8.61z"/>
-                    <path fill="#FBBC05" d="M5.1 14.74c-.24-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29L1.25 7.16C.45 8.76 0 10.56 0 12.5s.45 3.74 1.25 5.34l3.85-3.1z"/>
-                    <path fill="#34A853" d="M12 23c3.24 0 5.95-1.08 7.93-2.91l-3.72-2.88c-1.11.75-2.53 1.2-4.21 1.2-3.22 0-5.99-2.25-6.91-5.7L1.16 15.8C3.1 19.81 7.14 23 12 23z"/>
-                  </svg>
-                  MASUK DENGAN GOOGLE
-                </button>
-
-                <div className="relative my-2 flex items-center justify-center">
-                  <span className="absolute bg-white px-3 text-[8px] font-black tracking-widest text-slate-400 uppercase">ATAU MASUK INSTAN (SIMULASI)</span>
-                  <div className="w-full border-b border-slate-100"></div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Ketik Email Admin Untuk Pengujian:</label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="email"
-                      value={adminAuthInputEmail}
-                      onChange={(e) => setAdminAuthInputEmail(e.target.value)}
-                      placeholder="ilhamabdillah987@gmail.com"
-                      className="flex-grow px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white transition-all placeholder:text-slate-300"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleManualEmailLogin();
-                      }}
-                    />
-                    <button 
-                      onClick={handleManualEmailLogin}
-                      className="px-5 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all shadow-md shadow-amber-100 cursor-pointer"
-                    >
-                      MASUK
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button 
-                  onClick={() => setIsAuthModalOpen(false)} 
-                  className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-500 font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all cursor-pointer text-center"
-                >
-                  BATAL
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
       </div>
     );
   }
@@ -3878,28 +3911,203 @@ export default function App() {
              </div>
           </motion.div>
         ) : (
-          <div className="h-screen flex flex-col items-center justify-center p-12 text-center bg-slate-50">
-             <motion.div 
-               initial={{ scale: 0.8, opacity: 0 }}
-               animate={{ scale: 1, opacity: 1 }}
-               className="bg-white p-12 rounded-[40px] shadow-2xl shadow-blue-100 border border-blue-50"
-             >
-               <div className="w-24 h-24 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-8 text-blue-600">
-                 <UserCircle size={64} className="opacity-40" />
-               </div>
-               <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-3 uppercase">KELAS {selectedClass}</h2>
-               <p className="text-slate-500 max-w-sm mx-auto leading-relaxed font-medium">Silahkan pilih data santri di sebelah kiri atau tambahkan santri baru untuk Kelas {selectedClass}.</p>
-               <motion.button 
-                 whileHover={{ scale: 1.05 }}
-                 whileTap={{ scale: 0.95 }}
-                 onClick={openAddModal} 
-                 className="mt-10 bg-blue-600 text-white px-10 py-4 rounded-2xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 w-full"
-               >
-                 TAMBAH SANTRI PERTAMA
-               </motion.button>
+          <div className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-10 no-print h-screen flex flex-col">
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-8"
+            >
+              {/* Header */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                <div>
+                  <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">PEMANTAUAN DATA MASUK KELAS {selectedClass}</h2>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">Status kelengkapan data diri, nilai pelajaran, sikap, dan presensi santri</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => fetchStudents(selectedClass)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-2"
+                  >
+                    🔄 Refresh Data
+                  </button>
+                  <button 
+                    onClick={openAddModal}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
+                  >
+                    <Plus size={14} /> Tambah Santri
+                  </button>
+                </div>
+              </div>
 
+              {/* Counter Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* 1. Total Students */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5">
+                  <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                    🎓
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Total Santri</p>
+                    <p className="text-2xl font-black text-slate-800 leading-tight">{studentsList.length} Santri</p>
+                  </div>
+                </div>
 
-             </motion.div>
+                {/* 2. Grades complete count */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5">
+                  <div className="w-14 h-14 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                    📝
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Terisi Nilai Akademik</p>
+                    <p className="text-2xl font-black text-slate-800 leading-tight">
+                      {studentsList.filter(s => s.subjects?.some(sub => (sub.tulis?.nilai || 0) > 0 || (sub.lisan?.nilai || 0) > 0)).length} Santri
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Identity complete count */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5">
+                  <div className="w-14 h-14 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                    📋
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Identitas Terisi</p>
+                    <p className="text-2xl font-black text-slate-800 leading-tight">
+                      {studentsList.filter(s => s.nomorInduk && s.identity?.tempatTanggalLahir).length} Santri
+                    </p>
+                  </div>
+                </div>
+
+                {/* 4. Complete report cards (all parts filled) */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5">
+                  <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                    ✨
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Sikap & Presensi</p>
+                    <p className="text-2xl font-black text-slate-800 leading-tight">
+                      {studentsList.filter(s => (s.behavior?.spiritual || s.behavior?.social) && (s.attendance?.sakit || s.attendance?.izin || s.attendance?.alpha)).length} Santri
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Student status matrix table */}
+              <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden p-6 md:p-8">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Rincian Kelengkapan Pengisian Data</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 mb-6">Pilih salah satu baris santri di bawah untuk melihat rincian cetak atau mengedit nilainya secara langsung.</p>
+                </div>
+
+                {studentsList.length === 0 ? (
+                  <div className="py-20 text-center flex flex-col items-center justify-center gap-4">
+                    <div className="text-4xl">📭</div>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Belum ada data santri di kelas ini.</p>
+                    <button 
+                      onClick={openAddModal}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mt-2 transition-all shadow-md active:scale-95 cursor-pointer"
+                    >
+                      TAMBAH SANTRI SEKARANG
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-100 shadow-sm transition-all">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-400 border-b border-slate-100">
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest w-12 text-center">No</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest min-w-[180px]">Nama Santri</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">NIS / NISN</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Kelengkapan Nilai</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Identitas Dokumen</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Catatan Sikap</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {studentsList.map((s, idx) => {
+                          const subjectsWithGrades = s.subjects?.filter(sub => (sub.tulis?.nilai && sub.tulis.nilai > 0) || (sub.lisan?.nilai && sub.lisan.nilai > 0))?.length || 0;
+                          const totalSubjects = s.subjects?.length || 0;
+                          const hasNis = !!s.nomorInduk;
+                          const isIdentityComplete = !!(s.identity?.tempatTanggalLahir && s.identity?.namaAyah && s.identity?.alamatPesertaDidik);
+                          const isBehaviorComplete = !!(s.behavior?.spiritual || s.behavior?.social);
+
+                          return (
+                            <tr 
+                              key={s.id} 
+                              onClick={() => {
+                                const fIdx = filteredStudents.findIndex(fs => fs.id === s.id);
+                                if (fIdx !== -1) {
+                                  setCurrentIndex(fIdx);
+                                } else {
+                                  // fallback: find index in entire roster list
+                                  const rIdx = studentsList.findIndex(rs => rs.id === s.id);
+                                  if (rIdx !== -1) setCurrentIndex(rIdx);
+                                }
+                              }}
+                              className="hover:bg-blue-50/20 md:cursor-pointer transition-colors group"
+                            >
+                              <td className="px-6 py-4 text-xs font-bold text-slate-300 text-center">{idx + 1}</td>
+                              <td className="px-6 py-4">
+                                <span className="text-sm font-black text-slate-700 uppercase group-hover:text-blue-600 transition-colors">{s.name}</span>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                {hasNis ? (
+                                  <span className="font-mono text-xs font-semibold text-slate-600">{s.nomorInduk}</span>
+                                ) : (
+                                  <span className="text-[9px] bg-rose-50 text-rose-500 font-extrabold px-2.5 py-1 rounded-lg border border-rose-100">BELUM ADA</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <div className="flex flex-col items-center gap-1.5">
+                                  <div className="w-24 bg-slate-100 h-2 rounded-full overflow-hidden">
+                                    <div 
+                                      className="bg-blue-600 h-full rounded-full transition-all" 
+                                      style={{ width: `${totalSubjects > 0 ? (subjectsWithGrades / totalSubjects) * 100 : 0}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 font-bold">{subjectsWithGrades} / {totalSubjects} Mapel</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                {isIdentityComplete ? (
+                                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-black px-2.5 py-1 rounded-lg border border-emerald-100">🟢 LENGKAP</span>
+                                ) : (
+                                  <span className="text-[9px] bg-orange-50 text-orange-600 font-black px-2.5 py-1 rounded-lg border border-orange-100">⏳ PARSIAL</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                {isBehaviorComplete ? (
+                                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-black px-2.5 py-1 rounded-lg border border-emerald-100">🟢 SIKAP ADA</span>
+                                ) : (
+                                  <span className="text-[9px] bg-slate-50 text-slate-400 font-black px-2.5 py-1 rounded-lg border border-slate-200">❌ KOSONG</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={() => {
+                                    const fIdx = filteredStudents.findIndex(fs => fs.id === s.id);
+                                    if (fIdx !== -1) {
+                                      setCurrentIndex(fIdx);
+                                    } else {
+                                      const rIdx = studentsList.findIndex(rs => rs.id === s.id);
+                                      if (rIdx !== -1) setCurrentIndex(rIdx);
+                                    }
+                                  }}
+                                  className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-extrabold text-[10px] uppercase rounded-lg transition-all border border-blue-100 cursor-pointer"
+                                >
+                                  Kelola Rapor
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </div>
         )}
       </main>
