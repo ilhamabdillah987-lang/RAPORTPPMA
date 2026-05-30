@@ -1096,12 +1096,21 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [editingStudent]);
 
-  // Synchronize student list to client-side localStorage cache in real-time
+  // Synchronize student list to client-side localStorage cache and back up to local Express server
   useEffect(() => {
     if (selectedClass && studentsList.length > 0) {
       localStorage.setItem(`raport_students_cache_${selectedClass}`, JSON.stringify(studentsList));
+      fetch('/api/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          className: selectedClass, 
+          students: studentsList,
+          waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+        })
+      }).catch(err => console.warn('Pencatatan backup lokal tertunda:', err));
     }
-  }, [studentsList, selectedClass]);
+  }, [studentsList, selectedClass, globalWaliKelas, globalWaliKelasPutra, globalWaliKelasPutri]);
 
   const handleCloseModal = async () => {
     if (editingStudent && editingStudent.id && saveStatus === 'saving') {
@@ -2053,6 +2062,23 @@ export default function App() {
                 HAPUS LOGO
               </button>
             </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-indigo-950 to-slate-900 p-5 rounded-[24px] text-white shadow-xl shadow-blue-50/20 border border-indigo-800/20">
+            <h3 className="text-[10px] font-black tracking-[0.25em] uppercase text-indigo-300 mb-2 flex items-center gap-2">
+              <span className="text-sm">📊</span> SERVER MONITOR
+            </h3>
+            <p className="text-[9px] text-indigo-200/70 leading-relaxed mb-4 font-semibold uppercase tracking-wider">
+              Cek real-time status pengisian semua kelas & unduh cadangan raport.
+            </p>
+            <a 
+              href="/status" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-[10px] font-black uppercase text-center block transition-all shadow-md shadow-indigo-950 flex items-center justify-center gap-2"
+            >
+              📊 Buka Dashboard Monitor
+            </a>
           </div>
         </div>
 
