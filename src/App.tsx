@@ -946,6 +946,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [showSheetPreview, setShowSheetPreview] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState<'students' | 'bulk' | 'settings'>('students');
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, isEditingModal = false) => {
     const file = e.target.files?.[0];
@@ -1184,6 +1185,7 @@ export default function App() {
     setSelectedClass(className);
     safeLocalStorageSetItem('selected_class', className);
     setCurrentIndex(0);
+    setWorkspaceTab('students');
   };
 
   const handleUpdateGlobalWaliKelas = async (val: string) => {
@@ -2664,89 +2666,30 @@ export default function App() {
               })}
             </div>
 
-            {/* Elegant Administrator Access Action Panel */}
+            {/* Elegant Public Monitor Access Panel */}
             <div className="mt-12 pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-center sm:text-left">
-                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">👑 Akses Khusus Administrator</h4>
-                <p className="text-[10px] font-extrabold text-slate-400 uppercase mt-0.5">Pantau progres pengisian raport seluruh kelas secara real-time</p>
+                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 justify-center sm:justify-start">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 font-sans"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  Pemantauan Data Terisi
+                </h4>
+                <p className="text-[10px] font-extrabold text-slate-400 uppercase mt-0.5">Lihat hasil & progres pengisian data seluruh kelas secara realtime</p>
               </div>
               <button
-                onClick={() => setIsAuthModalOpen(true)}
+                onClick={() => {
+                  fetchStatusSummary();
+                  setIsMonitorModalOpen(true);
+                }}
                 className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-[10px] tracking-widest uppercase rounded-2xl active:scale-95 transition-all shadow-lg hover:shadow-xl cursor-pointer flex items-center gap-2"
               >
-                MASUK MENU ADMIN
+                📊 PANTAU INPUT REALTIME
               </button>
             </div>
           </div>
         </motion.div>
-
-        {/* Beautiful Authentication Modal */}
-        {isAuthModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col relative"
-            >
-              <button 
-                onClick={() => setIsAuthModalOpen(false)}
-                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors rounded-xl font-bold cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-4 text-2xl border border-blue-100 shadow-sm">
-                  👑
-                </div>
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Akses Dasbor Admin</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1.5">Masuk untuk memantau data seluruh kelas</p>
-              </div>
-
-              <div className="space-y-6">
-                {/* Google Sign In Option */}
-                <button 
-                  onClick={handleGoogleSignIn}
-                  className="w-full flex items-center justify-center gap-3 px-5 py-3.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white font-extrabold text-xs tracking-wider uppercase rounded-2xl transition-all shadow-md cursor-pointer"
-                >
-                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                  </svg>
-                  Masuk dengan Google
-                </button>
-
-                <div className="relative flex items-center justify-center my-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-100"></div>
-                  </div>
-                  <span className="relative px-4 bg-white text-[9px] font-black text-slate-300 uppercase tracking-widest">Atau Masuk Instan (Iframe)</span>
-                </div>
-
-                {/* Email Sign In Fallback */}
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Email Administrator</label>
-                  <input 
-                    type="email"
-                    placeholder="ilhamabdillah987@gmail.com"
-                    value={adminAuthInputEmail}
-                    onChange={(e) => setAdminAuthInputEmail(e.target.value)}
-                    className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 placeholder-slate-300"
-                  />
-                </div>
-
-                <button 
-                  onClick={handleManualEmailLogin}
-                  className="w-full py-3.5 bg-blue-50 hover:bg-blue-100 active:scale-[0.98] text-blue-600 font-extrabold text-xs tracking-wider uppercase rounded-2xl transition-all border border-blue-100 cursor-pointer text-center"
-                >
-                  Lanjutkan Masuk
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
       </div>
     );
   }
@@ -2809,16 +2752,62 @@ export default function App() {
         </div>
 
         <div className="space-y-6 flex-1">
+          {/* Section: Navigasi Mode Halaman */}
+          <div className="space-y-1 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+            <h3 className="text-slate-400 text-[9px] font-black tracking-[0.2em] mb-2 uppercase px-2 flex items-center gap-1.5">
+              🚀 NAVIGASI UTAMA
+            </h3>
+            <button
+              onClick={() => {
+                setWorkspaceTab('students');
+                setIsSidebarOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center gap-3 text-xs font-bold uppercase tracking-wider cursor-pointer ${
+                workspaceTab === 'students'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-100/55'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <LucideUser size={15} /> Data & Raport
+            </button>
+            <button
+              onClick={() => {
+                setWorkspaceTab('bulk');
+                setIsSidebarOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center gap-3 text-xs font-bold uppercase tracking-wider cursor-pointer ${
+                workspaceTab === 'bulk'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-100/55'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <LayoutDashboard size={15} /> Input Massal
+            </button>
+            <button
+              onClick={() => {
+                setWorkspaceTab('settings');
+                setIsSidebarOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center gap-3 text-xs font-bold uppercase tracking-wider cursor-pointer ${
+                workspaceTab === 'settings'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-100/55'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <Settings size={15} /> Setting Raport
+            </button>
+          </div>
+
           {/* Section: Students List */}
-          <div>
+          <div className="pt-2">
             <h3 className="text-[10px] uppercase font-black text-slate-400 mb-3 ml-2 flex items-center gap-2">
-              <LucideUser size={12} /> Data Santri
+              <LucideUser size={12} /> Daftar Santri
             </h3>
             
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
               <input 
-                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-semibold"
                 placeholder="Cari santri..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -2830,14 +2819,18 @@ export default function App() {
                 {filteredStudents.map((s, idx) => (
                   <button 
                     key={s.id}
-                    onClick={() => setCurrentIndex(idx)}
-                    className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between group ${currentIndex === idx ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'hover:bg-slate-50 text-slate-600'}`}
+                    onClick={() => {
+                      setCurrentIndex(idx);
+                      setWorkspaceTab('students');
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between group ${workspaceTab === 'students' && currentIndex === idx ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'hover:bg-slate-50 text-slate-600'}`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${currentIndex === idx ? 'bg-white' : 'bg-slate-300'}`}></div>
+                      <div className={`w-2 h-2 rounded-full ${workspaceTab === 'students' && currentIndex === idx ? 'bg-white' : 'bg-slate-300'}`}></div>
                       <span className="text-xs font-bold truncate max-w-[140px]">{s.name}</span>
                     </div>
-                    {currentIndex === idx ? <ChevronRight size={14} /> : <div className="w-1.5 h-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-400 rounded-full"></div>}
+                    {workspaceTab === 'students' && currentIndex === idx ? <ChevronRight size={14} /> : <div className="w-1.5 h-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-400 rounded-full"></div>}
                   </button>
                 ))}
               </div>
@@ -2876,146 +2869,6 @@ export default function App() {
           </div>
         </div>
 
-        <div className="mt-8 px-2 space-y-4">
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
-            <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
-              <Settings size={12} /> SETTING RAPORT
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Nama Kelas</label>
-                <input 
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
-                  placeholder="X (SEPULUH)..."
-                  value={globalNamaKelas}
-                  onChange={e => handleUpdateGlobalNamaKelas(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Tanggal Raport</label>
-                <input 
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
-                  placeholder="20 DESEMBER 2025..."
-                  value={globalTanggalRaport}
-                  onChange={e => handleUpdateGlobalTanggalRaport(e.target.value)}
-                />
-              </div>
-               <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Wali Kelas Santri Putra</label>
-                <input 
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
-                  placeholder="NAMA WALI PUTRA..."
-                  value={globalWaliKelasPutra}
-                  onChange={e => handleUpdateGlobalWaliKelasPutra(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Wali Kelas Santri Putri</label>
-                <input 
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
-                  placeholder="NAMA WALI PUTRI..."
-                  value={globalWaliKelasPutri}
-                  onChange={e => handleUpdateGlobalWaliKelasPutri(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Kepala Kepesantrenan</label>
-                <input 
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
-                  placeholder="NAMA KEPALA..."
-                  value={globalKepala}
-                  onChange={e => handleUpdateGlobalKepala(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">Tgl Kenaikan/Kelulusan</label>
-                <input 
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
-                  placeholder="21 JUNI 2026..."
-                  value={globalTanggalKenaikan}
-                  onChange={e => handleUpdateGlobalTanggalKenaikan(e.target.value)}
-                />
-              </div>
-              <button 
-                onClick={handleProcessPromotion}
-                className="w-full mt-2 py-3 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase hover:bg-red-100 transition-all border border-red-100 shadow-sm"
-              >
-                Proses Kenaikan/Lulus
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
-            <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
-              <FileText size={12} /> INPUT MASSAL (KELAS)
-            </h3>
-            <div className="flex flex-col gap-2">
-              <button 
-                onClick={() => setIsBulkAddOpen(true)}
-                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
-              >
-                <span className="flex items-center gap-2"><Plus size={14} /> Input Data Santri</span>
-              </button>
-              <button 
-                onClick={() => setIsBulkGradesOpen(true)}
-                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
-              >
-                <span className="flex items-center gap-2"><LayoutDashboard size={14} /> Input Nilai Massal</span>
-              </button>
-              <button 
-                onClick={() => setIsBulkIdentityOpen(true)}
-                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
-              >
-                <span className="flex items-center gap-2"><UserCircle size={14} /> Input Identitas Massal</span>
-              </button>
-              <button 
-                onClick={() => setIsBulkExtraOpen(true)}
-                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
-              >
-                <span className="flex items-center gap-2"><Plus size={14} /> Input Ekstra Massal</span>
-              </button>
-              <button 
-                onClick={() => setIsBulkBehaviorOpen(true)}
-                className="flex items-center justify-between w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 text-[9px] font-black uppercase"
-              >
-                <span className="flex items-center gap-2"><FileText size={14} /> Input Sikap Massal</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 border-dashed">
-            <h3 className="text-slate-400 text-[10px] font-black tracking-[0.2em] mb-3 uppercase flex items-center gap-2">
-              <Settings size={12} /> LOGO PESANTREN
-            </h3>
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-white text-blue-600 rounded-xl cursor-pointer hover:bg-blue-50 transition-all border border-blue-100 text-[10px] font-black">
-                <Plus size={14} /> GANTI LOGO
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleLogoUpload}
-                />
-              </label>
-              <button 
-                onClick={() => {
-                  showConfirm({
-                    title: 'Hapus Logo Kustom',
-                    message: 'Apakah Anda yakin ingin menghapus logo kustom Anda dan kembali ke logo default?',
-                    confirmText: 'YA, HAPUS LOGO',
-                    onConfirm: () => {
-                      setLogoUrl('');
-                      localStorage.removeItem('al_hikmah_custom_logo');
-                    }
-                  });
-                }}
-                className="text-[9px] text-slate-400 hover:text-slate-600 transition-colors font-bold text-center underline underline-offset-2"
-              >
-                HAPUS LOGO
-              </button>
-            </div>
-          </div>
-
           <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 p-4 rounded-2xl border border-emerald-550/10 text-center mt-4">
             <div className="flex items-center justify-center gap-2 mb-1">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -3023,8 +2876,6 @@ export default function App() {
             </div>
             <p className="text-[9px] font-bold text-emerald-600 uppercase">Kapasitas: Tanpa Batas AKTIF</p>
           </div>
-
-        </div>
 
         <div className="pb-6 pt-4 border-t border-slate-100 flex flex-col gap-3">
             <button 
@@ -4064,255 +3915,318 @@ export default function App() {
               </div>
             ))}
           </div>
-        ) : selectedStudent ? (
-          <motion.div 
-            key={selectedStudent.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-4 md:p-8 pb-20 flex flex-col items-center"
-          >
-             {/* Main Dashboard View (No-Print) */}
-             {!showSheetPreview && (
-                <StudentDashboard 
-                  student={selectedStudent}
-                  studentRankings={studentRankings}
-                  onEdit={openEditModal}
-                  onPrint={handlePrint}
-                  onShowSheet={() => setShowSheetPreview(true)}
-                />
-             )}
+        ) : workspaceTab === 'students' ? (
+          selectedStudent ? (
+            <motion.div 
+              key={selectedStudent.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 md:p-8 pb-20 flex flex-col items-center"
+            >
+               {/* Main Dashboard View (No-Print) */}
+               {!showSheetPreview && (
+                  <StudentDashboard 
+                    student={selectedStudent}
+                    studentRankings={studentRankings}
+                    onEdit={openEditModal}
+                    onPrint={handlePrint}
+                    onShowSheet={() => setShowSheetPreview(true)}
+                  />
+               )}
 
-             {/* Sheet Preview Toggle (when visible) */}
-             {showSheetPreview && (
-               <div className="w-full max-w-[210mm] mb-8 no-print flex justify-between items-center bg-white p-6 rounded-[32px] border border-blue-100 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner"><Printer size={24} /></div>
-                    <div>
-                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight leading-none mb-1">Preview Lembar Raport</h3>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Formal A4 Sheet Layout</p>
+               {/* Sheet Preview Toggle (when visible) */}
+               {showSheetPreview && (
+                 <div className="w-full max-w-[210mm] mb-8 no-print flex justify-between items-center bg-white p-6 rounded-[32px] border border-blue-100 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner"><Printer size={24} /></div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight leading-none mb-1">Preview Lembar Raport</h3>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Formal A4 Sheet Layout</p>
+                      </div>
                     </div>
-                  </div>
-                  <button 
-                    onClick={() => setShowSheetPreview(false)}
-                    className="px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-slate-100"
-                  >
-                    KEMBALI KE DASHBOARD
-                  </button>
-               </div>
-             )}
+                    <button 
+                      onClick={() => setShowSheetPreview(false)}
+                      className="px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-slate-100"
+                    >
+                      KEMBALI KE DASHBOARD
+                    </button>
+                 </div>
+               )}
 
-             <div className={`${showSheetPreview ? 'block' : 'hidden'} scale-[0.45] xs:scale-[0.55] sm:scale-[0.75] md:scale-100 print:scale-100 origin-top overflow-visible print:m-0 print:p-0 print:block print:h-auto`}>
-               <ReportTemplate 
-                  student={selectedStudent}
-                  logoUrl={logoUrl}
-                  globalNamaKelas={globalNamaKelas}
-                  globalTanggalRaport={globalTanggalRaport}
-                  globalWaliKelas={globalWaliKelas}
-                  globalWaliKelasPutra={globalWaliKelasPutra}
-                  globalWaliKelasPutri={globalWaliKelasPutri}
-                  globalKepala={globalKepala}
-                  studentRankings={studentRankings}
-                  autoSaveStudent={autoSaveStudent}
-                  setStudentsList={setStudentsList}
-                />
-             </div>
-          </motion.div>
-        ) : (
-          <div className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-10 no-print h-screen flex flex-col">
+               <div className={`${showSheetPreview ? 'block' : 'hidden'} scale-[0.45] xs:scale-[0.55] sm:scale-[0.75] md:scale-100 print:scale-100 origin-top overflow-visible print:m-0 print:p-0 print:block print:h-auto`}>
+                 <ReportTemplate 
+                    student={selectedStudent}
+                    logoUrl={logoUrl}
+                    globalNamaKelas={globalNamaKelas}
+                    globalTanggalRaport={globalTanggalRaport}
+                    globalWaliKelas={globalWaliKelas}
+                    globalWaliKelasPutra={globalWaliKelasPutra}
+                    globalWaliKelasPutri={globalWaliKelasPutri}
+                    globalKepala={globalKepala}
+                    studentRankings={studentRankings}
+                    autoSaveStudent={autoSaveStudent}
+                    setStudentsList={setStudentsList}
+                  />
+               </div>
+            </motion.div>
+          ) : (
+            <div className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-10 no-print h-screen flex flex-col justify-center items-center">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="max-w-md w-full bg-white p-8 rounded-[32px] border border-slate-100 shadow-md text-center flex flex-col items-center gap-6"
+              >
+                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-3xl shadow-inner animate-bounce">
+                  📖
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">RAPORT KELAS {selectedClass}</h3>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1.5 leading-relaxed">
+                    Silakan pilih nama santri di bilah samping kiri untuk mulai mengelola nilai, melihat lembar raport, atau mencetaknya.
+                  </p>
+                </div>
+                <div className="w-full flex flex-col gap-2.5 pt-4 border-t border-slate-100">
+                  <button
+                    onClick={openAddModal}
+                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] tracking-widest uppercase rounded-2xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Plus size={14} /> TAMBAH SANTRI BARU
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )
+        ) : workspaceTab === 'bulk' ? (
+          <div className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-10 no-print min-h-screen flex flex-col">
             <motion.div 
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               className="space-y-8"
             >
               {/* Header */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                <div>
-                  <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">PEMANTAUAN DATA MASUK KELAS {selectedClass}</h2>
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">Status kelengkapan data diri, nilai pelajaran, sikap, dan presensi santri</p>
-                </div>
-                <div className="flex items-center gap-3">
+              <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
+                <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-2.5">
+                  <LayoutDashboard className="text-blue-600" size={24} /> Input Massal - Kelas {selectedClass}
+                </h2>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">Layanan input multi-data secara cepat & efisien untuk seluruh santri sekaligus</p>
+              </div>
+
+              {/* Bento Grid layout for Mass Inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Card 1: Input Data Santri Sekaligus */}
+                <div className="bg-white rounded-[28px] p-6 border border-slate-100 hover:border-blue-200 transition-all hover:translate-y-[-2px] hover:shadow-lg hover:shadow-slate-100/50 flex flex-col justify-between">
+                  <div>
+                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl shadow-sm mb-4">✍️</div>
+                    <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider font-sans">Input Data Santri Sekaligus</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1.5 leading-relaxed">Masukkan daftar nama santri baru secara cepat dalam satu baris per nama.</p>
+                  </div>
                   <button 
-                    onClick={() => fetchStudents(selectedClass)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-2"
+                    onClick={() => setIsBulkAddOpen(true)}
+                    className="w-full mt-6 py-3 bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-600 font-extrabold text-[10px] tracking-widest uppercase rounded-xl transition-all border border-blue-100 cursor-pointer text-center font-sans"
                   >
-                    🔄 Refresh Data
+                    Buka Input Santri
                   </button>
+                </div>
+
+                {/* Card 2: Input Nilai Massal */}
+                <div className="bg-white rounded-[28px] p-6 border border-slate-100 hover:border-blue-200 transition-all hover:translate-y-[-2px] hover:shadow-lg hover:shadow-slate-100/50 flex flex-col justify-between">
+                  <div>
+                    <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-2xl shadow-sm mb-4">🏆</div>
+                    <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider font-sans">Input Nilai Massal</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1.5 leading-relaxed">Isi nilai ujian tulis dan lisan santri secara simultan per mata pelajaran.</p>
+                  </div>
                   <button 
-                    onClick={openAddModal}
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
+                    onClick={() => setIsBulkGradesOpen(true)}
+                    className="w-full mt-6 py-3 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-700 font-extrabold text-[10px] tracking-widest uppercase rounded-xl transition-all border border-amber-100 cursor-pointer text-center font-sans"
                   >
-                    <Plus size={14} /> Tambah Santri
+                    Buka Input Nilai
+                  </button>
+                </div>
+
+                {/* Card 3: Input Identitas Massal */}
+                <div className="bg-white rounded-[28px] p-6 border border-slate-100 hover:border-indigo-200 transition-all hover:translate-y-[-2px] hover:shadow-lg hover:shadow-slate-100/50 flex flex-col justify-between">
+                  <div>
+                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-sm mb-4">📋</div>
+                    <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider font-sans">Input Identitas Massal</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1.5 leading-relaxed">Update No Induk, NISN, TTL, nama orang tua, alamat secara kooperatif sekaligus.</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsBulkIdentityOpen(true)}
+                    className="w-full mt-6 py-3 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-600 font-extrabold text-[10px] tracking-widest uppercase rounded-xl transition-all border border-indigo-100 cursor-pointer text-center font-sans"
+                  >
+                    Buka Input Identitas
+                  </button>
+                </div>
+
+                {/* Card 4: Input Ekstra Massal */}
+                <div className="bg-white rounded-[28px] p-6 border border-slate-100 hover:border-teal-200 transition-all hover:translate-y-[-2px] hover:shadow-lg hover:shadow-slate-100/50 flex flex-col justify-between">
+                  <div>
+                    <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center text-2xl shadow-sm mb-4">🌟</div>
+                    <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider font-sans">Input Ekstra Massal</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1.5 leading-relaxed">Kelola data kegiatan ekstrakurikuler & prestasi untuk seluruh santri.</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsBulkExtraOpen(true)}
+                    className="w-full mt-6 py-3 bg-teal-50 hover:bg-teal-100 active:scale-95 text-teal-700 font-extrabold text-[10px] tracking-widest uppercase rounded-xl transition-all border border-teal-100 cursor-pointer text-center font-sans"
+                  >
+                    Buka Input Ekstra
+                  </button>
+                </div>
+
+                {/* Card 5: Input Sikap Massal */}
+                <div className="bg-white rounded-[28px] p-6 border border-slate-100 hover:border-rose-200 transition-all hover:translate-y-[-2px] hover:shadow-lg hover:shadow-slate-100/50 flex flex-col justify-between">
+                  <div>
+                    <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-2xl shadow-sm mb-4">✨</div>
+                    <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider font-sans">Input Sikap Massal</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1.5 leading-relaxed">Masukkan deskripsi perilaku spiritual, sosial, & catatan wali kelas secara massal.</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsBulkBehaviorOpen(true)}
+                    className="w-full mt-6 py-3 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-600 font-extrabold text-[10px] tracking-widest uppercase rounded-xl transition-all border border-rose-100 cursor-pointer text-center font-sans"
+                  >
+                    Buka Input Sikap
                   </button>
                 </div>
               </div>
-
-              {/* Counter Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* 1. Total Students */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5">
-                  <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
-                    🎓
-                  </div>
-                  <div>
-                    <p className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Total Santri</p>
-                    <p className="text-2xl font-black text-slate-800 leading-tight">{studentsList.length} Santri</p>
-                  </div>
-                </div>
-
-                {/* 2. Grades complete count */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5">
-                  <div className="w-14 h-14 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center text-2xl font-bold">
-                    📝
-                  </div>
-                  <div>
-                    <p className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Terisi Nilai Akademik</p>
-                    <p className="text-2xl font-black text-slate-800 leading-tight">
-                      {studentsList.filter(s => s.subjects?.some(sub => (sub.tulis?.nilai || 0) > 0 || (sub.lisan?.nilai || 0) > 0)).length} Santri
-                    </p>
-                  </div>
-                </div>
-
-                {/* 3. Identity complete count */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5">
-                  <div className="w-14 h-14 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
-                    📋
-                  </div>
-                  <div>
-                    <p className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Identitas Terisi</p>
-                    <p className="text-2xl font-black text-slate-800 leading-tight">
-                      {studentsList.filter(s => s.nomorInduk && s.identity?.tempatTanggalLahir).length} Santri
-                    </p>
-                  </div>
-                </div>
-
-                {/* 4. Complete report cards (all parts filled) */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5">
-                  <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
-                    ✨
-                  </div>
-                  <div>
-                    <p className="text-[9px] uppercase font-black text-slate-400 tracking-wider">Sikap & Presensi</p>
-                    <p className="text-2xl font-black text-slate-800 leading-tight">
-                      {studentsList.filter(s => (s.behavior?.spiritual || s.behavior?.social) && (s.attendance?.sakit || s.attendance?.izin || s.attendance?.alpha)).length} Santri
-                    </p>
-                  </div>
-                </div>
+            </motion.div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-10 no-print min-h-screen flex flex-col">
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-8"
+            >
+              {/* Header */}
+              <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
+                <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-2.5 font-sans">
+                  <Settings className="text-blue-600 animate-spin-slow" size={24} /> Setting Raport - Kelas {selectedClass}
+                </h2>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">Konfigurasi parameter administratif raport kelas, logo instansi, dan kenaikan kelas</p>
               </div>
 
-              {/* Student status matrix table */}
-              <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden p-6 md:p-8">
+              {/* Main Settings Card */}
+              <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-6 md:p-8 space-y-8">
                 <div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Rincian Kelengkapan Pengisian Data</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 mb-6">Pilih salah satu baris santri di bawah untuk melihat rincian cetak atau mengedit nilainya secara langsung.</p>
+                  <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">📋 Identitas Administratif Kelas</h3>
                 </div>
 
-                {studentsList.length === 0 ? (
-                  <div className="py-20 text-center flex flex-col items-center justify-center gap-4">
-                    <div className="text-4xl">📭</div>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Belum ada data santri di kelas ini.</p>
-                    <button 
-                      onClick={openAddModal}
-                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mt-2 transition-all shadow-md active:scale-95 cursor-pointer"
-                    >
-                      TAMBAH SANTRI SEKARANG
-                    </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Nama Kelas</label>
+                    <input 
+                      className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+                      placeholder="X (SEPULUH)..."
+                      value={globalNamaKelas}
+                      onChange={e => handleUpdateGlobalNamaKelas(e.target.value)}
+                    />
                   </div>
-                ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-100 shadow-sm transition-all">
-                    <table className="w-full text-left border-collapse min-w-[700px]">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-400 border-b border-slate-100">
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest w-12 text-center">No</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest min-w-[180px]">Nama Santri</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">NIS / NISN</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Kelengkapan Nilai</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Identitas Dokumen</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Catatan Sikap</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {studentsList.map((s, idx) => {
-                          const subjectsWithGrades = s.subjects?.filter(sub => (sub.tulis?.nilai && sub.tulis.nilai > 0) || (sub.lisan?.nilai && sub.lisan.nilai > 0))?.length || 0;
-                          const totalSubjects = s.subjects?.length || 0;
-                          const hasNis = !!s.nomorInduk;
-                          const isIdentityComplete = !!(s.identity?.tempatTanggalLahir && s.identity?.namaAyah && s.identity?.alamatPesertaDidik);
-                          const isBehaviorComplete = !!(s.behavior?.spiritual || s.behavior?.social);
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Tanggal Raport</label>
+                    <input 
+                      className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+                      placeholder="20 DESEMBER 2025..."
+                      value={globalTanggalRaport}
+                      onChange={e => handleUpdateGlobalTanggalRaport(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Wali Kelas Santri Putra</label>
+                    <input 
+                      className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+                      placeholder="NAMA WALI PUTRA..."
+                      value={globalWaliKelasPutra}
+                      onChange={e => handleUpdateGlobalWaliKelasPutra(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Wali Kelas Santri Putri</label>
+                    <input 
+                      className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+                      placeholder="NAMA WALI PUTRI..."
+                      value={globalWaliKelasPutri}
+                      onChange={e => handleUpdateGlobalWaliKelasPutri(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Kepala Kepesantrenan</label>
+                    <input 
+                      className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+                      placeholder="NAMA KEPALA..."
+                      value={globalKepala}
+                      onChange={e => handleUpdateGlobalKepala(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Tgl Kenaikan/Kelulusan</label>
+                    <input 
+                      className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+                      placeholder="21 JUNI 2026..."
+                      value={globalTanggalKenaikan}
+                      onChange={e => handleUpdateGlobalTanggalKenaikan(e.target.value)}
+                    />
+                  </div>
+                </div>
 
-                          return (
-                            <tr 
-                              key={s.id} 
-                              onClick={() => {
-                                const fIdx = filteredStudents.findIndex(fs => fs.id === s.id);
-                                if (fIdx !== -1) {
-                                  setCurrentIndex(fIdx);
-                                } else {
-                                  // fallback: find index in entire roster list
-                                  const rIdx = studentsList.findIndex(rs => rs.id === s.id);
-                                  if (rIdx !== -1) setCurrentIndex(rIdx);
-                                }
-                              }}
-                              className="hover:bg-blue-50/20 md:cursor-pointer transition-colors group"
-                            >
-                              <td className="px-6 py-4 text-xs font-bold text-slate-300 text-center">{idx + 1}</td>
-                              <td className="px-6 py-4">
-                                <span className="text-sm font-black text-slate-700 uppercase group-hover:text-blue-600 transition-colors">{s.name}</span>
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                {hasNis ? (
-                                  <span className="font-mono text-xs font-semibold text-slate-600">{s.nomorInduk}</span>
-                                ) : (
-                                  <span className="text-[9px] bg-rose-50 text-rose-500 font-extrabold px-2.5 py-1 rounded-lg border border-rose-100">BELUM ADA</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                <div className="flex flex-col items-center gap-1.5">
-                                  <div className="w-24 bg-slate-100 h-2 rounded-full overflow-hidden">
-                                    <div 
-                                      className="bg-blue-600 h-full rounded-full transition-all" 
-                                      style={{ width: `${totalSubjects > 0 ? (subjectsWithGrades / totalSubjects) * 100 : 0}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-[10px] text-slate-500 font-bold">{subjectsWithGrades} / {totalSubjects} Mapel</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                {isIdentityComplete ? (
-                                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-black px-2.5 py-1 rounded-lg border border-emerald-100">🟢 LENGKAP</span>
-                                ) : (
-                                  <span className="text-[9px] bg-orange-50 text-orange-600 font-black px-2.5 py-1 rounded-lg border border-orange-100">⏳ PARSIAL</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                {isBehaviorComplete ? (
-                                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-black px-2.5 py-1 rounded-lg border border-emerald-100">🟢 SIKAP ADA</span>
-                                ) : (
-                                  <span className="text-[9px] bg-slate-50 text-slate-400 font-black px-2.5 py-1 rounded-lg border border-slate-200">❌ KOSONG</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
-                                <button
-                                  onClick={() => {
-                                    const fIdx = filteredStudents.findIndex(fs => fs.id === s.id);
-                                    if (fIdx !== -1) {
-                                      setCurrentIndex(fIdx);
-                                    } else {
-                                      const rIdx = studentsList.findIndex(rs => rs.id === s.id);
-                                      if (rIdx !== -1) setCurrentIndex(rIdx);
-                                    }
-                                  }}
-                                  className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-extrabold text-[10px] uppercase rounded-lg transition-all border border-blue-100 cursor-pointer"
-                                >
-                                  Kelola Rapor
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                {/* Logo Customizer */}
+                <div className="pt-6 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider font-sans">🏫 Kustomisasi Logo Pesantren</h4>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5 leading-relaxed">Sesuaikan logo instansi pondok pesantren Anda yang terpasang di cetakan raport formal.</p>
                   </div>
-                )}
+                  <div className="flex items-center gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                    <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-md overflow-hidden p-1 border border-slate-100 shrink-0 font-sans">
+                      {logoUrl ? (
+                        <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                      ) : (
+                        <Settings size={20} className="text-slate-300" />
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2 w-full">
+                      <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 rounded-xl cursor-pointer transition-all shadow-sm text-[10px] font-black uppercase text-center font-sans">
+                        <Plus size={14} /> GANTI LOGO
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={handleLogoUpload}
+                        />
+                      </label>
+                      {logoUrl && (
+                        <button 
+                          onClick={() => {
+                            showConfirm({
+                              title: 'Hapus Logo Kustom',
+                              message: 'Apakah Anda yakin ingin menghapus logo kustom Anda dan kembali ke logo default?',
+                              confirmText: 'YA, HAPUS LOGO',
+                              onConfirm: () => {
+                                setLogoUrl('');
+                                localStorage.removeItem('al_hikmah_custom_logo');
+                              }
+                            });
+                          }}
+                          className="text-[9px] text-rose-550 hover:text-rose-600 hover:underline transition-all font-black text-center uppercase"
+                        >
+                          Hapus Logo Kustom
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Promotion Panel / Danger Zone */}
+                <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 bg-rose-50/40 p-6 rounded-2xl border border-rose-100/50 font-sans">
+                  <div className="text-center sm:text-left">
+                    <h4 className="text-xs font-black uppercase text-rose-800 tracking-wider">⚠️ Kenaikan Kelas / Kelulusan</h4>
+                    <p className="text-[10px] font-extrabold text-slate-550 uppercase mt-0.5 animate-pulse">harap periksa kembali seluruh data sebelum menaikan kelas / meluluskan santri</p>
+                  </div>
+                  <button 
+                    onClick={handleProcessPromotion}
+                    className="px-6 py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[10px] tracking-widest uppercase rounded-xl active:scale-95 transition-all shadow-lg shadow-rose-100 hover:translate-y-[-1px] text-center cursor-pointer font-sans"
+                  >
+                    Proses Kenaikan/Lulus
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
