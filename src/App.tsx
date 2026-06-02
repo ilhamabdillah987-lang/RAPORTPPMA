@@ -104,12 +104,13 @@ interface ReportTemplateProps {
   studentRankings: any[];
   autoSaveStudent: (s: Partial<Student>) => void | Promise<void>;
   setStudentsList: React.Dispatch<React.SetStateAction<Student[]>>;
+  currentUserEmail?: string | null;
 }
 
 const ReportTemplate = ({ 
   student, logoUrl, globalNamaKelas, globalTanggalRaport, 
   globalWaliKelas, globalWaliKelasPutra = '', globalWaliKelasPutri = '', globalKepala, studentRankings, 
-  autoSaveStudent, setStudentsList 
+  autoSaveStudent, setStudentsList, currentUserEmail = null
 }: ReportTemplateProps) => {
   const waliKelasToPrint = useMemo(() => {
     const jk = (student.identity?.jenisKelamin || '').trim().toUpperCase();
@@ -185,73 +186,85 @@ const ReportTemplate = ({
       </section>
 
       {/* PAGE 2: IDENTITAS SANTRI */}
-      <section className="page flex flex-col pt-8 pb-6 px-12 text-[10pt] font-sans">
-        <h1 className="text-center text-[12pt] font-black uppercase mb-8 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
-        <div className="flex-1 space-y-0.5">
-          <table className="w-full border-collapse">
-            <tbody>
-              {[
-                { id: "1.", label: 'Nama Peserta Didik (Lengkap)', value: student.name },
-                { id: "2.", label: 'NIS / NISN', value: student.identity?.nisNisn },
-                { id: "3.", label: 'Tempat, Tanggal Lahir', value: student.identity?.tempatTanggalLahir },
-                { id: "4.", label: 'Jenis Kelamin', value: student.identity?.jenisKelamin },
-                { id: "5.", label: 'Agama', value: student.identity?.agama },
-                { id: "6.", label: 'Status dalam Keluarga', value: student.identity?.statusDalamKeluarga },
-                { id: "7.", label: 'Anak ke', value: student.identity?.anakKe },
-                { id: "8.", label: 'Alamat Peserta Didik', value: student.identity?.alamatPesertaDidik },
-                { label: '', isSpacer: true },
-                { id: "9.", label: 'Nomor Telepon Rumah', value: student.identity?.teleponRumah },
-                { id: "10.", label: 'Sekolah Asal', value: student.identity?.sekolahAsal },
-                { id: "11.", label: 'Diterima di pesantren ini', isHeader: true },
-                { label: 'Di kelas', indent: true, value: student.identity?.diterimaDiKelas },
-                { label: 'Pada tanggal', indent: true, value: student.identity?.diterimaPadaTanggal },
-                { id: "12.", label: 'Nama Orang Tua', isHeader: true },
-                { label: 'a. Ayah', indent: true, value: student.identity?.namaAyah },
-                { label: 'b. Ibu', indent: true, value: student.identity?.namaIbu },
-                { id: "13.", label: 'Alamat Orang Tua', value: student.identity?.alamatOrangTua },
-                { label: '', isSpacer: true },
-                { id: "14.", label: 'Nomor Telepon Rumah', value: student.identity?.teleponOrangTua },
-                { label: 'Pekerjaan Orang Tua', isHeader: true },
-                { label: 'a. Ayah', indent: true, value: student.identity?.pekerjaanAyah },
-                { label: 'b. Ibu', indent: true, value: student.identity?.pekerjaanIbu },
-                { id: "15.", label: 'Nama Wali Peserta Didik', value: student.identity?.namaWali },
-                { id: "16.", label: 'Alamat Wali Peserta Didik', value: student.identity?.alamatWali },
-                { label: 'Nomor Telepon Rumah', indent: true, value: student.identity?.teleponWali },
-                { id: "17.", label: 'Pekerjaan Wali Peserta Didik', value: student.identity?.pekerjaanWali },
-              ].map((row, idx) => {
-                if (row.isSpacer) return <tr key={`spacer-${idx}`}><td colSpan={4} className="h-2"></td></tr>;
-                return (
-                  <tr key={idx} className="align-top">
-                    <td className="w-8 py-1 font-bold">{(row as any).id || ''}</td>
-                    <td className={`w-[45%] py-1 ${row.indent ? 'pl-6' : ''} ${row.isHeader ? 'font-black' : 'font-medium'}`}>
-                      {row.label}
-                    </td>
-                    <td className="w-4 py-1 text-center">:</td>
-                    <td className={`py-1 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black' : ''}`}>
-                      {row.value}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex justify-between items-end mt-8 px-12">
-          <div className="w-[3cm] h-[4cm] border-2 border-slate-900 flex items-center justify-center text-center text-[7pt] text-slate-400 font-bold bg-slate-50 uppercase tracking-tighter leading-tight shrink-0 overflow-hidden relative group">
-            {student.photoUrl ? (
-              <img src={student.photoUrl} alt="Foto Santri" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <span className="p-3">Pas Foto<br/>3 x 4 cm</span>
-            )}
+      {currentUserEmail ? (
+        <section className="page flex flex-col pt-8 pb-6 px-12 text-[10pt] font-sans">
+          <h1 className="text-center text-[12pt] font-black uppercase mb-8 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
+          <div className="flex-1 space-y-0.5">
+            <table className="w-full border-collapse">
+              <tbody>
+                {[
+                  { id: "1.", label: 'Nama Peserta Didik (Lengkap)', value: student.name },
+                  { id: "2.", label: 'NIS / NISN', value: student.identity?.nisNisn },
+                  { id: "3.", label: 'Tempat, Tanggal Lahir', value: student.identity?.tempatTanggalLahir },
+                  { id: "4.", label: 'Jenis Kelamin', value: student.identity?.jenisKelamin },
+                  { id: "5.", label: 'Agama', value: student.identity?.agama },
+                  { id: "6.", label: 'Status dalam Keluarga', value: student.identity?.statusDalamKeluarga },
+                  { id: "7.", label: 'Anak ke', value: student.identity?.anakKe },
+                  { id: "8.", label: 'Alamat Peserta Didik', value: student.identity?.alamatPesertaDidik },
+                  { label: '', isSpacer: true },
+                  { id: "9.", label: 'Nomor Telepon Rumah', value: student.identity?.teleponRumah },
+                  { id: "10.", label: 'Sekolah Asal', value: student.identity?.sekolahAsal },
+                  { id: "11.", label: 'Diterima di pesantren ini', isHeader: true },
+                  { label: 'Di kelas', indent: true, value: student.identity?.diterimaDiKelas },
+                  { label: 'Pada tanggal', indent: true, value: student.identity?.diterimaPadaTanggal },
+                  { id: "12.", label: 'Nama Orang Tua', isHeader: true },
+                  { label: 'a. Ayah', indent: true, value: student.identity?.namaAyah },
+                  { label: 'b. Ibu', indent: true, value: student.identity?.namaIbu },
+                  { id: "13.", label: 'Alamat Orang Tua', value: student.identity?.alamatOrangTua },
+                  { label: '', isSpacer: true },
+                  { id: "14.", label: 'Nomor Telepon Rumah', value: student.identity?.teleponOrangTua },
+                  { label: 'Pekerjaan Orang Tua', isHeader: true },
+                  { label: 'a. Ayah', indent: true, value: student.identity?.pekerjaanAyah },
+                  { label: 'b. Ibu', indent: true, value: student.identity?.pekerjaanIbu },
+                  { id: "15.", label: 'Nama Wali Peserta Didik', value: student.identity?.namaWali },
+                  { id: "16.", label: 'Alamat Wali Peserta Didik', value: student.identity?.alamatWali },
+                  { label: 'Nomor Telepon Rumah', indent: true, value: student.identity?.teleponWali },
+                  { id: "17.", label: 'Pekerjaan Wali Peserta Didik', value: student.identity?.pekerjaanWali },
+                ].map((row, idx) => {
+                  if (row.isSpacer) return <tr key={`spacer-${idx}`}><td colSpan={4} className="h-2"></td></tr>;
+                  return (
+                    <tr key={idx} className="align-top">
+                      <td className="w-8 py-1 font-bold">{(row as any).id || ''}</td>
+                      <td className={`w-[45%] py-1 ${row.indent ? 'pl-6' : ''} ${row.isHeader ? 'font-black' : 'font-medium'}`}>
+                        {row.label}
+                      </td>
+                      <td className="w-4 py-1 text-center">:</td>
+                      <td className={`py-1 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black' : ''}`}>
+                        {row.value}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          <div className="text-center w-80 mb-2">
-            <p className="mb-0 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
-            <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
-            <div className="h-20"></div>
-            <p className="font-black text-[10pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
+          <div className="flex justify-between items-end mt-8 px-12">
+            <div className="w-[3cm] h-[4cm] border-2 border-slate-900 flex items-center justify-center text-center text-[7pt] text-slate-400 font-bold bg-slate-50 uppercase tracking-tighter leading-tight shrink-0 overflow-hidden relative group">
+              {student.photoUrl ? (
+                <img src={student.photoUrl} alt="Foto Santri" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="p-3">Pas Foto<br/>3 x 4 cm</span>
+              )}
+            </div>
+            <div className="text-center w-80 mb-2">
+              <p className="mb-0 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
+              <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
+              <div className="h-20"></div>
+              <p className="font-black text-[10pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="page flex flex-col items-center justify-center p-12 text-center print:hidden bg-slate-50 border border-dashed border-slate-200 my-8 mx-auto rounded-3xl min-h-[300px] w-full max-w-[180mm]">
+          <div className="max-w-md mx-auto py-8">
+            <span className="text-4xl block mb-4 leading-none">🔒</span>
+            <h3 className="text-sm font-black uppercase tracking-wider text-slate-800 mb-1 leading-none">Halaman Identitas Dilindungi</h3>
+            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-relaxed mt-2">
+              Data diri Administratif & Identitas Orang Tua dilindungi kebijakan privasi Pesantren. Hanya pengisi data atau administrator yang login yang dapat melihat, mengubah, dan mencetak halaman ini.
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* PAGE 3: NILAI */}
       <section className="page">
@@ -3530,12 +3543,33 @@ export default function App() {
                     </button>
                   </div>
 
-                    <div className="flex gap-1 bg-white p-1 rounded-2xl border border-slate-200 overflow-x-auto no-scrollbar whitespace-nowrap">
-                      <button type="button" onClick={() => setActiveTab('basic')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'basic' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Informasi Dasar</button>
-                      <button type="button" onClick={() => setActiveTab('grades')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'grades' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Nilai Akademik</button>
-                      <button type="button" onClick={() => setActiveTab('extra')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'extra' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Ekstrakurikuler</button>
-                      <button type="button" onClick={() => setActiveTab('identity')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'identity' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Identitas Santri</button>
-                    </div>
+                  <div className="flex gap-1 bg-white p-1 rounded-2xl border border-slate-200 overflow-x-auto no-scrollbar whitespace-nowrap">
+                    <button type="button" onClick={() => setActiveTab('basic')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'basic' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Informasi Dasar</button>
+                    <button type="button" onClick={() => setActiveTab('grades')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'grades' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Nilai Akademik</button>
+                    <button type="button" onClick={() => setActiveTab('extra')} className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${activeTab === 'extra' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>Ekstrakurikuler</button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        if (currentUserEmail) {
+                          setActiveTab('identity');
+                        } else {
+                          showConfirm({
+                            title: 'Akses Terbatas',
+                            message: 'Data Identitas Administratif (Nama Orang Tua, Alamat, No HP, dll) dilindungi kebijakan privasi dan hanya bisa dilihat/diedit oleh Pengisi Data / Administrator yang telah masuk.',
+                            cancelText: 'Mengerti',
+                            confirmText: 'Masuk Sekarang',
+                            onConfirm: () => {
+                              setIsAuthModalOpen(true);
+                            }
+                          });
+                        }
+                      }}
+                      className={`px-5 py-2 text-xs font-bold rounded-xl transition-all shrink-0 flex items-center gap-1.5 ${activeTab === 'identity' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      <span>Identitas Santri</span>
+                      {!currentUserEmail && <span className="text-[10px]">🔒</span>}
+                    </button>
+                  </div>
 
                   <div className="flex-1 overflow-y-auto p-8">
                     <form id="student-form" onSubmit={handleSaveStudent} className="space-y-10">
@@ -3885,6 +3919,7 @@ export default function App() {
                   studentRankings={studentRankings}
                   autoSaveStudent={autoSaveStudent}
                   setStudentsList={setStudentsList}
+                  currentUserEmail={currentUserEmail}
                 />
               </div>
             ))}
@@ -3940,6 +3975,7 @@ export default function App() {
                     studentRankings={studentRankings}
                     autoSaveStudent={autoSaveStudent}
                     setStudentsList={setStudentsList}
+                    currentUserEmail={currentUserEmail}
                   />
                </div>
             </motion.div>
@@ -4025,10 +4061,24 @@ export default function App() {
                     <p className="text-[10px] text-slate-400 font-bold uppercase mt-1.5 leading-relaxed">Update No Induk, NISN, TTL, nama orang tua, alamat secara kooperatif sekaligus.</p>
                   </div>
                   <button 
-                    onClick={() => setIsBulkIdentityOpen(true)}
-                    className="w-full mt-6 py-3 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-600 font-extrabold text-[10px] tracking-widest uppercase rounded-xl transition-all border border-indigo-100 cursor-pointer text-center font-sans"
+                    onClick={() => {
+                      if (currentUserEmail) {
+                        setIsBulkIdentityOpen(true);
+                      } else {
+                        showConfirm({
+                          title: 'Akses Terbatas',
+                          message: 'Pengisian / pengeditan data identitas secara massal dilindungi kebijakan privasi dan hanya bisa diakses oleh Pengisi Data / Administrator yang telah masuk.',
+                          cancelText: 'Mengerti',
+                          confirmText: 'Masuk Sekarang',
+                          onConfirm: () => {
+                            setIsAuthModalOpen(true);
+                          }
+                        });
+                      }
+                    }}
+                    className="w-full mt-6 py-3 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-600 font-extrabold text-[10px] tracking-widest uppercase rounded-xl transition-all border border-indigo-100 cursor-pointer text-center font-sans relative"
                   >
-                    Buka Input Identitas
+                    Buka Input Identitas {!currentUserEmail && '🔒'}
                   </button>
                 </div>
 
