@@ -5,6 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
+import bcrypt from "bcryptjs";
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ interface Data {
   students: any[];
   classesBackup?: Record<string, { students: any[]; updatedAt: string; waliKelas?: string }>;
   configs?: Record<string, any>;
+  teachers?: any[];
 }
 
 async function startServer() {
@@ -30,7 +32,7 @@ async function startServer() {
 
   // Explicit lowdb setup
   const adapter = new JSONFile<Data>(path.join(process.cwd(), 'db.json'));
-  const defaultData: Data = { students: [], classesBackup: {}, configs: {} };
+  const defaultData: Data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
   const db = new Low<Data>(adapter, defaultData);
   
   await db.read();
@@ -49,6 +51,10 @@ async function startServer() {
     }
     if (!db.data.students) {
       db.data.students = [];
+      changed = true;
+    }
+    if (!db.data.teachers) {
+      db.data.teachers = [];
       changed = true;
     }
     if (changed) {
@@ -336,6 +342,179 @@ async function startServer() {
         filledClasses: classSummary.filter(c => c.hasData).length,
         totalStudents: classSummary.reduce((sum, c) => sum + c.studentCount, 0),
         serverTime: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- Teacher Management & Auth APIs ---
+
+  // Get all teachers
+  app.get("/api/teachers", (req, res) => {
+    try {
+      if (!db.data || !db.data.teachers) {
+        return res.json([]);
+      }
+      const mapped = db.data.teachers.map(t => ({
+        username: t.username,
+        waliKelas: t.waliKelas
+      }));
+      res.json(mapped);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Create a teacher account
+  app.post("/api/teachers", async (req, res) => {
+    try {
+      const { username, password, waliKelas } = req.body;
+      if (!username || !password || !waliKelas) {
+        return res.status(400).json({ error: "Username, password, dan waliKelas harus diisi" });
+      }
+
+      const normalizedUsername = username.trim().toLowerCase();
+
+      if (!db.data) {
+        db.data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
+      }
+      if (!db.data.teachers) {
+        db.data.teachers = [];
+      }
+
+      const exists = db.data.teachers.some(t => t.username.toLowerCase() === normalizedUsername);
+      if (exists) {
+        return res.status(400).json({ error: "Username sudah digunakan" });
+      }
+
+      // Hash password
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync(password, salt);
+
+      const newTeacher = {
+        username: normalizedUsername,
+        pwdHash: hash,
+        waliKelas: waliKelas.trim()
+      };
+
+      db.data.teachers.push(newTeacher);
+
+      // Link wali kelas designation to classesBackup
+      if (!db.data.classesBackup) db.data.classesBackup = {};
+      const cls = waliKelas.trim();
+      if (!db.data.classesBackup[cls]) {
+        db.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString(), waliKelas: normalizedUsername };
+      } else {
+        db.data.classesBackup[cls].waliKelas = normalizedUsername;
+      }
+
+      await db.write();
+
+      res.status(201).json({ success: true, teacher: { username: normalizedUsername, waliKelas: cls } });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Edit a teacher account
+  app.put("/api/teachers/:username", async (req, res) => {
+    try {
+      const { username } = req.params;
+      const { password, waliKelas } = req.body;
+      
+      if (!db.data || !db.data.teachers) {
+        return res.status(404).json({ error: "Data teachers tidak ditemukan" });
+      }
+
+      const idx = db.data.teachers.findIndex(t => t.username.toLowerCase() === username.toLowerCase());
+      if (idx === -1) {
+        return res.status(404).json({ error: "Guru tidak ditemukan" });
+      }
+
+      const teacher = db.data.teachers[idx];
+      if (waliKelas) {
+        teacher.waliKelas = waliKelas.trim();
+        // Also update this waliKelas designated teacher in classesBackup
+        if (!db.data.classesBackup) db.data.classesBackup = {};
+        const cls = waliKelas.trim();
+        if (!db.data.classesBackup[cls]) {
+          db.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString(), waliKelas: username.toLowerCase() };
+        } else {
+          db.data.classesBackup[cls].waliKelas = username.toLowerCase();
+        }
+      }
+
+      if (password && password.trim().length > 0) {
+        const salt = bcrypt.genSaltSync(10);
+        teacher.pwdHash = bcrypt.hashSync(password, salt);
+      }
+
+      db.data.teachers[idx] = teacher;
+      await db.write();
+
+      res.json({ success: true, teacher: { username: teacher.username, waliKelas: teacher.waliKelas } });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Delete a teacher account
+  app.delete("/api/teachers/:username", async (req, res) => {
+    try {
+      const { username } = req.params;
+      if (!db.data || !db.data.teachers) {
+        return res.status(404).json({ error: "Guru tidak ditemukan" });
+      }
+
+      const idx = db.data.teachers.findIndex(t => t.username.toLowerCase() === username.toLowerCase());
+      if (idx === -1) {
+        return res.status(404).json({ error: "Guru tidak ditemukan" });
+      }
+
+      const teacher = db.data.teachers[idx];
+      const cls = teacher.waliKelas;
+      if (cls && db.data.classesBackup && db.data.classesBackup[cls] && db.data.classesBackup[cls].waliKelas === username.toLowerCase()) {
+        db.data.classesBackup[cls].waliKelas = "-";
+      }
+
+      db.data.teachers.splice(idx, 1);
+      await db.write();
+
+      res.json({ success: true, message: `Guru ${username} berhasil dihapus` });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Teacher login
+  app.post("/api/auth/teacher-login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username dan password diperlukan" });
+      }
+
+      if (!db.data || !db.data.teachers) {
+        return res.status(400).json({ error: "Username atau password salah" });
+      }
+
+      const teacher = db.data.teachers.find(t => t.username.toLowerCase() === username.toString().trim().toLowerCase());
+      if (!teacher) {
+        return res.status(400).json({ error: "Username atau password salah" });
+      }
+
+      const matches = bcrypt.compareSync(password, teacher.pwdHash);
+      if (!matches) {
+        return res.status(400).json({ error: "Username atau password salah" });
+      }
+
+      res.json({
+        success: true,
+        teacher: {
+          username: teacher.username,
+          waliKelas: teacher.waliKelas
+        }
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

@@ -782,9 +782,17 @@ export default function App() {
   const [isStatsLoading, setIsStatsLoading] = useState(false);
   const [monitorSearchQuery, setMonitorSearchQuery] = useState('');
   
-  // Admin Dashboard States
-  const [isAdminViewActive, setIsAdminViewActive] = useState(false);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  // Admin Dashboard & Teacher States
+  const [isAdminViewActive, setIsAdminViewActive] = useState(() => {
+    const isParam = typeof window !== 'undefined' && (window.location.pathname === '/admin' || window.location.search.includes('view=admin'));
+    return isParam;
+  });
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('raport_admin_email');
+    }
+    return null;
+  });
   const [adminAuthInputEmail, setAdminAuthInputEmail] = useState('');
   const [adminClassesStats, setAdminClassesStats] = useState<any[]>([]);
   const [isAdminDataLoading, setIsAdminDataLoading] = useState(false);
@@ -792,13 +800,54 @@ export default function App() {
   const [selectedAdminClassDetail, setSelectedAdminClassDetail] = useState<string | null>(null);
   const [adminSelectedClassStudents, setAdminSelectedClassStudents] = useState<any[]>([]);
 
-  // Listen for real Firebase auth state changes
+  // Sub-navigation within Admin Dashboard
+  const [adminSubTab, setAdminSubTab] = useState<'stats' | 'teachers'>('stats');
+
+  // Teacher credentials states
+  const [currentTeacher, setCurrentTeacher] = useState<{ username: string; waliKelas: string } | null>(() => {
+    try {
+      const saved = localStorage.getItem('raport_current_teacher');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [teachersList, setTeachersList] = useState<any[]>([]);
+  const [isTeachersLoading, setIsTeachersLoading] = useState(false);
+
+  // Teacher CRUD Form States
+  const [teacherFormUsername, setTeacherFormUsername] = useState('');
+  const [teacherFormPassword, setTeacherFormPassword] = useState('');
+  const [teacherFormWaliKelas, setTeacherFormWaliKelas] = useState('');
+  const [editingTeacherUsername, setEditingTeacherUsername] = useState<string | null>(null);
+
+  // Front-end Login Inputs inside Modal
+  const [teacherInputUsername, setTeacherInputUsername] = useState('');
+  const [teacherInputPassword, setTeacherInputPassword] = useState('');
+  const [activeAuthTab, setActiveAuthTab] = useState<'teacher' | 'admin'>('teacher');
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Helper check for secure data modification / private viewer access
+  const canEditOrViewPrivate = () => {
+    if (currentUserEmail) return true;
+    if (currentTeacher && currentTeacher.waliKelas === selectedClass) return true;
+    return false;
+  };
+
+  // Sync Firebase authentication
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUserEmail(user.email);
+        if (user.email) {
+          localStorage.setItem('raport_admin_email', user.email);
+        }
       } else {
-        setCurrentUserEmail(null);
+        const savedSim = localStorage.getItem('raport_admin_email');
+        if (!savedSim) {
+          setCurrentUserEmail(null);
+        }
       }
     });
   }, []);
@@ -818,11 +867,29 @@ export default function App() {
     }
   };
 
+  const fetchTeachers = async () => {
+    setIsTeachersLoading(true);
+    try {
+      const res = await fetch('/api/teachers');
+      if (res.ok) {
+        const data = await res.json();
+        setTeachersList(data || []);
+      }
+    } catch (err) {
+      console.error("Gagal mengambil data guru:", err);
+    } finally {
+      setIsTeachersLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isAdminViewActive) {
       fetchAdminStats();
+      if (currentUserEmail) {
+        fetchTeachers();
+      }
     }
-  }, [isAdminViewActive]);
+  }, [isAdminViewActive, currentUserEmail]);
 
   const handleViewAdminClassDetail = async (classNameStr: string) => {
     if (selectedAdminClassDetail === classNameStr) {
@@ -847,38 +914,28 @@ export default function App() {
   };
 
   const handleOpenAdminMenu = () => {
-    if (currentUserEmail === 'ilhamabdillah987@gmail.com') {
-      setIsAdminViewActive(true);
-    } else {
-      setIsAuthModalOpen(true);
-    }
+    setIsAdminViewActive(true);
   };
 
   const handleGoogleSignIn = async () => {
+    setAuthError(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
       if (result && result.user) {
         const email = result.user.email;
-        if (email === 'ilhamabdillah987@gmail.com') {
-          setCurrentUserEmail(email);
-          setIsAuthModalOpen(false);
-          setIsAdminViewActive(true);
-        } else {
-          showConfirm({
-            title: 'Akses Ditolak',
-            message: `Akses khusus Administrator. Email '${email}' bukan email admin terdaftar. Silakan login sebagai ilhamabdillah987@gmail.com.`,
-            cancelText: 'Tutup',
-            confirmText: 'Selesai',
-            onConfirm: () => {}
-          });
+        setCurrentUserEmail(email);
+        if (email) {
+          localStorage.setItem('raport_admin_email', email);
         }
+        setIsAuthModalOpen(false);
+        setIsAdminViewActive(true);
       }
     } catch (err) {
       console.warn("Google Sign-In Error. Fallback support active.", err);
       showConfirm({
-        title: 'Sign-In Tertunda',
-        message: 'Google Sign-In tidak dapat membuka popup di dalam sandbox. Silakan gunakan metode "Masuk Instan (Simulasi)" untuk pengujian gratis.',
-        cancelText: 'Mengerti',
+        title: 'Sign-In Tertunda (Masalah Sandbox)',
+        message: 'Google Sign-In tidak dapat membuka popup karena pembatasan sandbox di web preview ini. Mohon gunakan panel "Masuk via Google Simulator" dengan mengetik email Anda langsung.',
+        cancelText: 'Tutup',
         confirmText: 'Lanjutkan',
         onConfirm: () => {}
       });
@@ -887,19 +944,158 @@ export default function App() {
 
   const handleManualEmailLogin = () => {
     const trimmed = adminAuthInputEmail.trim().toLowerCase();
-    if (trimmed === 'ilhamabdillah987@gmail.com') {
+    if (trimmed) {
       setCurrentUserEmail(trimmed);
+      localStorage.setItem('raport_admin_email', trimmed);
       setIsAuthModalOpen(false);
       setIsAdminViewActive(true);
     } else {
       showConfirm({
-        title: 'Akses Ditolak',
-        message: `Silakan ketik email administrator yang valid: ilhamabdillah987@gmail.com`,
+        title: 'Input Tidak Valid',
+        message: 'Ketik email Google atau nama akun simulasi yang valid.',
         cancelText: 'Tutup',
         confirmText: 'Selesai',
         onConfirm: () => {}
       });
     }
+  };
+
+  // Login handler for designated teacher accounts
+  const handleTeacherLogIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    if (!teacherInputUsername.trim() || !teacherInputPassword.trim()) {
+      setAuthError("Username dan password wajib diisi");
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/teacher-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: teacherInputUsername.trim(),
+          password: teacherInputPassword.trim()
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const teacherInfo = data.teacher;
+        setCurrentTeacher(teacherInfo);
+        localStorage.setItem('raport_current_teacher', JSON.stringify(teacherInfo));
+        setIsAuthModalOpen(false);
+        setTeacherInputUsername('');
+        setTeacherInputPassword('');
+        setAuthError(null);
+
+        showConfirm({
+          title: 'Sukses Masuk',
+          message: `Selamat datang Wali Kelas ${teacherInfo.waliKelas}! Anda sekarang dapat mengisi dan melihat seluruh identitas santri kelas Anda.`,
+          cancelText: 'Lanjut',
+          confirmText: 'OK',
+          onConfirm: () => {}
+        });
+
+        if (teacherInfo.waliKelas) {
+          handleSelectClass(teacherInfo.waliKelas);
+        }
+      } else {
+        const errData = await res.json();
+        setAuthError(errData.error || "Gagal masuk. Username atau sandi salah.");
+      }
+    } catch (err) {
+      console.error("Gagal melakukan login guru:", err);
+      setAuthError("Koneksi gagal atau server terputus.");
+    }
+  };
+
+  // CRUD actions helper for registering teachers
+  const handleSaveTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teacherFormUsername.trim() || (!editingTeacherUsername && !teacherFormPassword.trim()) || !teacherFormWaliKelas) {
+      showConfirm({
+        title: 'Formulir Belum Lengkap',
+        message: 'Mohon isi username, password, dan pilihan kelas wali secara valid.',
+        cancelText: 'Tutup',
+        confirmText: 'Selesai',
+        onConfirm: () => {}
+      });
+      return;
+    }
+
+    try {
+      const isEditing = editingTeacherUsername !== null;
+      const url = isEditing ? `/api/teachers/${encodeURIComponent(editingTeacherUsername!)}` : '/api/teachers';
+      const method = isEditing ? 'PUT' : 'POST';
+      const body: any = {
+        username: teacherFormUsername.trim().toLowerCase(),
+        waliKelas: teacherFormWaliKelas
+      };
+      if (teacherFormPassword) {
+        body.password = teacherFormPassword;
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        showConfirm({
+          title: 'Simpan Sukses',
+          message: isEditing ? `Akun guru '${teacherFormUsername}' berhasil diperbarui.` : `Akun guru '${teacherFormUsername}' berhasil didaftarkan.`,
+          cancelText: 'Mengerti',
+          confirmText: 'Selesai',
+          onConfirm: () => {}
+        });
+        setTeacherFormUsername('');
+        setTeacherFormPassword('');
+        setTeacherFormWaliKelas('');
+        setEditingTeacherUsername(null);
+        fetchTeachers();
+        fetchAdminStats();
+      } else {
+        const errData = await res.json();
+        showConfirm({
+          title: 'Gagal Tersimpan',
+          message: errData.error || 'Gagal menyimpan data guru.',
+          cancelText: 'Tutup',
+          confirmText: 'Selesai',
+          onConfirm: () => {}
+        });
+      }
+    } catch (err) {
+      console.error("Gagal menyimpan guru:", err);
+    }
+  };
+
+  // Remove teacher
+  const handleDeleteTeacher = async (usernameStr: string) => {
+    showConfirm({
+      title: 'Hapus Akun Guru',
+      message: `Hapus akun guru '${usernameStr}' secara permanen dari server? Data wali kelas akan dinonaktifkan.`,
+      isDanger: true,
+      cancelText: 'Batal',
+      confirmText: 'YA, HAPUS AKUN',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/teachers/${encodeURIComponent(usernameStr)}`, {
+            method: 'DELETE'
+          });
+          if (res.ok) {
+            fetchTeachers();
+            fetchAdminStats();
+          } else {
+            const errData = await res.json();
+            alert("Gagal menghapus guru: " + errData.error);
+          }
+        } catch (err) {
+          console.error("Error menghapus guru:", err);
+        }
+      }
+    });
   };
   
   // Custom Confirmation Modal State & Handler (Bypasses iframe alert/confirm limitations)
@@ -2329,21 +2525,21 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
         {/* Admin Navigation Bar */}
-        <header className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white py-6 px-8 flex items-center justify-between no-print shadow-lg">
+        <header className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white py-6 px-8 flex items-center justify-between no-print shadow-lg shrink-0">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-white/15 rounded-2xl flex items-center justify-center text-2xl border border-white/20">
               👑
             </div>
             <div>
               <h1 className="text-sm font-black uppercase tracking-wider">DASBOR ADMINISTRATOR AL-HIKMAH</h1>
-              <p className="text-[10px] text-blue-200/80 font-bold uppercase tracking-widest mt-0.5">Pemantauan Pengisian Data Raport Terpusat</p>
+              <p className="text-[10px] text-blue-200/80 font-bold uppercase tracking-widest mt-0.5">Sistem Integrasi Akun Guru & Monitoring Nilai Terpusat</p>
             </div>
           </div>
           
           <div className="flex items-center gap-4">
             <div className="hidden md:flex flex-col text-right">
               <span className="text-[9px] text-blue-200/60 font-black uppercase tracking-wider">Sudah Masuk Sebagai:</span>
-              <span className="text-[11px] font-black text-amber-400">{currentUserEmail}</span>
+              <span className="text-[11px] font-black text-amber-400 capitalize">{currentUserEmail}</span>
             </div>
             
             <button 
@@ -2359,10 +2555,36 @@ export default function App() {
           </div>
         </header>
 
+        {/* Tab Selection */}
+        <div className="bg-white border-b border-slate-200 py-4 px-6 md:px-8 flex justify-center no-print shrink-0">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full max-w-md border border-slate-200/60 shadow-inner">
+            <button 
+              onClick={() => setAdminSubTab('stats')}
+              className={`flex-1 py-3 text-[10px] font-black text-center uppercase tracking-widest rounded-xl transition-all duration-200 ${
+                adminSubTab === 'stats' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              📊 Pemantauan Kelas
+            </button>
+            <button 
+              onClick={() => {
+                setAdminSubTab('teachers');
+                fetchTeachers();
+              }}
+              className={`flex-1 py-3 text-[10px] font-black text-center uppercase tracking-widest rounded-xl transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                adminSubTab === 'teachers' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              👤 Kelola Akun Guru
+            </button>
+          </div>
+        </div>
+
         {/* Main Dashboard Workspace */}
-        <main className="flex-grow p-6 md:p-10 max-w-7xl w-full mx-auto space-y-8 animate-in fade-in duration-300">
-          
-          {/* Quick Statistics Overview Grid */}
+        <main className="flex-grow p-6 md:p-10 max-w-7xl w-full mx-auto space-y-8 animate-in fade-in duration-300 overflow-y-auto">
+          {adminSubTab === 'stats' ? (
+            <>
+              {/* Quick Statistics Overview Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-5">
               <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
@@ -2481,15 +2703,15 @@ export default function App() {
                         <div className="flex gap-2">
                           <button 
                             onClick={() => handleViewAdminClassDetail(cls.name)}
-                            className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all cursor-pointer text-xs font-bold uppercase flex items-center gap-1.5"
+                            className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all cursor-pointer text-xs font-bold uppercase flex items-center gap-1.5 border border-slate-200/40 shadow-sm"
                             title="Tampilkan Santri"
                           >
-                            <span>🔍</span> {selectedAdminClassDetail === cls.name ? 'TUTUP' : 'PENGISI'}
+                            <span>🔍</span> {selectedAdminClassDetail === cls.name ? 'TUTUP' : 'PENGISI & DATA NILAI'}
                           </button>
                           
                           <a 
                             href={`/api/classes-download/${encodeURIComponent(cls.name)}`}
-                            className={`p-2.5 rounded-xl transition-all text-xs text-center flex items-center justify-center font-bold uppercase ${
+                            className={`p-2.5 rounded-xl transition-all text-xs text-center flex items-center justify-center font-bold uppercase shadow-sm ${
                               cls.hasData 
                                 ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-100 cursor-pointer' 
                                 : 'bg-slate-50 opacity-40 pointer-events-none text-slate-300'
@@ -2504,11 +2726,14 @@ export default function App() {
 
                     {/* Class Students Details Panel */}
                     {selectedAdminClassDetail === cls.name && (
-                      <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                          <h5 className="text-[10px] uppercase font-black text-slate-500 tracking-wider">
-                            Daftar Santri Kelas {cls.name} ({adminSelectedClassStudents.length} Santri)
+                      <div className="bg-white rounded-3xl border border-slate-200 p-6 space-y-6 animate-in slide-in-from-top-3 duration-250 shadow-md">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200/60 pb-4 gap-4">
+                          <h5 className="text-[11px] uppercase font-black text-slate-500 tracking-wider flex items-center gap-2">
+                            <FileText size={16} className="text-blue-500" /> Ringkasan Nilai Komprehensif Kelas {cls.name} ({adminSelectedClassStudents.length} Santri)
                           </h5>
+                          <div className="text-[10px] font-black uppercase text-slate-400">
+                            Wali Kelas: <span className="text-indigo-600">{cls.waliKelas || '-'}</span>
+                          </div>
                         </div>
 
                         {adminSelectedClassStudents.length === 0 ? (
@@ -2516,56 +2741,118 @@ export default function App() {
                             Belum ada santri yang dimasukkan di kelas ini.
                           </p>
                         ) : (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left text-[11px] font-bold text-slate-600 border-collapse">
-                              <thead>
-                                <tr className="border-b border-slate-100 text-slate-400 uppercase text-[9px] tracking-wider font-extrabold bg-slate-50/50">
-                                  <th className="py-2.5 px-3 w-10">No</th>
-                                  <th className="py-2.5 px-3">Nama Santri</th>
-                                  <th className="py-2.5 px-3">Nomor Induk</th>
-                                  <th className="py-2.5 px-3">Kehadiran (S/I/A)</th>
-                                  <th className="py-2.5 px-3">Status Rapor</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {adminSelectedClassStudents.map((s, idx) => {
+                          <div className="space-y-6">
+                            {/* Scrollable Grand Score Spreadsheet Matrix */}
+                            <div>
+                              <div className="flex items-center gap-1.5 mb-2.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                                <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">MATRIKS MASTER NILAI SANTRI (TULIS / LISAN)</span>
+                              </div>
+                              <div className="overflow-x-auto border border-slate-200 rounded-2xl max-h-[400px] overflow-y-auto shadow-inner bg-slate-50/50">
+                                <table className="w-full text-left text-[10px] font-black text-slate-600 border-collapse">
+                                  <thead>
+                                    <tr className="border-b border-slate-200 text-slate-500 uppercase text-[8px] tracking-wider font-black bg-slate-100/80 sticky top-0 z-10">
+                                      <th className="py-3 px-4 w-12 text-center bg-slate-100/90 shadow-[0_1px_0_rgba(226,232,240,1)]">No</th>
+                                      <th className="py-3 px-4 min-w-[160px] bg-slate-100/90 shadow-[0_1px_0_rgba(226,232,240,1)]">Nama Santri</th>
+                                      <th className="py-3 px-4 w-28 bg-slate-100/90 font-mono shadow-[0_1px_0_rgba(226,232,240,1)]">NO INDUK</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Al-Qur'an</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Tajwid</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Fiqih</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Tauhid</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Hadits</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Akhlaq</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Tarikh/Sirah</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Bahasa Arab</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Imla/Khat</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Nahwu/Shorof</th>
+                                      <th className="py-3 px-4 text-center bg-slate-100/95 shadow-[0_1px_0_rgba(226,232,240,1)]">Tahfidz</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {adminSelectedClassStudents.map((s, idx) => {
+                                      const getSubj = (name: string) => {
+                                        const sub = (s.subjects || []).find((x: any) => x.name.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(x.name.toLowerCase()));
+                                        if (!sub) return { tulis: '-', lisan: '-' };
+                                        return {
+                                          tulis: sub.tulis?.nilai !== undefined ? sub.tulis.nilai : '-',
+                                          lisan: sub.lisan?.nilai !== undefined ? sub.lisan.nilai : '-'
+                                        };
+                                      };
+
+                                      return (
+                                        <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-100/40 bg-white select-none transition-colors">
+                                          <td className="py-3 px-4 text-slate-400 font-extrabold text-center border-r border-slate-100">{idx + 1}</td>
+                                          <td className="py-3 px-4 text-slate-800 font-black uppercase text-[10px] tracking-tight border-r border-slate-105">{s.name}</td>
+                                          <td className="py-3 px-4 text-slate-500 font-mono text-[9px] border-r border-slate-100">{s.nomorInduk || '-'}</td>
+                                          {[
+                                            'Al-Qur\'an', 'Tajwid', 'Fiqih', 'Tauhid', 'Hadits',
+                                            'Akhlaq', 'Tarikh', 'Bahasa Arab', 'Imla', 'Nahwu', 'Tahfidz'
+                                          ].map(subName => {
+                                            const scoreInfo = getSubj(subName);
+                                            return (
+                                              <td key={subName} className="py-2.5 px-3 text-center border-r border-slate-100">
+                                                <div className="flex flex-col items-center justify-center gap-0.5">
+                                                  <span className="text-slate-700 font-bold">T: {scoreInfo.tulis}</span>
+                                                  <span className="text-indigo-600/80 text-[8px] font-black">L: {scoreInfo.lisan}</span>
+                                                </div>
+                                              </td>
+                                            );
+                                          })}
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* Attendance and data completeness */}
+                            <div>
+                              <div className="flex items-center gap-1.5 mb-2.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+                                <span className="text-[9px] font-black uppercase text-slate-450 tracking-wider">DAFTAR ABSENSI & KELENGKAPAN DATA</span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {adminSelectedClassStudents.map(s => {
+                                  const activeAttendance = s.behavior || { sick: 0, permission: 0, alfa: 0 };
                                   const subjectsCount = s.subjects ? s.subjects.length : 0;
                                   const hasIdentity = s.identity && s.identity.fullName;
                                   return (
-                                    <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50/30">
-                                      <td className="py-2 px-3 text-slate-400 font-extrabold">{idx + 1}</td>
-                                      <td className="py-2 px-3 text-slate-800 font-black uppercase text-[10px]">{s.name}</td>
-                                      <td className="py-2 px-3 text-slate-500 font-mono text-[10px]">{s.nomorInduk || '-'}</td>
-                                      <td className="py-2 px-3 text-slate-600 text-[10px]">
-                                        {s.behavior?.sick || 0}S / {s.behavior?.permission || 0}I / {s.behavior?.alfa || 0}A
-                                      </td>
-                                      <td className="py-2 px-3">
-                                        <div className="flex gap-1.5 flex-wrap">
+                                    <div key={s.id} className="flex justify-between items-center bg-slate-50/70 p-4 rounded-2xl border border-slate-100">
+                                      <div className="flex flex-col">
+                                        <span className="text-[10px] font-black text-slate-800 uppercase">{s.name}</span>
+                                        <span className="text-[8px] font-bold text-slate-400 mt-0.5">NIS: {s.nomorInduk || '-'}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex gap-1.5">
                                           {subjectsCount > 0 ? (
                                             <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[8px] uppercase tracking-wider font-black border border-emerald-100">
                                               {subjectsCount} Nilai
                                             </span>
                                           ) : (
                                             <span className="px-2 py-0.5 bg-rose-50 text-rose-500 rounded text-[8px] uppercase tracking-wider font-black border border-rose-100">
-                                              Nilai Kosong
+                                              Kosong
                                             </span>
                                           )}
                                           {hasIdentity ? (
                                             <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[8px] uppercase tracking-wider font-black border border-purple-100">
-                                              Identitas OK
+                                              ID OK
                                             </span>
                                           ) : (
                                             <span className="px-2 py-0.5 bg-slate-100 text-slate-400 rounded text-[8px] uppercase tracking-wider font-black">
-                                              Id Kosong
+                                              ID Kosong
                                             </span>
                                           )}
                                         </div>
-                                      </td>
-                                    </tr>
+                                        <span className="text-[9px] font-black text-slate-500 uppercase bg-white border border-slate-150 px-2.5 py-1 rounded-lg">
+                                          🤒 S: {activeAttendance.sick || 0} | ✉️ I: {activeAttendance.permission || 0} | 🚫 A: {activeAttendance.alfa || 0}
+                                        </span>
+                                      </div>
+                                    </div>
                                   );
                                 })}
-                              </tbody>
-                            </table>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -2575,6 +2862,158 @@ export default function App() {
               </div>
             )}
           </div>
+        </>
+      ) : (
+            /* --- Tab 2: Manage Accounts of teachers inside App ---- */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in duration-350">
+              
+              {/* Teacher Form Card - Left Column */}
+              <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
+                <div>
+                  <h3 className="text-sm font-black text-slate-850 uppercase tracking-tight flex items-center gap-2">
+                    {editingTeacherUsername ? '✍️ Edit Akun Guru' : '👤 Buat Akun Guru Baru'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Isi username, kata sandi, dan kelas wali gurunya.</p>
+                </div>
+
+                <form onSubmit={handleSaveTeacher} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Nama Pengguna (Username)</label>
+                    <input 
+                      type="text"
+                      className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
+                      placeholder="Contoh: ustadz_ahmad..."
+                      disabled={editingTeacherUsername !== null}
+                      value={teacherFormUsername}
+                      onChange={e => setTeacherFormUsername(e.target.value.replace(/\s+/g, ''))}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">
+                      {editingTeacherUsername ? 'Kata Sandi Baru (Kosong jika tak diubah)' : 'Kata Sandi (Password)'}
+                    </label>
+                    <input 
+                      type="password"
+                      className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
+                      placeholder="Masukkan kata sandi guru..."
+                      value={teacherFormPassword}
+                      onChange={e => setTeacherFormPassword(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Wali Kelas Untuk Pendidikan</label>
+                    <select
+                      className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
+                      value={teacherFormWaliKelas}
+                      onChange={e => setTeacherFormWaliKelas(e.target.value)}
+                    >
+                      <option value="">-- Pilih Kelas Wali --</option>
+                      {CLASSES.map(cls => (
+                        <option key={cls} value={cls}>Kelas {cls}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {authError && (
+                    <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-[9px] font-black uppercase text-rose-500">
+                      ⚠️ {authError}
+                    </div>
+                  )}
+
+                  <div className="pt-4 flex gap-3">
+                    <button 
+                      type="submit"
+                      className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-[10px] tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer text-center"
+                    >
+                      {editingTeacherUsername ? 'PERBARUI AKUN' : 'DAFTARKAN GURU'}
+                    </button>
+                    {editingTeacherUsername && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setTeacherFormUsername('');
+                          setTeacherFormPassword('');
+                          setTeacherFormWaliKelas('');
+                          setEditingTeacherUsername(null);
+                        }}
+                        className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-500 text-[10px] font-bold uppercase rounded-xl transition-colors border border-slate-200 cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              {/* Registered Teachers List - Right Column */}
+              <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                    👤 Guru Kelas & Wali Kelas Terdaftar
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Daftar Guru binaan Pondok Pesantren Modern Al-Hikmah terintegrasi.</p>
+                </div>
+
+                {isTeachersLoading ? (
+                  <div className="py-16 text-center">
+                    <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase mt-4 tracking-widest">Memuat database guru...</p>
+                  </div>
+                ) : teachersList.length === 0 ? (
+                  <div className="py-20 text-center border-2 border-dashed border-slate-100 rounded-3xl">
+                    <span className="text-3xl block filter grayscale mb-2">👤</span>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Belum ada akun Guru yang didaftarkan.</p>
+                    <p className="text-[9px] text-slate-400 uppercase mt-1">Gunakan formulir sebelah kiri untuk membuat akun pertama.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3.5">
+                    {teachersList.map((teacher) => (
+                      <div 
+                        key={teacher.username} 
+                        className="flex items-center justify-between p-4.5 bg-slate-50/60 rounded-2xl border border-slate-100 hover:border-slate-200 transition-all shadow-sm"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-indigo-50 text-indigo-700 rounded-xl flex items-center justify-center font-bold text-sm uppercase">
+                            {teacher.username.charAt(0)}
+                          </div>
+                          <div>
+                            <span className="text-[10px] tracking-widest font-extrabold text-indigo-500 uppercase font-sans">GURU KELAS</span>
+                            <h4 className="text-xs font-black text-slate-800 capitalize leading-tight mt-0.5">{teacher.username}</h4>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase leading-none mt-1">
+                              Wali Kelas: <span className="text-slate-600 font-extrabold">Kelas {teacher.waliKelas}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingTeacherUsername(teacher.username);
+                              setTeacherFormUsername(teacher.username);
+                              setTeacherFormPassword('');
+                              setTeacherFormWaliKelas(teacher.waliKelas);
+                            }}
+                            className="p-2 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors uppercase font-black text-[9px] tracking-wider cursor-pointer border border-slate-200"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTeacher(teacher.username)}
+                            className="p-2 px-3.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors uppercase font-black text-[9px] tracking-wider cursor-pointer border border-rose-100"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
         </main>
       </div>
     );
