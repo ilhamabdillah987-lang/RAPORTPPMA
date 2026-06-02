@@ -697,6 +697,55 @@ const getHuruf = (nilai: number | string) => {
   return "D";
 };
 
+const safeLocalStorageSetItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn(`Gagal menyimpan ke localStorage untuk key "${key}":`, error);
+  }
+};
+
+const compressImage = (file: File, maxWidth = 300, maxHeight = 400): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Calculate aspect ratio
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        } else {
+          resolve(event.target?.result as string || '');
+        }
+      };
+      img.onerror = () => resolve('');
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function App() {
   const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];
 
@@ -898,22 +947,24 @@ export default function App() {
 
   const [showSheetPreview, setShowSheetPreview] = useState(false);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, isEditingModal = false) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, isEditingModal = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
+    try {
+      const base64String = await compressImage(file, 240, 320); // standard 3x4 portrait proportions
+      if (!base64String) return;
+
       if (isEditingModal && editingStudent) {
         setEditingStudent({ ...editingStudent, photoUrl: base64String });
       } else if (selectedStudent) {
         const studentId = selectedStudent.id;
         setStudentsList(prev => prev.map(s => s.id === studentId ? { ...s, photoUrl: base64String } : s));
-        setDoc(doc(db, 'students', studentId), { photoUrl: base64String, updatedAt: new Date().toISOString() }, { merge: true });
+        await setDoc(doc(db, 'students', studentId), { photoUrl: base64String, updatedAt: new Date().toISOString() }, { merge: true });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Gagal memproses unggahan foto:", err);
+    }
   };
 
   // Close sidebar on mobile when student changes
@@ -942,6 +993,17 @@ export default function App() {
 
   // Fetch configs from Firebase
   useEffect(() => {
+    // Reset all class-specific config states to prevent bleeding from the previous class
+    setGlobalWaliKelas('');
+    setGlobalWaliKelasPutra('');
+    setGlobalWaliKelasPutri('');
+    setGlobalNamaKelas('');
+    setGlobalTanggalRaport('20 Desember 2025');
+    setGlobalKepala('');
+    setGlobalTanggalKenaikan('21 Juni 2026');
+
+    if (!selectedClass) return;
+
     // Config keys to listen to
     const configKeys = [
       `wali_kelas_${selectedClass}`,
@@ -957,8 +1019,8 @@ export default function App() {
     const unsubscribers = configKeys.map(key => {
       return onSnapshot(doc(db, 'configs', key), (snapshot) => {
         if (snapshot.exists()) {
-          const val = snapshot.data().value;
-          localStorage.setItem(`raport_config_cache_${key}`, val);
+          const val = snapshot.data().value || '';
+          safeLocalStorageSetItem(`raport_config_cache_${key}`, val);
           if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(val);
           if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(val);
           if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(val);
@@ -980,8 +1042,14 @@ export default function App() {
             if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(cachedVal);
             if (key === 'al_hikmah_custom_logo') setLogoUrl(cachedVal);
           } else {
-            if (key.startsWith('tanggal_raport_')) setGlobalTanggalRaport('20 Desember 2025');
-            if (key.startsWith('tanggal_kenaikan_')) setGlobalTanggalKenaikan('21 Juni 2026');
+            // Explicitly clear key when no database/cache value exists
+            if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas('');
+            if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra('');
+            if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri('');
+            if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas('');
+            if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala('');
+            if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport('20 Desember 2025');
+            if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan('21 Juni 2026');
           }
         }
       }, (error) => {
@@ -997,8 +1065,13 @@ export default function App() {
           if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(cachedVal);
           if (key === 'al_hikmah_custom_logo') setLogoUrl(cachedVal);
         } else {
-          if (key.startsWith('tanggal_raport_')) setGlobalTanggalRaport('20 Desember 2025');
-          if (key.startsWith('tanggal_kenaikan_')) setGlobalTanggalKenaikan('21 Juni 2026');
+          if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas('');
+          if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra('');
+          if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri('');
+          if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas('');
+          if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala('');
+          if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport('20 Desember 2025');
+          if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan('21 Juni 2026');
         }
       });
     });
@@ -1006,19 +1079,17 @@ export default function App() {
     return () => unsubscribers.forEach(unsub => unsub());
   }, [selectedClass]);
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        try {
+      try {
+        const base64 = await compressImage(file, 200, 200);
+        if (base64) {
           await setDoc(doc(db, 'configs', 'al_hikmah_custom_logo'), { value: base64, updatedAt: new Date().toISOString() });
-        } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, 'configs/al_hikmah_custom_logo');
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, 'configs/al_hikmah_custom_logo');
+      }
     }
   };
 
@@ -1060,7 +1131,7 @@ export default function App() {
       // Sort by noUrut
       students.sort((a, b) => (a.noUrut || 0) - (b.noUrut || 0));
       setStudentsList(students);
-      localStorage.setItem(`raport_students_cache_${className}`, JSON.stringify(students));
+      safeLocalStorageSetItem(`raport_students_cache_${className}`, JSON.stringify(students));
     } catch (e) {
       handleFirestoreError(e, OperationType.GET, 'students');
       
@@ -1073,7 +1144,7 @@ export default function App() {
           if (data && data.students && data.students.length > 0) {
             console.log('Berhasil membuat cadangan dari data server:', data.students.length);
             setStudentsList(data.students);
-            localStorage.setItem(`raport_students_cache_${className}`, JSON.stringify(data.students));
+            safeLocalStorageSetItem(`raport_students_cache_${className}`, JSON.stringify(data.students));
             setIsLoading(false);
             return;
           }
@@ -1111,7 +1182,7 @@ export default function App() {
 
   const handleSelectClass = (className: string) => {
     setSelectedClass(className);
-    localStorage.setItem('selected_class', className);
+    safeLocalStorageSetItem('selected_class', className);
     setCurrentIndex(0);
   };
 
@@ -1297,7 +1368,7 @@ export default function App() {
   // Synchronize student list to client-side localStorage cache and back up to local Express server
   useEffect(() => {
     if (selectedClass && studentsList.length > 0) {
-      localStorage.setItem(`raport_students_cache_${selectedClass}`, JSON.stringify(studentsList));
+      safeLocalStorageSetItem(`raport_students_cache_${selectedClass}`, JSON.stringify(studentsList));
       fetch('/api/backup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1319,7 +1390,7 @@ export default function App() {
         const data = await res.json();
         if (data && data.students && data.students.length > 0) {
           setStudentsList(data.students);
-          localStorage.setItem(`raport_students_cache_${classNameStr}`, JSON.stringify(data.students));
+          safeLocalStorageSetItem(`raport_students_cache_${classNameStr}`, JSON.stringify(data.students));
           if (!quiet) {
             setSyncStatus('success');
             setTimeout(() => setSyncStatus('idle'), 3000);
@@ -1673,7 +1744,7 @@ export default function App() {
           
           // 2. Persist to client-side localStorage cache immediately
           if (selectedClass) {
-            localStorage.setItem(`raport_students_cache_${selectedClass}`, JSON.stringify(updated));
+            safeLocalStorageSetItem(`raport_students_cache_${selectedClass}`, JSON.stringify(updated));
             
             // 3. Back up to local Express server
             fetch('/api/backup', {
@@ -2241,7 +2312,7 @@ export default function App() {
     );
   }
 
-  if (false) {
+  if (isAdminViewActive) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
         {/* Admin Navigation Bar */}
@@ -2498,55 +2569,184 @@ export default function App() {
 
   if (!selectedClass) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans">
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans relative overflow-x-hidden">
+        {/* Subtle decorative background circles */}
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/5 rounded-full pointer-events-none blur-3xl"></div>
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-500/5 rounded-full pointer-events-none blur-3xl"></div>
+
         <motion.div 
           initial="hidden"
           animate="visible"
           variants={fadeIn}
-          className="max-w-4xl w-full bg-white rounded-3xl shadow-[0_20px_50px_rgba(8,112,184,0.1)] overflow-hidden border border-blue-50"
+          className="max-w-4xl w-full bg-white rounded-[40px] shadow-[0_24px_70px_rgba(8,112,184,0.08)] overflow-hidden border border-blue-50/50 z-10"
         >
-          <div className="bg-gradient-to-br from-blue-700 to-blue-900 p-12 text-center text-white relative overflow-hidden">
+          <div className="bg-gradient-to-br from-indigo-700 via-blue-800 to-slate-900 p-12 text-center text-white relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
               <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white to-transparent"></div>
             </div>
             <div className="relative z-10">
-              <div className="bg-white/20 w-32 h-32 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/30 shadow-2xl overflow-hidden p-4">
+              <div className="bg-white/15 w-32 h-32 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden p-4">
                 {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain -rotate-12" />
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain -rotate-12 animate-pulse" />
                 ) : (
-                  <div className="text-white/50 text-xs font-black uppercase -rotate-12">No Logo</div>
+                  <div className="text-white/40 text-[10px] font-black uppercase -rotate-12 tracking-wider">Al-Hikmah</div>
                 )}
               </div>
-              <h1 className="text-3xl font-black tracking-tight uppercase">SISTEM RAPORT AL-HIKMAH</h1>
-              <p className="text-blue-100/80 text-sm mt-2 font-medium tracking-widest uppercase">Silahkan Pilih Tingkat Kelas</p>
+              <h1 className="text-3xl font-black tracking-tight uppercase leading-none">RAPORT AL-HIKMAH</h1>
+              <p className="text-blue-200/90 text-xs mt-3 font-bold tracking-[0.25em] uppercase">SINKRONISASI CLOUD & DATA TERPUSAT</p>
             </div>
-            <button 
-              className="absolute top-6 right-6 p-3 bg-white/10 opacity-0 pointer-events-none rounded-2xl transition-all text-white border border-white/10"
-            >
-              <LogOut size={20} />
-            </button>
           </div>
           
-          <div className="p-12">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              {classes.map((cls) => (
-                <motion.button
-                  key={cls}
-                  whileHover={{ scale: 1.05, translateY: -4 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => handleSelectClass(cls)}
-                  className="group relative overflow-hidden bg-slate-50 border-2 border-slate-100 hover:border-blue-500 hover:bg-white p-8 rounded-[32px] transition-all flex flex-col items-center gap-4 shadow-sm hover:shadow-xl hover:shadow-blue-100"
-                >
-                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl font-black text-slate-400 group-hover:text-blue-600 transition-colors shadow-sm group-hover:shadow-md">
-                    {cls}
-                  </div>
-                  <span className="text-xs font-black text-slate-400 group-hover:text-slate-800 uppercase tracking-widest transition-colors">KELAS {cls}</span>
-                  <div className="absolute top-0 right-0 w-12 h-12 bg-blue-600/5 rounded-bl-full translate-x-6 -translate-y-6 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform"></div>
-                </motion.button>
-              ))}
+          <div className="p-8 md:p-12">
+            <div className="text-center mb-10">
+              <span className="px-4 py-1.5 bg-slate-100 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-full">
+                Sistem Penilaian Semester Ganjil & Genap
+              </span>
+              <h2 className="text-slate-800 text-sm font-black uppercase tracking-wider mt-3">Silakan Pilih Tingkat Kelas Anda</h2>
+              <p className="text-[10px] uppercase font-bold text-slate-400 mt-1">Data tersimpan secara aman di dalam folder cloud server</p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
+              {classes.map((cls) => {
+                // Highly elegant color schemes per educational category
+                let activeBorder = 'hover:border-blue-500 hover:shadow-blue-50/70';
+                let tagBg = 'bg-blue-500/5 text-blue-600 border-blue-500/10';
+                let circleBg = 'bg-blue-500';
+                
+                if (cls.includes('MTs')) {
+                  activeBorder = 'hover:border-indigo-500 hover:shadow-indigo-50/70';
+                  tagBg = 'bg-indigo-50/80 text-indigo-700 border-indigo-100';
+                  circleBg = 'bg-indigo-600';
+                } else if (cls.includes('SMP')) {
+                  activeBorder = 'hover:border-emerald-500 hover:shadow-emerald-50/70';
+                  tagBg = 'bg-emerald-50/80 text-emerald-700 border-emerald-100';
+                  circleBg = 'bg-emerald-600';
+                } else if (cls.includes('SMA')) {
+                  activeBorder = 'hover:border-violet-500 hover:shadow-violet-50/70';
+                  tagBg = 'bg-violet-50/80 text-violet-700 border-violet-100';
+                  circleBg = 'bg-violet-600';
+                } else if (cls === 'ALUMNI') {
+                  activeBorder = 'hover:border-amber-500 hover:shadow-amber-50/70';
+                  tagBg = 'bg-amber-50/80 text-amber-700 border-amber-100';
+                  circleBg = 'bg-amber-600';
+                }
+
+                return (
+                  <motion.button
+                    key={cls}
+                    whileHover={{ scale: 1.04, y: -4 }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => handleSelectClass(cls)}
+                    className={`group relative overflow-hidden bg-white border-2 border-slate-100/80 ${activeBorder} p-5 rounded-[28px] transition-all flex flex-col items-center gap-3.5 shadow-sm hover:shadow-xl cursor-pointer`}
+                  >
+                    {/* Width adjusted label to ensure spelling is perfectly straight/unstacked ("lurus") */}
+                    <div className={`w-28 h-10 rounded-2xl flex items-center justify-center font-black text-sm tracking-wide transition-colors ${tagBg}`}>
+                      {cls}
+                    </div>
+
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="text-[9px] font-black text-slate-400 group-hover:text-slate-800 uppercase tracking-widest transition-colors">
+                        KELAS {cls}
+                      </span>
+                    </div>
+
+                    {/* Left little indicator circle */}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${circleBg} opacity-60`}></span>
+                      <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider">
+                        {cls === 'ALUMNI' ? 'Graduated' : 'Aktif'}
+                      </span>
+                    </div>
+
+                    <div className="absolute top-0 right-0 w-8 h-8 bg-slate-500/5 rounded-bl-full translate-x-4 -translate-y-4 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform"></div>
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {/* Elegant Administrator Access Action Panel */}
+            <div className="mt-12 pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">👑 Akses Khusus Administrator</h4>
+                <p className="text-[10px] font-extrabold text-slate-400 uppercase mt-0.5">Pantau progres pengisian raport seluruh kelas secara real-time</p>
+              </div>
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-[10px] tracking-widest uppercase rounded-2xl active:scale-95 transition-all shadow-lg hover:shadow-xl cursor-pointer flex items-center gap-2"
+              >
+                MASUK MENU ADMIN
+              </button>
             </div>
           </div>
         </motion.div>
+
+        {/* Beautiful Authentication Modal */}
+        {isAuthModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col relative"
+            >
+              <button 
+                onClick={() => setIsAuthModalOpen(false)}
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors rounded-xl font-bold cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-4 text-2xl border border-blue-100 shadow-sm">
+                  👑
+                </div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Akses Dasbor Admin</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1.5">Masuk untuk memantau data seluruh kelas</p>
+              </div>
+
+              <div className="space-y-6">
+                {/* Google Sign In Option */}
+                <button 
+                  onClick={handleGoogleSignIn}
+                  className="w-full flex items-center justify-center gap-3 px-5 py-3.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white font-extrabold text-xs tracking-wider uppercase rounded-2xl transition-all shadow-md cursor-pointer"
+                >
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  Masuk dengan Google
+                </button>
+
+                <div className="relative flex items-center justify-center my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-100"></div>
+                  </div>
+                  <span className="relative px-4 bg-white text-[9px] font-black text-slate-300 uppercase tracking-widest">Atau Masuk Instan (Iframe)</span>
+                </div>
+
+                {/* Email Sign In Fallback */}
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Email Administrator</label>
+                  <input 
+                    type="email"
+                    placeholder="ilhamabdillah987@gmail.com"
+                    value={adminAuthInputEmail}
+                    onChange={(e) => setAdminAuthInputEmail(e.target.value)}
+                    className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 placeholder-slate-300"
+                  />
+                </div>
+
+                <button 
+                  onClick={handleManualEmailLogin}
+                  className="w-full py-3.5 bg-blue-50 hover:bg-blue-100 active:scale-[0.98] text-blue-600 font-extrabold text-xs tracking-wider uppercase rounded-2xl transition-all border border-blue-100 cursor-pointer text-center"
+                >
+                  Lanjutkan Masuk
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     );
   }
@@ -2816,6 +3016,13 @@ export default function App() {
             </div>
           </div>
 
+          <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 p-4 rounded-2xl border border-emerald-550/10 text-center mt-4">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+              <span className="text-[10px] uppercase font-black tracking-widest text-emerald-800">Database Unlimited</span>
+            </div>
+            <p className="text-[9px] font-bold text-emerald-600 uppercase">Kapasitas: Tanpa Batas AKTIF</p>
+          </div>
 
         </div>
 
