@@ -749,9 +749,7 @@ const compressImage = (file: File, maxWidth = 300, maxHeight = 400): Promise<str
 export default function App() {
   const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];
 
-  const [selectedClass, setSelectedClass] = useState<string>(() => {
-    return localStorage.getItem('selected_class') || '10 SMA';
-  });
+  const [selectedClass, setSelectedClass] = useState<string>('');
   const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [globalWaliKelas, setGlobalWaliKelas] = useState<string>('');
   const [globalWaliKelasPutra, setGlobalWaliKelasPutra] = useState<string>('');
@@ -2595,7 +2593,7 @@ export default function App() {
                 )}
               </div>
               <h1 className="text-3xl font-black tracking-tight uppercase leading-none">RAPORT AL-HIKMAH</h1>
-              <p className="text-blue-200/90 text-xs mt-3 font-bold tracking-[0.25em] uppercase">SINKRONISASI CLOUD & DATA TERPUSAT</p>
+              <p className="text-blue-200/90 text-xs mt-3 font-bold tracking-[0.25em] uppercase">PONDOK PESANTREN MODERN AL-HIKMAH</p>
             </div>
           </div>
           
@@ -2605,7 +2603,6 @@ export default function App() {
                 Sistem Penilaian Semester Ganjil & Genap
               </span>
               <h2 className="text-slate-800 text-sm font-black uppercase tracking-wider mt-3">Silakan Pilih Tingkat Kelas Anda</h2>
-              <p className="text-[10px] uppercase font-bold text-slate-400 mt-1">Data tersimpan secara aman di dalam folder cloud server</p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
@@ -2664,29 +2661,6 @@ export default function App() {
                   </motion.button>
                 );
               })}
-            </div>
-
-            {/* Elegant Public Monitor Access Panel */}
-            <div className="mt-12 pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-center sm:text-left">
-                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 justify-center sm:justify-start">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 font-sans"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  Pemantauan Data Terisi
-                </h4>
-                <p className="text-[10px] font-extrabold text-slate-400 uppercase mt-0.5">Lihat hasil & progres pengisian data seluruh kelas secara realtime</p>
-              </div>
-              <button
-                onClick={() => {
-                  fetchStatusSummary();
-                  setIsMonitorModalOpen(true);
-                }}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-[10px] tracking-widest uppercase rounded-2xl active:scale-95 transition-all shadow-lg hover:shadow-xl cursor-pointer flex items-center gap-2"
-              >
-                📊 PANTAU INPUT REALTIME
-              </button>
             </div>
           </div>
         </motion.div>
