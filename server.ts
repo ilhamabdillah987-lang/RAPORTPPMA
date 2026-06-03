@@ -368,9 +368,9 @@ async function startServer() {
         return res.json([]);
       }
       const mapped = db.data.teachers.map(t => ({
-        username: t.username,
-        name: t.name || t.username,
-        waliKelas: t.waliKelas
+        username: t && t.username ? t.username : "unknown",
+        name: t && t.name ? t.name : (t && t.username ? t.username : "unknown"),
+        waliKelas: t && t.waliKelas ? t.waliKelas : ""
       }));
       res.json(mapped);
     } catch (err: any) {
@@ -397,7 +397,7 @@ async function startServer() {
         db.data.teachers = [];
       }
 
-      const exists = db.data.teachers.some(t => t.username.toLowerCase() === preservedUsername.toLowerCase());
+      const exists = db.data.teachers.some(t => t && t.username && t.username.toLowerCase() === preservedUsername.toLowerCase());
       if (exists) {
         return res.status(400).json({ error: "Username sudah digunakan" });
       }
@@ -442,7 +442,7 @@ async function startServer() {
         return res.status(404).json({ error: "Data teachers tidak ditemukan" });
       }
 
-      const idx = db.data.teachers.findIndex(t => t.username.toLowerCase() === username.toLowerCase());
+      const idx = db.data.teachers.findIndex(t => t && t.username && t.username.toLowerCase() === username.toLowerCase());
       if (idx === -1) {
         return res.status(404).json({ error: "Guru tidak ditemukan" });
       }
@@ -485,7 +485,7 @@ async function startServer() {
         return res.status(404).json({ error: "Guru tidak ditemukan" });
       }
 
-      const idx = db.data.teachers.findIndex(t => t.username.toLowerCase() === username.toLowerCase());
+      const idx = db.data.teachers.findIndex(t => t && t.username && t.username.toLowerCase() === username.toLowerCase());
       if (idx === -1) {
         return res.status(404).json({ error: "Guru tidak ditemukan" });
       }
@@ -517,7 +517,7 @@ async function startServer() {
         return res.status(400).json({ error: "Username atau password salah" });
       }
 
-      const teacher = db.data.teachers.find(t => t.username.toLowerCase() === username.toString().trim().toLowerCase());
+      const teacher = db.data.teachers.find(t => t && t.username && t.username.toLowerCase() === username.toString().trim().toLowerCase());
       if (!teacher) {
         return res.status(400).json({ error: "Username atau password salah" });
       }
