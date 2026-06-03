@@ -511,29 +511,32 @@ const db = new Low<Data>(adapter, defaultData);
   // Teacher login
   app.post("/api/auth/teacher-login", async (req, res) => {
     try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        return res.status(400).json({ error: "Username dan password diperlukan" });
+      const loginIdentifier = (req.body.name || req.body.username || "").toString().trim();
+      if (!loginIdentifier) {
+        return res.status(400).json({ error: "Nama guru diperlukan untuk masuk" });
       }
 
       if (!db.data || !db.data.teachers) {
-        return res.status(400).json({ error: "Username atau password salah" });
+        return res.status(400).json({ error: "Data guru belum diinisialisasi di sistem" });
       }
 
-      const teacher = db.data.teachers.find(t => t && t.username && t.username.toLowerCase() === username.toString().trim().toLowerCase());
+      const normalizedInput = loginIdentifier.toLowerCase().replace(/\s+/g, '');
+      const teacher = db.data.teachers.find(t => {
+        if (!t) return false;
+        const normName = t.name ? t.name.toLowerCase().replace(/\s+/g, '') : '';
+        const normUser = t.username ? t.username.toLowerCase().replace(/\s+/g, '') : '';
+        return normName === normalizedInput || normUser === normalizedInput;
+      });
+
       if (!teacher) {
-        return res.status(400).json({ error: "Username atau password salah" });
-      }
-
-      const matches = bcrypt.compareSync(password, teacher.pwdHash);
-      if (!matches) {
-        return res.status(400).json({ error: "Username atau password salah" });
+        return res.status(400).json({ error: "Nama guru tidak ditemukan di sistem. Hubungi administrator." });
       }
 
       res.json({
         success: true,
         teacher: {
           username: teacher.username,
+          name: teacher.name || teacher.username,
           waliKelas: teacher.waliKelas
         }
       });

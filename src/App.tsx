@@ -841,13 +841,10 @@ export default function App() {
 
   // Auto-save teacher registration
   useEffect(() => {
-    const isEditing = editingTeacherUsername !== null;
     const nameFilled = teacherFormName.trim().length >= 3;
-    const usernameFilled = teacherFormUsername.trim().length >= 3;
-    const passwordFilled = isEditing ? true : (teacherFormPassword.trim().length >= 4);
     const classFilled = teacherFormWaliKelas.trim().length > 0;
 
-    if (!nameFilled || !usernameFilled || !passwordFilled || !classFilled) {
+    if (!nameFilled || !classFilled) {
       setAutoSaveStatus('incomplete');
       return;
     }
@@ -866,7 +863,7 @@ export default function App() {
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [teacherFormName, teacherFormUsername, teacherFormPassword, teacherFormWaliKelas, editingTeacherUsername]);
+  }, [teacherFormName, teacherFormWaliKelas, editingTeacherUsername]);
 
   // Front-end Login Inputs inside Modal
   const [teacherInputUsername, setTeacherInputUsername] = useState('');
@@ -1013,12 +1010,13 @@ export default function App() {
     }
   };
 
-  // Login handler for designated teacher accounts
+  // Login handler for designated teacher accounts (single name field login, no password/username needed)
   const handleTeacherLogIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    if (!teacherInputUsername.trim() || !teacherInputPassword.trim()) {
-      setAuthError("Username dan password wajib diisi");
+    const enteredName = teacherInputUsername.trim();
+    if (!enteredName) {
+      setAuthError("Nama Lengkap wajib diisi");
       return;
     }
 
@@ -1027,8 +1025,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: teacherInputUsername.trim(),
-          password: teacherInputPassword.trim()
+          name: enteredName
         })
       });
 
@@ -1066,7 +1063,7 @@ export default function App() {
           handleSelectClass(teacherInfo.waliKelas);
         }
       } else {
-        setAuthError(resData.error || "Gagal masuk. Username atau sandi salah.");
+        setAuthError(resData.error || "Gagal masuk. Nama guru tidak terdaftar.");
       }
     } catch (err) {
       console.error("Gagal melakukan login guru:", err);
@@ -1141,14 +1138,18 @@ export default function App() {
   const handleAutoSaveTeacher = async () => {
     const isEditing = editingTeacherUsername !== null;
     const trimmedName = teacherFormName.trim();
-    const trimmedUsername = teacherFormUsername.trim();
-    const trimmedPassword = teacherFormPassword;
     const selectedWali = teacherFormWaliKelas.trim();
 
-    if (!trimmedName || !trimmedUsername || (!isEditing && !trimmedPassword) || !selectedWali) {
+    if (!trimmedName || !selectedWali) {
       setAutoSaveStatus('incomplete');
       return;
     }
+
+    // Dynamic generation of username & password to satisfy server constraints
+    const derivedUsername = isEditing 
+      ? editingTeacherUsername! 
+      : (trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '') + Math.floor(100 + Math.random() * 900));
+    const derivedPassword = "password123";
 
     setAutoSaveStatus('saving');
     setAutoSaveErrorMessage('');
@@ -1160,17 +1161,10 @@ export default function App() {
       
       const body: any = {
         name: trimmedName,
-        username: trimmedUsername,
-        waliKelas: selectedWali
+        username: derivedUsername,
+        waliKelas: selectedWali,
+        password: derivedPassword
       };
-      
-      if (isEditing) {
-        if (trimmedPassword) {
-          body.password = trimmedPassword;
-        }
-      } else {
-        body.password = trimmedPassword;
-      }
 
       console.log(`[Admin Auto-Save] Saving teacher via ${method} to ${url}`, body);
 
@@ -3034,14 +3028,14 @@ export default function App() {
               <div className="lg:col-span-12 xl:col-span-5 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
                 <div>
                   <h3 className="text-sm font-black text-slate-850 uppercase tracking-tight flex items-center gap-2">
-                    {editingTeacherUsername ? '✍️ Edit Akun Guru' : '👤 Buat Akun Guru Baru'}
+                    {editingTeacherUsername ? '✍️ EDIT DATA GURU' : '👤 INPUT DATA GURU & TUGAS WALI KELAS'}
                   </h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Isi nama, username, kata sandi, dan kelas wali gurunya.</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Cukup masukkan nama lengkap guru dan tentukan kelas binaannya. Sistem akan langsung mendaftarkan guru secara otomatis.</p>
                 </div>
 
                 <form onSubmit={handleSaveTeacher} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Nama Lengkap Guru</label>
+                     <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Nama Lengkap Guru</label>
                     <input 
                       type="text"
                       required
@@ -3049,33 +3043,6 @@ export default function App() {
                       placeholder="Contoh: Ustadz Ahmad Syarif, S.Pd..."
                       value={teacherFormName}
                       onChange={e => setTeacherFormName(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Nama Pengguna (Username untuk Login)</label>
-                    <input 
-                      type="text"
-                      required
-                      className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
-                      placeholder="Contoh: ahmad..."
-                      disabled={editingTeacherUsername !== null}
-                      value={teacherFormUsername}
-                      onChange={e => setTeacherFormUsername(e.target.value.replace(/\s+/g, ''))}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">
-                      {editingTeacherUsername ? 'Kata Sandi Baru (Kosong jika tak diubah)' : 'Kata Sandi (Password)'}
-                    </label>
-                    <input 
-                      type="password"
-                      required={editingTeacherUsername === null}
-                      className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
-                      placeholder="Masukkan kata sandi guru..."
-                      value={teacherFormPassword}
-                      onChange={e => setTeacherFormPassword(e.target.value)}
                     />
                   </div>
 
@@ -3097,7 +3064,7 @@ export default function App() {
                   {authError && (
                     <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-[9px] font-black uppercase text-rose-500">
                       ⚠️ {authError}
-                    </div>
+                     </div>
                   )}
 
                   <div className="pt-2">
@@ -3107,7 +3074,7 @@ export default function App() {
                         <div className="text-left">
                           <span className="text-[10px] font-black uppercase text-slate-500 block leading-tight">MENUNGGU INPUT LENGKAP</span>
                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide block mt-0.5">
-                            Lengkapi Nama, Username, Kata Sandi, dan Wali Kelas guru
+                            Lengkapi Nama Lengkap Guru dan Kelas Wali binaannya
                           </span>
                         </div>
                       </div>
@@ -3227,7 +3194,7 @@ export default function App() {
                             <span className="text-[10px] tracking-widest font-extrabold text-indigo-500 uppercase font-sans">GURU WALI KELAS</span>
                             <h4 className="text-xs font-black text-slate-800 capitalize leading-tight mt-0.5">{teacher.name || teacher.username}</h4>
                             <p className="text-[9px] font-bold text-slate-400 uppercase leading-none mt-1">
-                              ID Pengguna: <span className="text-indigo-600 font-extrabold">{teacher.username}</span> | Wali Kelas: <span className="text-slate-600 font-extrabold">Kelas {teacher.waliKelas}</span>
+                              Tugas Wali Kelas: <span className="text-slate-600 font-extrabold">Kelas {teacher.waliKelas}</span>
                             </p>
                           </div>
                         </div>
@@ -3237,8 +3204,6 @@ export default function App() {
                             onClick={() => {
                               setEditingTeacherUsername(teacher.username);
                               setTeacherFormName(teacher.name || teacher.username);
-                              setTeacherFormUsername(teacher.username);
-                              setTeacherFormPassword('');
                               setTeacherFormWaliKelas(teacher.waliKelas);
                             }}
                             className="p-2 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all uppercase font-black text-[9px] tracking-wider cursor-pointer border border-slate-200"
@@ -3332,30 +3297,22 @@ export default function App() {
             {activeAuthTab === 'teacher' ? (
               <form onSubmit={handleTeacherLogIn} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Nama Pengguna (Username)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Nama Lengkap Guru</label>
                   <input
                     type="text"
                     required
-                    className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold text-slate-705"
-                    placeholder="Masukkan username wali kelas..."
+                    className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold text-slate-700"
+                    placeholder="Masukkan nama lengkap sesuai yang diinput Admin..."
                     value={teacherInputUsername}
                     onChange={e => setTeacherInputUsername(e.target.value)}
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Kata Sandi (Password)</label>
-                  <input
-                    type="password"
-                    required
-                    className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold text-slate-705"
-                    placeholder="Masukkan password Anda..."
-                    value={teacherInputPassword}
-                    onChange={e => setTeacherInputPassword(e.target.value)}
-                  />
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider ml-1 mt-1 block">
+                    ⚡ Cukup masukkan nama Anda tanpa kata sandi / username
+                  </p>
                 </div>
                 <button
                   type="submit"
-                  className="w-full mt-6 py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer block text-center"
+                  className="w-full mt-4 py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer block text-center"
                 >
                   MASUK SEBAGAI GURU KELAS
                 </button>
