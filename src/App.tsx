@@ -992,9 +992,21 @@ export default function App() {
         })
       });
 
+      let resData;
+      try {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          resData = await res.json();
+        } else {
+          const text = await res.text();
+          resData = { error: text || `HTTP Error ${res.status}` };
+        }
+      } catch (errParsing) {
+        resData = { error: `Gagal memproses respon server (${res.status})` };
+      }
+
       if (res.ok) {
-        const data = await res.json();
-        const teacherInfo = data.teacher;
+        const teacherInfo = resData.teacher;
         setCurrentTeacher(teacherInfo);
         localStorage.setItem('raport_current_teacher', JSON.stringify(teacherInfo));
         setIsAuthModalOpen(false);
@@ -1014,8 +1026,7 @@ export default function App() {
           handleSelectClass(teacherInfo.waliKelas);
         }
       } else {
-        const errData = await res.json();
-        setAuthError(errData.error || "Gagal masuk. Username atau sandi salah.");
+        setAuthError(resData.error || "Gagal masuk. Username atau sandi salah.");
       }
     } catch (err) {
       console.error("Gagal melakukan login guru:", err);
@@ -1092,7 +1103,7 @@ export default function App() {
     
     const isEditing = editingTeacherUsername !== null;
     const trimmedName = teacherFormName.trim();
-    const trimmedUsername = teacherFormUsername.trim().toLowerCase();
+    const trimmedUsername = teacherFormUsername.trim();
     const trimmedPassword = teacherFormPassword;
     const selectedWali = teacherFormWaliKelas.trim();
 
@@ -1151,8 +1162,20 @@ export default function App() {
         body: JSON.stringify(body)
       });
 
+      let resData;
+      try {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          resData = await res.json();
+        } else {
+          const text = await res.text();
+          resData = { error: text || `HTTP Error ${res.status}` };
+        }
+      } catch (errParsing) {
+        resData = { error: `Gagal memproses respon server (${res.status})` };
+      }
+
       if (res.ok) {
-        const resData = await res.json();
         console.log("[Admin] Save teacher response:", resData);
         setAuthError(null);
         showConfirm({
@@ -1170,12 +1193,11 @@ export default function App() {
         fetchTeachers();
         fetchAdminStats();
       } else {
-        const errData = await res.json();
-        console.warn("[Admin] Save teacher failed:", errData);
-        setAuthError(errData.error || 'Gagal menyimpan data guru.');
+        console.warn("[Admin] Save teacher failed:", resData);
+        setAuthError(resData.error || 'Gagal menyimpan data guru.');
         showConfirm({
           title: 'Gagal Tersimpan',
-          message: errData.error || 'Gagal menyimpan data guru.',
+          message: resData.error || 'Gagal menyimpan data guru.',
           cancelText: 'Tutup',
           confirmText: 'Selesai',
           onConfirm: () => {}
@@ -3016,7 +3038,6 @@ export default function App() {
                     <input 
                       type="text"
                       required
-                      minLength={3}
                       className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
                       placeholder="Contoh: ahmad..."
                       disabled={editingTeacherUsername !== null}
@@ -3032,7 +3053,6 @@ export default function App() {
                     <input 
                       type="password"
                       required={editingTeacherUsername === null}
-                      minLength={4}
                       className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
                       placeholder="Masukkan kata sandi guru..."
                       value={teacherFormPassword}
