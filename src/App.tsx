@@ -1096,10 +1096,26 @@ export default function App() {
     const trimmedPassword = teacherFormPassword;
     const selectedWali = teacherFormWaliKelas.trim();
 
+    console.log("[Client] Submit handleSaveTeacher triggered:", {
+      isEditing,
+      trimmedName,
+      trimmedUsername,
+      passwordLength: trimmedPassword ? trimmedPassword.length : 0,
+      selectedWali
+    });
+
     if (!trimmedName || !trimmedUsername || (!isEditing && !trimmedPassword) || !selectedWali) {
+      const errorMsg = 'Mohon isi nama lengkap guru, username, password, dan pilihan kelas wali secara lengkap dan valid.';
+      setAuthError(errorMsg);
+      console.warn("[Client] Aborting submit: validation failed", {
+        trimmedName: !!trimmedName,
+        trimmedUsername: !!trimmedUsername,
+        password: !!trimmedPassword,
+        selectedWali: !!selectedWali
+      });
       showConfirm({
         title: 'Formulir Belum Lengkap',
-        message: 'Mohon isi nama lengkap guru, username, password, dan pilihan kelas wali secara valid.',
+        message: errorMsg,
         cancelText: 'Tutup',
         confirmText: 'Selesai',
         onConfirm: () => {}
@@ -1108,6 +1124,7 @@ export default function App() {
     }
 
     try {
+      setAuthError(null);
       const url = isEditing ? `/api/teachers/${encodeURIComponent(editingTeacherUsername!)}` : '/api/teachers';
       const method = isEditing ? 'PUT' : 'POST';
       
@@ -1137,6 +1154,7 @@ export default function App() {
       if (res.ok) {
         const resData = await res.json();
         console.log("[Admin] Save teacher response:", resData);
+        setAuthError(null);
         showConfirm({
           title: 'Simpan Sukses',
           message: isEditing ? `Akun guru '${trimmedUsername}' berhasil diperbarui.` : `Akun guru '${trimmedUsername}' berhasil didaftarkan.`,
@@ -1154,6 +1172,7 @@ export default function App() {
       } else {
         const errData = await res.json();
         console.warn("[Admin] Save teacher failed:", errData);
+        setAuthError(errData.error || 'Gagal menyimpan data guru.');
         showConfirm({
           title: 'Gagal Tersimpan',
           message: errData.error || 'Gagal menyimpan data guru.',
@@ -1164,6 +1183,7 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("[Admin] Gagal menyimpan guru:", err);
+      setAuthError(err.message || 'Koneksi gagal saat menghubungi server guru.');
       showConfirm({
         title: 'Koneksi Gagal',
         message: err.message || 'Gagal terhubung ke server database guru. Coba lagi.',

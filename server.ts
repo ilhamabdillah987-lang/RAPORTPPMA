@@ -380,9 +380,11 @@ async function startServer() {
 
   // Create a teacher account
   app.post("/api/teachers", async (req, res) => {
+    console.log("[Server] POST /api/teachers body payload:", req.body);
     try {
       const { username, password, waliKelas, name } = req.body;
       if (!username || !password || !waliKelas) {
+        console.warn("[Server] Validation failed for teacher creation:", { username, password: !!password, waliKelas });
         return res.status(400).json({ error: "Username, password, dan waliKelas harus diisi" });
       }
 
