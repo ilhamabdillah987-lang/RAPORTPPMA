@@ -1089,7 +1089,14 @@ export default function App() {
   // CRUD actions helper for registering teachers
   const handleSaveTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!teacherFormName.trim() || !teacherFormUsername.trim() || (!editingTeacherUsername && !teacherFormPassword.trim()) || !teacherFormWaliKelas) {
+    
+    const isEditing = editingTeacherUsername !== null;
+    const trimmedName = teacherFormName.trim();
+    const trimmedUsername = teacherFormUsername.trim().toLowerCase();
+    const trimmedPassword = teacherFormPassword;
+    const selectedWali = teacherFormWaliKelas.trim();
+
+    if (!trimmedName || !trimmedUsername || (!isEditing && !trimmedPassword) || !selectedWali) {
       showConfirm({
         title: 'Formulir Belum Lengkap',
         message: 'Mohon isi nama lengkap guru, username, password, dan pilihan kelas wali secara valid.',
@@ -1101,17 +1108,25 @@ export default function App() {
     }
 
     try {
-      const isEditing = editingTeacherUsername !== null;
       const url = isEditing ? `/api/teachers/${encodeURIComponent(editingTeacherUsername!)}` : '/api/teachers';
       const method = isEditing ? 'PUT' : 'POST';
+      
       const body: any = {
-        name: teacherFormName.trim(),
-        username: teacherFormUsername.trim().toLowerCase(),
-        waliKelas: teacherFormWaliKelas
+        name: trimmedName,
+        username: trimmedUsername,
+        waliKelas: selectedWali
       };
-      if (teacherFormPassword) {
-        body.password = teacherFormPassword;
+      
+      // If editing, password is optional. If creating, it's explicitly required.
+      if (isEditing) {
+        if (trimmedPassword) {
+          body.password = trimmedPassword;
+        }
+      } else {
+        body.password = trimmedPassword;
       }
+
+      console.log(`[Admin] Saving teacher via ${method} to ${url}`, body);
 
       const res = await fetch(url, {
         method,
@@ -1120,9 +1135,11 @@ export default function App() {
       });
 
       if (res.ok) {
+        const resData = await res.json();
+        console.log("[Admin] Save teacher response:", resData);
         showConfirm({
           title: 'Simpan Sukses',
-          message: isEditing ? `Akun guru '${teacherFormUsername}' berhasil diperbarui.` : `Akun guru '${teacherFormUsername}' berhasil didaftarkan.`,
+          message: isEditing ? `Akun guru '${trimmedUsername}' berhasil diperbarui.` : `Akun guru '${trimmedUsername}' berhasil didaftarkan.`,
           cancelText: 'Mengerti',
           confirmText: 'Selesai',
           onConfirm: () => {}
@@ -1136,6 +1153,7 @@ export default function App() {
         fetchAdminStats();
       } else {
         const errData = await res.json();
+        console.warn("[Admin] Save teacher failed:", errData);
         showConfirm({
           title: 'Gagal Tersimpan',
           message: errData.error || 'Gagal menyimpan data guru.',
@@ -1144,8 +1162,15 @@ export default function App() {
           onConfirm: () => {}
         });
       }
-    } catch (err) {
-      console.error("Gagal menyimpan guru:", err);
+    } catch (err: any) {
+      console.error("[Admin] Gagal menyimpan guru:", err);
+      showConfirm({
+        title: 'Koneksi Gagal',
+        message: err.message || 'Gagal terhubung ke server database guru. Coba lagi.',
+        cancelText: 'Tutup',
+        confirmText: 'Selesai',
+        onConfirm: () => {}
+      });
     }
   };
 
@@ -2970,6 +2995,8 @@ export default function App() {
                     <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Nama Pengguna (Username untuk Login)</label>
                     <input 
                       type="text"
+                      required
+                      minLength={3}
                       className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
                       placeholder="Contoh: ahmad..."
                       disabled={editingTeacherUsername !== null}
@@ -2984,6 +3011,8 @@ export default function App() {
                     </label>
                     <input 
                       type="password"
+                      required={editingTeacherUsername === null}
+                      minLength={4}
                       className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
                       placeholder="Masukkan kata sandi guru..."
                       value={teacherFormPassword}
@@ -2995,6 +3024,7 @@ export default function App() {
                     <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Wali Kelas Untuk Pendidikan</label>
                     <select
                       className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
+                      required
                       value={teacherFormWaliKelas}
                       onChange={e => setTeacherFormWaliKelas(e.target.value)}
                     >
