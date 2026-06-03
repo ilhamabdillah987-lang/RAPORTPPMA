@@ -18,23 +18,25 @@ interface Data {
   teachers?: any[];
 }
 
-async function startServer() {
-  const app = express();
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  app.use(cors());
+const app = express();
+export default app;
 
-  // Logging middleware
-  app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-  });
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(cors());
 
-  // Explicit lowdb setup
-  const adapter = new JSONFile<Data>(path.join(process.cwd(), 'db.json'));
-  const defaultData: Data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
-  const db = new Low<Data>(adapter, defaultData);
-  
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
+// Explicit lowdb setup
+const adapter = new JSONFile<Data>(path.join(process.cwd(), 'db.json'));
+const defaultData: Data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
+const db = new Low<Data>(adapter, defaultData);
+
+(async () => {
   await db.read();
   if (!db.data) {
     db.data = defaultData;
@@ -84,6 +86,7 @@ async function startServer() {
     await db.write();
     console.log(`Berhasil memigrasi ${migratedStudents.length} santri ke array utama.`);
   }
+})();
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
@@ -812,22 +815,26 @@ async function startServer() {
 
   // Vite setup
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
+    }).then(vite => {
+      app.use(vite.middlewares);
+    }).catch(err => {
+      console.error("[Server] Gagal menginisialisasi Vite middleware:", err);
     });
-    app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    if (!process.env.VERCEL) {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
-
-startServer();
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
