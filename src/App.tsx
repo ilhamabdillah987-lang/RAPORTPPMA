@@ -835,6 +835,39 @@ export default function App() {
   const [teacherFormWaliKelas, setTeacherFormWaliKelas] = useState('');
   const [editingTeacherUsername, setEditingTeacherUsername] = useState<string | null>(null);
 
+  // States for automatic teacher account registration
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'incomplete' | 'ready' | 'saving' | 'saved' | 'error'>('incomplete');
+  const [autoSaveErrorMessage, setAutoSaveErrorMessage] = useState('');
+
+  // Auto-save teacher registration
+  useEffect(() => {
+    const isEditing = editingTeacherUsername !== null;
+    const nameFilled = teacherFormName.trim().length >= 3;
+    const usernameFilled = teacherFormUsername.trim().length >= 3;
+    const passwordFilled = isEditing ? true : (teacherFormPassword.trim().length >= 4);
+    const classFilled = teacherFormWaliKelas.trim().length > 0;
+
+    if (!nameFilled || !usernameFilled || !passwordFilled || !classFilled) {
+      setAutoSaveStatus('incomplete');
+      return;
+    }
+
+    // Checking if it was already marked as saved to avoid duplicate submissions
+    if (autoSaveStatus === 'saved' || autoSaveStatus === 'saving') {
+      return;
+    }
+
+    // Set status to ready
+    setAutoSaveStatus('ready');
+
+    const delay = 800; // 800ms debounce
+    const timer = setTimeout(() => {
+      handleAutoSaveTeacher();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [teacherFormName, teacherFormUsername, teacherFormPassword, teacherFormWaliKelas, editingTeacherUsername]);
+
   // Front-end Login Inputs inside Modal
   const [teacherInputUsername, setTeacherInputUsername] = useState('');
   const [teacherInputPassword, setTeacherInputPassword] = useState('');
@@ -864,6 +897,13 @@ export default function App() {
       }
     });
   }, []);
+
+  // Redirect admin back to monitoring view if no class is selected
+  useEffect(() => {
+    if (currentUserEmail && !selectedClass && !isAdminViewActive) {
+      setIsAdminViewActive(true);
+    }
+  }, [currentUserEmail, selectedClass, isAdminViewActive]);
 
   const fetchAdminStats = async () => {
     setIsAdminDataLoading(true);
@@ -1097,42 +1137,21 @@ export default function App() {
     });
   };
 
-  // CRUD actions helper for registering teachers
-  const handleSaveTeacher = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  // Automated teacher registration
+  const handleAutoSaveTeacher = async () => {
     const isEditing = editingTeacherUsername !== null;
     const trimmedName = teacherFormName.trim();
     const trimmedUsername = teacherFormUsername.trim();
     const trimmedPassword = teacherFormPassword;
     const selectedWali = teacherFormWaliKelas.trim();
 
-    console.log("[Client] Submit handleSaveTeacher triggered:", {
-      isEditing,
-      trimmedName,
-      trimmedUsername,
-      passwordLength: trimmedPassword ? trimmedPassword.length : 0,
-      selectedWali
-    });
-
     if (!trimmedName || !trimmedUsername || (!isEditing && !trimmedPassword) || !selectedWali) {
-      const errorMsg = 'Mohon isi nama lengkap guru, username, password, dan pilihan kelas wali secara lengkap dan valid.';
-      setAuthError(errorMsg);
-      console.warn("[Client] Aborting submit: validation failed", {
-        trimmedName: !!trimmedName,
-        trimmedUsername: !!trimmedUsername,
-        password: !!trimmedPassword,
-        selectedWali: !!selectedWali
-      });
-      showConfirm({
-        title: 'Formulir Belum Lengkap',
-        message: errorMsg,
-        cancelText: 'Tutup',
-        confirmText: 'Selesai',
-        onConfirm: () => {}
-      });
+      setAutoSaveStatus('incomplete');
       return;
     }
+
+    setAutoSaveStatus('saving');
+    setAutoSaveErrorMessage('');
 
     try {
       setAuthError(null);
@@ -1145,7 +1164,6 @@ export default function App() {
         waliKelas: selectedWali
       };
       
-      // If editing, password is optional. If creating, it's explicitly required.
       if (isEditing) {
         if (trimmedPassword) {
           body.password = trimmedPassword;
@@ -1154,7 +1172,7 @@ export default function App() {
         body.password = trimmedPassword;
       }
 
-      console.log(`[Admin] Saving teacher via ${method} to ${url}`, body);
+      console.log(`[Admin Auto-Save] Saving teacher via ${method} to ${url}`, body);
 
       const res = await fetch(url, {
         method,
@@ -1176,44 +1194,38 @@ export default function App() {
       }
 
       if (res.ok) {
-        console.log("[Admin] Save teacher response:", resData);
+        console.log("[Admin Auto-Save] Success:", resData);
+        setAutoSaveStatus('saved');
         setAuthError(null);
-        showConfirm({
-          title: 'Simpan Sukses',
-          message: isEditing ? `Akun guru '${trimmedUsername}' berhasil diperbarui.` : `Akun guru '${trimmedUsername}' berhasil didaftarkan.`,
-          cancelText: 'Mengerti',
-          confirmText: 'Selesai',
-          onConfirm: () => {}
-        });
-        setTeacherFormName('');
-        setTeacherFormUsername('');
-        setTeacherFormPassword('');
-        setTeacherFormWaliKelas('');
-        setEditingTeacherUsername(null);
+        
+        // Reset form variables after successful save so user can register the next teacher
+        setTimeout(() => {
+          setTeacherFormName('');
+          setTeacherFormUsername('');
+          setTeacherFormPassword('');
+          setTeacherFormWaliKelas('');
+          setEditingTeacherUsername(null);
+          setAutoSaveStatus('incomplete');
+        }, 1500);
+
         fetchTeachers();
         fetchAdminStats();
       } else {
-        console.warn("[Admin] Save teacher failed:", resData);
-        setAuthError(resData.error || 'Gagal menyimpan data guru.');
-        showConfirm({
-          title: 'Gagal Tersimpan',
-          message: resData.error || 'Gagal menyimpan data guru.',
-          cancelText: 'Tutup',
-          confirmText: 'Selesai',
-          onConfirm: () => {}
-        });
+        console.warn("[Admin Auto-Save] Fail:", resData);
+        setAutoSaveStatus('error');
+        setAutoSaveErrorMessage(resData.error || 'Gagal menyimpan data guru.');
       }
     } catch (err: any) {
-      console.error("[Admin] Gagal menyimpan guru:", err);
-      setAuthError(err.message || 'Koneksi gagal saat menghubungi server guru.');
-      showConfirm({
-        title: 'Koneksi Gagal',
-        message: err.message || 'Gagal terhubung ke server database guru. Coba lagi.',
-        cancelText: 'Tutup',
-        confirmText: 'Selesai',
-        onConfirm: () => {}
-      });
+      console.error("[Admin Auto-Save] Connection error:", err);
+      setAutoSaveStatus('error');
+      setAutoSaveErrorMessage(err.message || 'Koneksi gagal ke server.');
     }
+  };
+
+  // CRUD actions helper for registering teachers
+  const handleSaveTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleAutoSaveTeacher();
   };
 
   // Remove teacher
@@ -2687,11 +2699,7 @@ export default function App() {
             </div>
             
             <button 
-              onClick={() => {
-                setIsAdminViewActive(false);
-                setSelectedAdminClassDetail(null);
-                setAdminSelectedClassStudents([]);
-              }}
+              onClick={handleLogout}
               className="px-5 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all border border-white/10 cursor-pointer flex items-center gap-2"
             >
               <LogOut size={14} /> Keluar Dasbor
@@ -2845,6 +2853,17 @@ export default function App() {
                         )}
 
                         <div className="flex gap-2">
+                          <button 
+                            onClick={() => {
+                              setIsAdminViewActive(false);
+                              handleSelectClass(cls.name);
+                            }}
+                            className="p-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white/95 rounded-xl transition-all cursor-pointer text-xs font-bold uppercase flex items-center gap-1.5 shadow-sm border border-indigo-500/10"
+                            title="Audit / Edit Nilai dan Data Kelas"
+                          >
+                            <span>✏️</span> AUDIT & EDIT
+                          </button>
+
                           <button 
                             onClick={() => handleViewAdminClassDetail(cls.name)}
                             className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all cursor-pointer text-xs font-bold uppercase flex items-center gap-1.5 border border-slate-200/40 shadow-sm"
@@ -3081,14 +3100,79 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className="pt-4 flex gap-3">
-                    <button 
-                      type="submit"
-                      className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-[10px] tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer text-center"
-                    >
-                      {editingTeacherUsername ? 'PERBARUI AKUN' : 'DAFTARKAN GURU'}
-                    </button>
-                    {editingTeacherUsername && (
+                  <div className="pt-2">
+                    {autoSaveStatus === 'incomplete' && (
+                      <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl flex items-center gap-3">
+                        <span className="text-xl animate-pulse">✍️</span>
+                        <div className="text-left">
+                          <span className="text-[10px] font-black uppercase text-slate-500 block leading-tight">MENUNGGU INPUT LENGKAP</span>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide block mt-0.5">
+                            Lengkapi Nama, Username, Kata Sandi, dan Wali Kelas guru
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {autoSaveStatus === 'ready' && (
+                      <div className="p-4 bg-amber-50/70 border border-amber-200/50 rounded-2xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl animate-bounce">⚡</span>
+                          <div className="text-left">
+                            <span className="text-[10px] font-black uppercase text-amber-700 block leading-tight">SIAP DIDAFTARKAN OTOMATIS</span>
+                            <span className="text-[9px] font-extrabold text-amber-600 uppercase tracking-wide block mt-0.5">
+                              Sistem mendeteksi data lengkap... Menyimpan dalam 1 detik
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+
+                    {autoSaveStatus === 'saving' && (
+                      <div className="p-4 bg-blue-50/70 border border-blue-200/50 rounded-2xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl animate-pulse">⏳</span>
+                          <div className="text-left">
+                            <span className="text-[10px] font-black uppercase text-blue-700 block leading-tight">SEDANG MENDAFTARKAN GURU</span>
+                            <span className="text-[9px] font-extrabold text-blue-600 uppercase tracking-wide block mt-0.5 animate-pulse">
+                              Menghubungi database ponpes Al-Hikmah...
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+
+                    {autoSaveStatus === 'saved' && (
+                      <div className="p-4 bg-emerald-50 border border-emerald-200/50 rounded-2xl flex items-center gap-3 animate-bounce">
+                        <span className="text-xl">✅</span>
+                        <div className="text-left">
+                          <span className="text-[10px] font-black uppercase text-emerald-700 block leading-tight">BERHASIL DIDAFARKAN/DIPERBARUI!</span>
+                          <span className="text-[9px] font-extrabold text-emerald-600 uppercase tracking-wide block mt-0.5">
+                            Sistem langsung mendaftarkan guru dengan nama & kelas wali
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {autoSaveStatus === 'error' && (
+                      <div className="p-4 bg-rose-50 border border-rose-250 rounded-2xl flex flex-col gap-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl mt-0.5">⚠️</span>
+                          <div className="text-left">
+                            <span className="text-[10px] font-black uppercase text-rose-700 block leading-tight">GAGAL MENDAFTARKAN GURU</span>
+                            <span className="text-[9px] font-extrabold text-rose-600 uppercase tracking-wide block mt-0.5">
+                              {autoSaveErrorMessage || "Terjadi kesalahan sistem."}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[8px] text-rose-450 font-extrabold uppercase mt-1 block">Perbaiki data di atas agar sistem mencoba menyimpan ulang secara otomatis.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {editingTeacherUsername && (
+                    <div className="pt-2">
                       <button 
                         type="button"
                         onClick={() => {
@@ -3097,13 +3181,14 @@ export default function App() {
                           setTeacherFormPassword('');
                           setTeacherFormWaliKelas('');
                           setEditingTeacherUsername(null);
+                          setAutoSaveStatus('incomplete');
                         }}
-                        className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-500 text-[10px] font-bold uppercase rounded-xl transition-colors border border-slate-200 cursor-pointer"
+                        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 text-[10px] font-black tracking-wider uppercase rounded-xl transition-all border border-slate-200 cursor-pointer text-center"
                       >
-                        Batal
+                        Batal Mode Edit (Kembali ke Daftar Guru Baru)
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </form>
               </div>
 
@@ -3331,53 +3416,65 @@ export default function App() {
   }
 
   if (!selectedClass) {
-    return (
-      <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans">
-        {/* Header to return to Admin Dashboard */}
-        <header className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white py-4 px-6 md:px-8 flex items-center justify-between shadow-md">
-          <div>
-            <span className="text-[9px] uppercase font-bold tracking-wider text-blue-300">ADMIN MODE: KELAS AUDITOR</span>
-            <h1 className="text-xs font-black uppercase tracking-wider leading-none mt-1">PILIH KELAS UNTUK DIEDIT/DIAUDIT</h1>
-          </div>
-          <button
-            onClick={() => setIsAdminViewActive(true)}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+    if (currentTeacher) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans relative overflow-x-hidden">
+          {/* Subtle decorative background circles */}
+          <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/5 rounded-full pointer-events-none blur-3xl"></div>
+          <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-500/5 rounded-full pointer-events-none blur-3xl"></div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="max-w-md w-full bg-white rounded-[32px] border border-slate-200/80 p-8 md:p-10 shadow-[0_20px_50px_rgba(8,112,184,0.05)] text-center space-y-6"
           >
-            ⬅️ KEMBALI KE PANEL MONITOR
-          </button>
-        </header>
+            <div className="w-20 h-20 bg-indigo-50 text-indigo-700 rounded-2xl flex items-center justify-center text-3xl mx-auto shadow-md">
+              👤
+            </div>
+            
+            <div className="space-y-2">
+              <span className="text-[10px] tracking-widest font-black text-indigo-500 uppercase">AKSES GURU KELAS</span>
+              <h2 className="text-xl font-black text-slate-800 capitalize leading-tight">Selamat Datang, {currentTeacher.username}</h2>
+              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+                Anda terdaftar sebagai Wali Kelas <span className="text-slate-600 font-extrabold">{currentTeacher.waliKelas}</span>
+              </p>
+            </div>
 
-        <main className="flex-grow p-6 md:p-10 max-w-7xl w-full mx-auto space-y-6">
-          <div className="text-center mb-6">
-            <h2 className="text-slate-800 text-xs font-black uppercase tracking-wider">Silakan Pilih Tingkat Kelas Yang Ingin Anda Kelola atau Audit</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Seluruh data yang diedit akan live di cloud.</p>
-          </div>
+            <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-2 text-left">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider">Tugas Wali Kelas:</span>
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full font-black text-[9px] uppercase tracking-wider">
+                  Kelas {currentTeacher.waliKelas}
+                </span>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-            {CLASSES.map((cls) => {
-              let tagBg = 'bg-blue-500/5 text-blue-600 border-blue-500/10';
-              if (cls.includes('MTs')) tagBg = 'bg-indigo-50 text-indigo-700 border-indigo-150';
-              else if (cls.includes('SMP')) tagBg = 'bg-emerald-50 text-emerald-700 border-emerald-150';
-              else if (cls.includes('SMA')) tagBg = 'bg-violet-50 text-violet-700 border-violet-150';
-              else if (cls === 'ALUMNI') tagBg = 'bg-amber-50 text-amber-700 border-amber-150';
+            <div className="space-y-3 pt-2">
+              <button
+                onClick={() => handleSelectClass(currentTeacher.waliKelas)}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer block text-center"
+              >
+                MASUK KE WORKSPACE KELAS 🚀
+              </button>
+              
+              <button
+                onClick={handleLogout}
+                className="w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs tracking-widest uppercase rounded-xl transition-all cursor-pointer block text-center border border-slate-200"
+              >
+                KELUAR AKUN
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      );
+    }
 
-              return (
-                <motion.button
-                  key={cls}
-                  whileHover={{ scale: 1.03, y: -2 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => handleSelectClass(cls)}
-                  className="bg-white border border-slate-200 p-5 rounded-2xl transition-all flex flex-col items-center gap-3 shadow-sm hover:shadow-md cursor-pointer"
-                >
-                  <div className={`w-full py-2.5 rounded-xl flex items-center justify-center font-black text-[11px] tracking-wide ${tagBg}`}>
-                    {cls}
-                  </div>
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">KELAS {cls}</span>
-                </motion.button>
-              );
-            })}
-          </div>
-        </main>
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Mengarahkan Sesi Anda...</p>
+        </div>
       </div>
     );
   }
