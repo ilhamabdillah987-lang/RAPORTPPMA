@@ -7,7 +7,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import XLSXStyle from 'xlsx-js-style';
 import { Student, Subject, StudentIdentity } from './types';
-import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User as LucideUser, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu, LogIn } from 'lucide-react';
+import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User as LucideUser, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu, LogIn, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot } from './firebase';
 
@@ -760,9 +760,21 @@ const compressImage = (file: File, maxWidth = 300, maxHeight = 400): Promise<str
 };
 
 export default function App() {
-  const CLASSES = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];
+  const CLASSES = [
+    '7 MTs Putra', '7 MTs Putri', '7 MTs Putra & Putri',
+    '7 SMP Putra', '7 SMP Putri', '7 SMP Putra & Putri',
+    '8 MTs Putra', '8 MTs Putri', '8 MTs Putra & Putri',
+    '8 SMP Putra', '8 SMP Putri', '8 SMP Putra & Putri',
+    '9 MTs Putra', '9 MTs Putri', '9 MTs Putra & Putri',
+    '9 SMP Putra', '9 SMP Putri', '9 SMP Putra & Putri',
+    '10 SMA Putra', '10 SMA Putri', '10 SMA Putra & Putri',
+    '11 SMA Putra', '11 SMA Putri', '11 SMA Putra & Putri',
+    '12 SMA Putra', '12 SMA Putri', '12 SMA Putra & Putri',
+    'ALUMNI'
+  ];
 
   const [selectedClass, setSelectedClass] = useState<string>('');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [globalWaliKelas, setGlobalWaliKelas] = useState<string>('');
   const [globalWaliKelasPutra, setGlobalWaliKelasPutra] = useState<string>('');
@@ -817,6 +829,7 @@ export default function App() {
   const [isTeachersLoading, setIsTeachersLoading] = useState(false);
 
   // Teacher CRUD Form States
+  const [teacherFormName, setTeacherFormName] = useState('');
   const [teacherFormUsername, setTeacherFormUsername] = useState('');
   const [teacherFormPassword, setTeacherFormPassword] = useState('');
   const [teacherFormWaliKelas, setTeacherFormWaliKelas] = useState('');
@@ -1010,13 +1023,76 @@ export default function App() {
     }
   };
 
+  const handleManualSync = async () => {
+    if (!selectedClass) return;
+    setSyncStatus('syncing');
+    try {
+      const res = await fetch('/api/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          className: selectedClass,
+          students: studentsList,
+          waliKelas: currentTeacher?.username || ''
+        })
+      });
+      if (res.ok) {
+        setSyncStatus('success');
+        showConfirm({
+          title: 'Sinkronisasi Berhasil',
+          message: `Berhasil menyinkronkan data ${studentsList.length} santri Kelas ${selectedClass} ke database pusat admin. Admin sekarang dapat melihat perkembangan pengisian raport secara keseluruhan secara realtime.`,
+          cancelText: 'Selesai',
+          confirmText: 'Lanjutkan',
+          onConfirm: () => {}
+        });
+        setTimeout(() => setSyncStatus('idle'), 3000);
+      } else {
+        setSyncStatus('error');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+        showConfirm({
+          title: 'Sinkronisasi Gagal',
+          message: 'Gagal melakukan sinkronisasi ke server. Silakan periksa koneksi Anda dan coba lagi.',
+          cancelText: 'Tutup',
+          confirmText: 'Lanjutkan',
+          onConfirm: () => {}
+        });
+      }
+    } catch (err) {
+      setSyncStatus('error');
+      setTimeout(() => setSyncStatus('idle'), 3000);
+      console.error(err);
+    }
+  };
+
+  const handleLogout = () => {
+    showConfirm({
+      title: 'Konfirmasi Keluar',
+      message: 'Apakah Anda yakin ingin keluar dari sistem Raport Al-Hikmah?',
+      cancelText: 'Batal',
+      confirmText: 'Keluar Sekarang',
+      onConfirm: async () => {
+        try {
+          await signOut(auth);
+        } catch (e) {
+          console.warn('Firebase signOut error:', e);
+        }
+        localStorage.removeItem('raport_admin_email');
+        localStorage.removeItem('raport_current_teacher');
+        setCurrentUserEmail(null);
+        setCurrentTeacher(null);
+        setSelectedClass('');
+        setIsAdminViewActive(false);
+      }
+    });
+  };
+
   // CRUD actions helper for registering teachers
   const handleSaveTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!teacherFormUsername.trim() || (!editingTeacherUsername && !teacherFormPassword.trim()) || !teacherFormWaliKelas) {
+    if (!teacherFormName.trim() || !teacherFormUsername.trim() || (!editingTeacherUsername && !teacherFormPassword.trim()) || !teacherFormWaliKelas) {
       showConfirm({
         title: 'Formulir Belum Lengkap',
-        message: 'Mohon isi username, password, dan pilihan kelas wali secara valid.',
+        message: 'Mohon isi nama lengkap guru, username, password, dan pilihan kelas wali secara valid.',
         cancelText: 'Tutup',
         confirmText: 'Selesai',
         onConfirm: () => {}
@@ -1029,6 +1105,7 @@ export default function App() {
       const url = isEditing ? `/api/teachers/${encodeURIComponent(editingTeacherUsername!)}` : '/api/teachers';
       const method = isEditing ? 'PUT' : 'POST';
       const body: any = {
+        name: teacherFormName.trim(),
         username: teacherFormUsername.trim().toLowerCase(),
         waliKelas: teacherFormWaliKelas
       };
@@ -1050,6 +1127,7 @@ export default function App() {
           confirmText: 'Selesai',
           onConfirm: () => {}
         });
+        setTeacherFormName('');
         setTeacherFormUsername('');
         setTeacherFormPassword('');
         setTeacherFormWaliKelas('');
@@ -1134,7 +1212,6 @@ export default function App() {
     });
   };
 
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // keep for single student grid if needed, or remove later
   const [studentsToPrint, setStudentsToPrint] = useState<Student[]>([]);
@@ -2864,25 +2941,37 @@ export default function App() {
           </div>
         </>
       ) : (
-            /* --- Tab 2: Manage Accounts of teachers inside App ---- */
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in duration-350">
+        /* --- Tab 2: Manage Accounts of teachers inside App ---- */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in duration-350">
               
               {/* Teacher Form Card - Left Column */}
-              <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
+              <div className="lg:col-span-12 xl:col-span-5 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
                 <div>
                   <h3 className="text-sm font-black text-slate-850 uppercase tracking-tight flex items-center gap-2">
                     {editingTeacherUsername ? '✍️ Edit Akun Guru' : '👤 Buat Akun Guru Baru'}
                   </h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Isi username, kata sandi, dan kelas wali gurunya.</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Isi nama, username, kata sandi, dan kelas wali gurunya.</p>
                 </div>
 
                 <form onSubmit={handleSaveTeacher} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Nama Pengguna (Username)</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Nama Lengkap Guru</label>
+                    <input 
+                      type="text"
+                      required
+                      className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
+                      placeholder="Contoh: Ustadz Ahmad Syarif, S.Pd..."
+                      value={teacherFormName}
+                      onChange={e => setTeacherFormName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Nama Pengguna (Username untuk Login)</label>
                     <input 
                       type="text"
                       className="w-full px-4 py-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
-                      placeholder="Contoh: ustadz_ahmad..."
+                      placeholder="Contoh: ahmad..."
                       disabled={editingTeacherUsername !== null}
                       value={teacherFormUsername}
                       onChange={e => setTeacherFormUsername(e.target.value.replace(/\s+/g, ''))}
@@ -2933,6 +3022,7 @@ export default function App() {
                       <button 
                         type="button"
                         onClick={() => {
+                          setTeacherFormName('');
                           setTeacherFormUsername('');
                           setTeacherFormPassword('');
                           setTeacherFormWaliKelas('');
@@ -2948,7 +3038,7 @@ export default function App() {
               </div>
 
               {/* Registered Teachers List - Right Column */}
-              <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
+              <div className="lg:col-span-12 xl:col-span-7 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-6">
                 <div>
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                     👤 Guru Kelas & Wali Kelas Terdaftar
@@ -2976,13 +3066,13 @@ export default function App() {
                       >
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 bg-indigo-50 text-indigo-700 rounded-xl flex items-center justify-center font-bold text-sm uppercase">
-                            {teacher.username.charAt(0)}
+                            {(teacher.name || teacher.username).charAt(0)}
                           </div>
                           <div>
-                            <span className="text-[10px] tracking-widest font-extrabold text-indigo-500 uppercase font-sans">GURU KELAS</span>
-                            <h4 className="text-xs font-black text-slate-800 capitalize leading-tight mt-0.5">{teacher.username}</h4>
+                            <span className="text-[10px] tracking-widest font-extrabold text-indigo-500 uppercase font-sans">GURU WALI KELAS</span>
+                            <h4 className="text-xs font-black text-slate-800 capitalize leading-tight mt-0.5">{teacher.name || teacher.username}</h4>
                             <p className="text-[9px] font-bold text-slate-400 uppercase leading-none mt-1">
-                              Wali Kelas: <span className="text-slate-600 font-extrabold">Kelas {teacher.waliKelas}</span>
+                              ID Pengguna: <span className="text-indigo-600 font-extrabold">{teacher.username}</span> | Wali Kelas: <span className="text-slate-600 font-extrabold">Kelas {teacher.waliKelas}</span>
                             </p>
                           </div>
                         </div>
@@ -2991,11 +3081,12 @@ export default function App() {
                           <button
                             onClick={() => {
                               setEditingTeacherUsername(teacher.username);
+                              setTeacherFormName(teacher.name || teacher.username);
                               setTeacherFormUsername(teacher.username);
                               setTeacherFormPassword('');
                               setTeacherFormWaliKelas(teacher.waliKelas);
                             }}
-                            className="p-2 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors uppercase font-black text-[9px] tracking-wider cursor-pointer border border-slate-200"
+                            className="p-2 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all uppercase font-black text-[9px] tracking-wider cursor-pointer border border-slate-200"
                           >
                             Edit
                           </button>
@@ -3019,7 +3110,7 @@ export default function App() {
     );
   }
 
-  if (!selectedClass) {
+  if (!currentUserEmail && !currentTeacher) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans relative overflow-x-hidden">
         {/* Subtle decorative background circles */}
@@ -3030,92 +3121,193 @@ export default function App() {
           initial="hidden"
           animate="visible"
           variants={fadeIn}
-          className="max-w-4xl w-full bg-white rounded-[40px] shadow-[0_24px_70px_rgba(8,112,184,0.08)] overflow-hidden border border-blue-50/50 z-10"
+          className="max-w-xl w-full bg-white rounded-[40px] shadow-[0_24px_70px_rgba(8,112,184,0.08)] overflow-hidden border border-blue-50/50 z-10 animate-in fade-in duration-300"
         >
-          <div className="bg-gradient-to-br from-indigo-700 via-blue-800 to-slate-900 p-12 text-center text-white relative overflow-hidden">
+          <div className="bg-gradient-to-br from-indigo-700 via-blue-800 to-slate-900 p-10 text-center text-white relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
               <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white to-transparent"></div>
             </div>
             <div className="relative z-10">
-              <div className="bg-white/15 w-32 h-32 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden p-4">
+              <div className="bg-white/15 w-24 h-24 rounded-2xl rotate-12 flex items-center justify-center mx-auto mb-5 backdrop-blur-md border border-white/20 shadow-xl overflow-hidden p-3">
                 {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain -rotate-12 animate-pulse" />
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain -rotate-12" />
                 ) : (
                   <div className="text-white/40 text-[10px] font-black uppercase -rotate-12 tracking-wider">Al-Hikmah</div>
                 )}
               </div>
-              <h1 className="text-3xl font-black tracking-tight uppercase leading-none">RAPORT AL-HIKMAH</h1>
-              <p className="text-blue-200/90 text-xs mt-3 font-bold tracking-[0.25em] uppercase">PONDOK PESANTREN MODERN AL-HIKMAH</p>
+              <h1 className="text-2xl font-black tracking-tight uppercase leading-none">RAPORT AL-HIKMAH</h1>
+              <p className="text-blue-200/90 text-[10px] mt-2 font-bold tracking-[0.25em] uppercase">PONDOK PESANTREN MODERN AL-HIKMAH</p>
             </div>
           </div>
           
-          <div className="p-8 md:p-12">
-            <div className="text-center mb-10">
-              <span className="px-4 py-1.5 bg-slate-100 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-full">
-                Sistem Penilaian Semester Ganjil & Genap
-              </span>
-              <h2 className="text-slate-800 text-sm font-black uppercase tracking-wider mt-3">Silakan Pilih Tingkat Kelas Anda</h2>
+          <div className="p-8 md:p-10">
+            {/* Login Tab selector */}
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/60 shadow-inner mb-8">
+              <button
+                onClick={() => {
+                  setActiveAuthTab('teacher');
+                  setAuthError(null);
+                }}
+                className={`flex-1 py-3 text-[10px] font-black text-center uppercase tracking-widest rounded-xl transition-all duration-250 cursor-pointer ${
+                  activeAuthTab === 'teacher' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                👤 Wali Kelas / Guru
+              </button>
+              <button
+                onClick={() => {
+                  setActiveAuthTab('admin');
+                  setAuthError(null);
+                }}
+                className={`flex-1 py-3 text-[10px] font-black text-center uppercase tracking-widest rounded-xl transition-all duration-250 cursor-pointer ${
+                  activeAuthTab === 'admin' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-800'
+                }`}
+              >
+                👑 Administrator
+              </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
-              {classes.map((cls) => {
-                // Highly elegant color schemes per educational category
-                let activeBorder = 'hover:border-blue-500 hover:shadow-blue-50/70';
-                let tagBg = 'bg-blue-500/5 text-blue-600 border-blue-500/10';
-                let circleBg = 'bg-blue-500';
+            {/* ERROR DISPLAY */}
+            {authError && (
+              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl text-[10px] font-black uppercase text-rose-600 flex items-center gap-2 animate-pulse">
+                ⚠️ {authError}
+              </div>
+            )}
+
+            {activeAuthTab === 'teacher' ? (
+              <form onSubmit={handleTeacherLogIn} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Nama Pengguna (Username)</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold text-slate-705"
+                    placeholder="Masukkan username wali kelas..."
+                    value={teacherInputUsername}
+                    onChange={e => setTeacherInputUsername(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Kata Sandi (Password)</label>
+                  <input
+                    type="password"
+                    required
+                    className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold text-slate-705"
+                    placeholder="Masukkan password Anda..."
+                    value={teacherInputPassword}
+                    onChange={e => setTeacherInputPassword(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full mt-6 py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer block text-center"
+                >
+                  MASUK SEBAGAI GURU KELAS
+                </button>
+              </form>
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1 text-center">
+                    Gunakan akun Google Anda untuk mengakses panel admin Al-Hikmah terpusat.
+                  </p>
+                </div>
                 
-                if (cls.includes('MTs')) {
-                  activeBorder = 'hover:border-indigo-500 hover:shadow-indigo-50/70';
-                  tagBg = 'bg-indigo-50/80 text-indigo-700 border-indigo-100';
-                  circleBg = 'bg-indigo-600';
-                } else if (cls.includes('SMP')) {
-                  activeBorder = 'hover:border-emerald-500 hover:shadow-emerald-50/70';
-                  tagBg = 'bg-emerald-50/80 text-emerald-700 border-emerald-100';
-                  circleBg = 'bg-emerald-600';
-                } else if (cls.includes('SMA')) {
-                  activeBorder = 'hover:border-violet-500 hover:shadow-violet-50/70';
-                  tagBg = 'bg-violet-50/80 text-violet-700 border-violet-100';
-                  circleBg = 'bg-violet-600';
-                } else if (cls === 'ALUMNI') {
-                  activeBorder = 'hover:border-amber-500 hover:shadow-amber-50/70';
-                  tagBg = 'bg-amber-50/80 text-amber-700 border-amber-100';
-                  circleBg = 'bg-amber-600';
-                }
+                {/* Real Google Button */}
+                <button
+                  onClick={handleGoogleSignIn}
+                  className="w-full py-4 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 border-2 border-slate-200 font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.48 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.92-2.75 3.49-4.51 6.76-4.51z"/>
+                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.43c-.28 1.44-1.1 2.67-2.34 3.51l3.64 2.82c2.14-1.97 3.76-4.87 3.76-8.48z"/>
+                    <path fill="#FBBC05" d="M5.24 14.55C4.99 13.81 4.86 13.01 4.86 12s.13-1.81.38-2.55L1.39 6.46C.5 8.12 0 9.99 0 12s.5 3.88 1.39 5.54l3.85-2.99z"/>
+                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.64-2.82c-1.01.68-2.3 1.09-3.96 1.09-3.27 0-5.84-2.11-6.83-4.99l-3.85 2.99C3.37 20.33 7.35 23 12 23z"/>
+                  </svg>
+                  MASUK DENGAN AKUN GOOGLE
+                </button>
 
-                return (
-                  <motion.button
-                    key={cls}
-                    whileHover={{ scale: 1.04, y: -4 }}
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => handleSelectClass(cls)}
-                    className={`group relative overflow-hidden bg-white border-2 border-slate-100/80 ${activeBorder} p-5 rounded-[28px] transition-all flex flex-col items-center gap-3.5 shadow-sm hover:shadow-xl cursor-pointer`}
+                <div className="relative flex py-2 items-center">
+                  <div className="flex-grow border-t border-slate-200"></div>
+                  <span className="flex-shrink mx-4 text-slate-400 font-extrabold text-[9px] uppercase tracking-wider">MASUK VIA GOOGLE SIMULATOR</span>
+                  <div className="flex-grow border-t border-slate-200"></div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Email Google Admin (Simulasi)</label>
+                    <input
+                      type="email"
+                      className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
+                      placeholder="Masukkan alamat email Google..."
+                      value={adminAuthInputEmail}
+                      onChange={e => setAdminAuthInputEmail(e.target.value)}
+                    />
+                    <p className="text-[8px] text-slate-400 font-semibold px-1">Tip: Jika Google popup terblokir oleh iframe preview sandbox, ketik email Google Anda di atas & klik tombol di bawah.</p>
+                  </div>
+                  <button
+                    onClick={handleManualEmailLogin}
+                    className="w-full py-4 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer block text-center"
                   >
-                    {/* Width adjusted label to ensure spelling is perfectly straight/unstacked ("lurus") */}
-                    <div className={`w-28 h-10 rounded-2xl flex items-center justify-center font-black text-sm tracking-wide transition-colors ${tagBg}`}>
-                      {cls}
-                    </div>
-
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="text-[9px] font-black text-slate-400 group-hover:text-slate-800 uppercase tracking-widest transition-colors">
-                        KELAS {cls}
-                      </span>
-                    </div>
-
-                    {/* Left little indicator circle */}
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${circleBg} opacity-60`}></span>
-                      <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider">
-                        {cls === 'ALUMNI' ? 'Graduated' : 'Aktif'}
-                      </span>
-                    </div>
-
-                    <div className="absolute top-0 right-0 w-8 h-8 bg-slate-500/5 rounded-bl-full translate-x-4 -translate-y-4 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform"></div>
-                  </motion.button>
-                );
-              })}
-            </div>
+                    MASUK KODE SIMULATOR
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
+      </div>
+    );
+  }
+
+  if (!selectedClass) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans">
+        {/* Header to return to Admin Dashboard */}
+        <header className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white py-4 px-6 md:px-8 flex items-center justify-between shadow-md">
+          <div>
+            <span className="text-[9px] uppercase font-bold tracking-wider text-blue-300">ADMIN MODE: KELAS AUDITOR</span>
+            <h1 className="text-xs font-black uppercase tracking-wider leading-none mt-1">PILIH KELAS UNTUK DIEDIT/DIAUDIT</h1>
+          </div>
+          <button
+            onClick={() => setIsAdminViewActive(true)}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+          >
+            ⬅️ KEMBALI KE PANEL MONITOR
+          </button>
+        </header>
+
+        <main className="flex-grow p-6 md:p-10 max-w-7xl w-full mx-auto space-y-6">
+          <div className="text-center mb-6">
+            <h2 className="text-slate-800 text-xs font-black uppercase tracking-wider">Silakan Pilih Tingkat Kelas Yang Ingin Anda Kelola atau Audit</h2>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Seluruh data yang diedit akan live di cloud.</p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+            {CLASSES.map((cls) => {
+              let tagBg = 'bg-blue-500/5 text-blue-600 border-blue-500/10';
+              if (cls.includes('MTs')) tagBg = 'bg-indigo-50 text-indigo-700 border-indigo-150';
+              else if (cls.includes('SMP')) tagBg = 'bg-emerald-50 text-emerald-700 border-emerald-150';
+              else if (cls.includes('SMA')) tagBg = 'bg-violet-50 text-violet-700 border-violet-150';
+              else if (cls === 'ALUMNI') tagBg = 'bg-amber-50 text-amber-700 border-amber-150';
+
+              return (
+                <motion.button
+                  key={cls}
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleSelectClass(cls)}
+                  className="bg-white border border-slate-200 p-5 rounded-2xl transition-all flex flex-col items-center gap-3 shadow-sm hover:shadow-md cursor-pointer"
+                >
+                  <div className={`w-full py-2.5 rounded-xl flex items-center justify-center font-black text-[11px] tracking-wide ${tagBg}`}>
+                    {cls}
+                  </div>
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">KELAS {cls}</span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </main>
       </div>
     );
   }
@@ -3324,6 +3516,45 @@ export default function App() {
             className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all border border-slate-200"
           >
             <Printer size={18} /> CETAK SEMUA KELAS (PDF)
+          </button>
+
+          {/* Sync & Logout Controls */}
+          {currentTeacher && (
+            <button 
+              onClick={handleManualSync}
+              disabled={syncStatus === 'syncing' || filteredStudents.length === 0}
+              className={`w-full text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-xl ${
+                syncStatus === 'success' ? 'bg-emerald-600 shadow-emerald-100' :
+                syncStatus === 'error' ? 'bg-rose-600 shadow-rose-100' :
+                syncStatus === 'syncing' ? 'bg-indigo-500 shadow-indigo-100 cursor-not-allowed' :
+                'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-150 hover:translate-y-[-2px]'
+              }`}
+            >
+              <RefreshCw size={18} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
+              {syncStatus === 'syncing' ? 'SEDANG MENULIS DATA...' :
+               syncStatus === 'success' ? 'SINKRON DATA SUKSES ✅' :
+               syncStatus === 'error' ? 'SINKRON DATA GAGAL ❌' :
+               'SINKRONISASI SANTRI'}
+            </button>
+          )}
+
+          {currentUserEmail && (
+            <button 
+              onClick={() => {
+                setIsAdminViewActive(true);
+                handleClearClass();
+              }}
+              className="w-full bg-blue-700 hover:bg-blue-800 text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-lg hover:translate-y-[-1px]"
+            >
+              ⬅️ PANEL MONITOR ADMIN
+            </button>
+          )}
+
+          <button 
+            onClick={handleLogout}
+            className="w-full bg-slate-900 hover:bg-slate-950 text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-lg hover:translate-y-[-1px]"
+          >
+            <LogOut size={18} /> KELUAR AKUN
           </button>
         </div>
       </motion.aside>

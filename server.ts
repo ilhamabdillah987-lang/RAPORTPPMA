@@ -321,7 +321,18 @@ async function startServer() {
   // Status Summary API
   app.get("/api/status-summary", (req, res) => {
     try {
-      const predefinedClasses = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];
+      const predefinedClasses = [
+        '7 MTs Putra', '7 MTs Putri', '7 MTs Putra & Putri',
+        '7 SMP Putra', '7 SMP Putri', '7 SMP Putra & Putri',
+        '8 MTs Putra', '8 MTs Putri', '8 MTs Putra & Putri',
+        '8 SMP Putra', '8 SMP Putri', '8 SMP Putra & Putri',
+        '9 MTs Putra', '9 MTs Putri', '9 MTs Putra & Putri',
+        '9 SMP Putra', '9 SMP Putri', '9 SMP Putra & Putri',
+        '10 SMA Putra', '10 SMA Putri', '10 SMA Putra & Putri',
+        '11 SMA Putra', '11 SMA Putri', '11 SMA Putra & Putri',
+        '12 SMA Putra', '12 SMA Putri', '12 SMA Putra & Putri',
+        'ALUMNI'
+      ];
       const backups = db.data?.classesBackup || {};
       
       const classSummary = predefinedClasses.map(cls => {
@@ -358,6 +369,7 @@ async function startServer() {
       }
       const mapped = db.data.teachers.map(t => ({
         username: t.username,
+        name: t.name || t.username,
         waliKelas: t.waliKelas
       }));
       res.json(mapped);
@@ -369,7 +381,7 @@ async function startServer() {
   // Create a teacher account
   app.post("/api/teachers", async (req, res) => {
     try {
-      const { username, password, waliKelas } = req.body;
+      const { username, password, waliKelas, name } = req.body;
       if (!username || !password || !waliKelas) {
         return res.status(400).json({ error: "Username, password, dan waliKelas harus diisi" });
       }
@@ -394,6 +406,7 @@ async function startServer() {
 
       const newTeacher = {
         username: normalizedUsername,
+        name: (name || username).trim(),
         pwdHash: hash,
         waliKelas: waliKelas.trim()
       };
@@ -421,7 +434,7 @@ async function startServer() {
   app.put("/api/teachers/:username", async (req, res) => {
     try {
       const { username } = req.params;
-      const { password, waliKelas } = req.body;
+      const { password, waliKelas, name } = req.body;
       
       if (!db.data || !db.data.teachers) {
         return res.status(404).json({ error: "Data teachers tidak ditemukan" });
@@ -433,6 +446,9 @@ async function startServer() {
       }
 
       const teacher = db.data.teachers[idx];
+      if (name) {
+        teacher.name = name.trim();
+      }
       if (waliKelas) {
         teacher.waliKelas = waliKelas.trim();
         // Also update this waliKelas designated teacher in classesBackup
@@ -453,7 +469,7 @@ async function startServer() {
       db.data.teachers[idx] = teacher;
       await db.write();
 
-      res.json({ success: true, teacher: { username: teacher.username, waliKelas: teacher.waliKelas } });
+      res.json({ success: true, teacher: { username: teacher.username, name: teacher.name || teacher.username, waliKelas: teacher.waliKelas } });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -523,7 +539,18 @@ async function startServer() {
 
   // Server Portal - Monitor Pengisian Kelas Raport Al-Hikmah
   app.get("/status", async (req, res) => {
-    const predefinedClasses = ['7 MTs', '7 SMP', '8 MTs', '8 SMP', '9 MTs', '9 SMP', '10 SMA', '11 SMA', '12 SMA', 'ALUMNI'];
+    const predefinedClasses = [
+      '7 MTs Putra', '7 MTs Putri', '7 MTs Putra & Putri',
+      '7 SMP Putra', '7 SMP Putri', '7 SMP Putra & Putri',
+      '8 MTs Putra', '8 MTs Putri', '8 MTs Putra & Putri',
+      '8 SMP Putra', '8 SMP Putri', '8 SMP Putra & Putri',
+      '9 MTs Putra', '9 MTs Putri', '9 MTs Putra & Putri',
+      '9 SMP Putra', '9 SMP Putri', '9 SMP Putra & Putri',
+      '10 SMA Putra', '10 SMA Putri', '10 SMA Putra & Putri',
+      '11 SMA Putra', '11 SMA Putri', '11 SMA Putra & Putri',
+      '12 SMA Putra', '12 SMA Putri', '12 SMA Putra & Putri',
+      'ALUMNI'
+    ];
     const backups = db.data?.classesBackup || {};
     
     // Calculate Stats
