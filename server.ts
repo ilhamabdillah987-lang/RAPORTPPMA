@@ -388,7 +388,7 @@ async function startServer() {
         return res.status(400).json({ error: "Username, password, dan waliKelas harus diisi" });
       }
 
-      const normalizedUsername = username.trim().toLowerCase();
+      const preservedUsername = username.trim();
 
       if (!db.data) {
         db.data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
@@ -397,7 +397,7 @@ async function startServer() {
         db.data.teachers = [];
       }
 
-      const exists = db.data.teachers.some(t => t.username.toLowerCase() === normalizedUsername);
+      const exists = db.data.teachers.some(t => t.username.toLowerCase() === preservedUsername.toLowerCase());
       if (exists) {
         return res.status(400).json({ error: "Username sudah digunakan" });
       }
@@ -407,7 +407,7 @@ async function startServer() {
       const hash = bcrypt.hashSync(password, salt);
 
       const newTeacher = {
-        username: normalizedUsername,
+        username: preservedUsername,
         name: (name || username).trim(),
         pwdHash: hash,
         waliKelas: waliKelas.trim()
@@ -419,14 +419,14 @@ async function startServer() {
       if (!db.data.classesBackup) db.data.classesBackup = {};
       const cls = waliKelas.trim();
       if (!db.data.classesBackup[cls]) {
-        db.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString(), waliKelas: normalizedUsername };
+        db.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString(), waliKelas: preservedUsername.toLowerCase() };
       } else {
-        db.data.classesBackup[cls].waliKelas = normalizedUsername;
+        db.data.classesBackup[cls].waliKelas = preservedUsername.toLowerCase();
       }
 
       await db.write();
 
-      res.status(201).json({ success: true, teacher: { username: normalizedUsername, waliKelas: cls } });
+      res.status(201).json({ success: true, teacher: { username: preservedUsername, waliKelas: cls } });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
