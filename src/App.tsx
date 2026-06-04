@@ -1468,13 +1468,35 @@ export default function App() {
     }
   };
 
+  const cleanUndefined = (obj: any): any => {
+    if (obj === null || obj === undefined) return null;
+    if (Array.isArray(obj)) {
+      return obj.map(cleanUndefined);
+    }
+    if (typeof obj === 'object') {
+      const clean: any = {};
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          const val = obj[key];
+          if (val !== undefined) {
+            clean[key] = cleanUndefined(val);
+          }
+        }
+      }
+      return clean;
+    }
+    return obj;
+  };
+
   const autoSaveStudent = async (student: Partial<Student>) => {
     if (!student.id) return;
     setSaveStatus('saving');
     try {
-      await setDoc(doc(db, 'students', student.id), { ...student, updatedAt: new Date().toISOString() }, { merge: true });
+      const cleaned = cleanUndefined(student);
+      await setDoc(doc(db, 'students', student.id), { ...cleaned, updatedAt: new Date().toISOString() }, { merge: true });
       setSaveStatus('saved');
     } catch (e) {
+      console.warn('Auto save failed:', e);
       setSaveStatus('error');
     }
   };
@@ -2009,7 +2031,8 @@ export default function App() {
         return nextList;
       });
 
-      await setDoc(doc(db, 'students', studentId), payload, { merge: true });
+      const cleanedPayload = cleanUndefined(payload);
+      await setDoc(doc(db, 'students', studentId), cleanedPayload, { merge: true });
       
       if (!isEdit) {
         setSearchTerm('');
@@ -4196,11 +4219,11 @@ export default function App() {
                                </div>
                                <div className="form-group col-span-2">
                                 <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nama Lengkap</label>
-                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
+                                <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.name || ''} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
                               </div>
                               <div className="form-group col-span-2">
                                 <label className="text-xs font-bold text-slate-500 mb-1.5 block">NIS/NISN</label>
-                                <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
+                                <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-700" value={editingStudent.nomorInduk || ''} onChange={e => setEditingStudent({...editingStudent, nomorInduk: e.target.value})} />
                               </div>
                             </div>
                           </div>
