@@ -795,16 +795,8 @@ export default function App() {
   const [monitorSearchQuery, setMonitorSearchQuery] = useState('');
   
   // Admin Dashboard & Teacher States
-  const [isAdminViewActive, setIsAdminViewActive] = useState(() => {
-    const isParam = typeof window !== 'undefined' && (window.location.pathname === '/admin' || window.location.search.includes('view=admin'));
-    return isParam;
-  });
-  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('raport_admin_email');
-    }
-    return null;
-  });
+  const [isAdminViewActive, setIsAdminViewActive] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>("guru");
   const [adminAuthInputEmail, setAdminAuthInputEmail] = useState('');
   const [adminClassesStats, setAdminClassesStats] = useState<any[]>([]);
   const [isAdminDataLoading, setIsAdminDataLoading] = useState(false);
@@ -816,14 +808,7 @@ export default function App() {
   const [adminSubTab, setAdminSubTab] = useState<'stats' | 'teachers'>('stats');
 
   // Teacher credentials states
-  const [currentTeacher, setCurrentTeacher] = useState<{ username: string; waliKelas: string } | null>(() => {
-    try {
-      const saved = localStorage.getItem('raport_current_teacher');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [currentTeacher, setCurrentTeacher] = useState<{ username: string; waliKelas: string } | null>(null);
 
   const [teachersList, setTeachersList] = useState<any[]>([]);
   const [isTeachersLoading, setIsTeachersLoading] = useState(false);
@@ -873,34 +858,18 @@ export default function App() {
 
   // Helper check for secure data modification / private viewer access
   const canEditOrViewPrivate = () => {
-    if (currentUserEmail) return true;
-    if (currentTeacher && currentTeacher.waliKelas === selectedClass) return true;
-    return false;
+    return true;
   };
 
   // Sync Firebase authentication
   useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUserEmail(user.email);
-        if (user.email) {
-          localStorage.setItem('raport_admin_email', user.email);
-        }
-      } else {
-        const savedSim = localStorage.getItem('raport_admin_email');
-        if (!savedSim) {
-          setCurrentUserEmail(null);
-        }
-      }
-    });
+    // Authenticated state is bypassable in this simplified view mode
   }, []);
 
   // Redirect admin back to monitoring view if no class is selected
   useEffect(() => {
-    if (currentUserEmail && !selectedClass && !isAdminViewActive) {
-      setIsAdminViewActive(true);
-    }
-  }, [currentUserEmail, selectedClass, isAdminViewActive]);
+    // Admin features inactive, direct entry only
+  }, [selectedClass]);
 
   const fetchAdminStats = async () => {
     setIsAdminDataLoading(true);
@@ -3199,213 +3168,105 @@ export default function App() {
     );
   }
 
-  if (!currentUserEmail && !currentTeacher) {
+  if (!selectedClass) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans relative overflow-x-hidden">
-        {/* Subtle decorative background circles */}
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/5 rounded-full pointer-events-none blur-3xl"></div>
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-500/5 rounded-full pointer-events-none blur-3xl"></div>
+        {/* Beautiful fullcolor background decorations */}
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full pointer-events-none blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-500/10 rounded-full pointer-events-none blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/5 rounded-full pointer-events-none blur-3xl"></div>
 
         <motion.div 
           initial="hidden"
           animate="visible"
           variants={fadeIn}
-          className="max-w-xl w-full bg-white rounded-[40px] shadow-[0_24px_70px_rgba(8,112,184,0.08)] overflow-hidden border border-blue-50/50 z-10 animate-in fade-in duration-300"
+          className="max-w-xl w-full bg-white rounded-[40px] shadow-[0_32px_80px_rgba(8,112,184,0.12)] overflow-hidden border border-blue-50 z-10 duration-300"
         >
-          <div className="bg-gradient-to-br from-indigo-700 via-blue-800 to-slate-900 p-10 text-center text-white relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white to-transparent"></div>
+          {/* Header section with rich fullcolor gradients */}
+          <div className="bg-gradient-to-br from-emerald-600 via-blue-700 to-indigo-950 p-10 text-center text-white relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-full opacity-15 pointer-events-none">
+              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-teal-400 via-transparent to-transparent"></div>
             </div>
             <div className="relative z-10">
-              <div className="bg-white/15 w-24 h-24 rounded-2xl rotate-12 flex items-center justify-center mx-auto mb-5 backdrop-blur-md border border-white/20 shadow-xl overflow-hidden p-3">
+              <div className="bg-white/15 w-24 h-24 rounded-[28px] rotate-12 flex items-center justify-center mx-auto mb-5 backdrop-blur-md border border-white/20 shadow-xl overflow-hidden p-3 transition-transform hover:scale-105 duration-350">
                 {logoUrl ? (
                   <img src={logoUrl} alt="Logo" className="w-full h-full object-contain -rotate-12" />
                 ) : (
                   <div className="text-white/40 text-[10px] font-black uppercase -rotate-12 tracking-wider">Al-Hikmah</div>
                 )}
               </div>
-              <h1 className="text-2xl font-black tracking-tight uppercase leading-none">RAPORT AL-HIKMAH</h1>
-              <p className="text-blue-200/90 text-[10px] mt-2 font-bold tracking-[0.25em] uppercase">PONDOK PESANTREN MODERN AL-HIKMAH</p>
+              <h1 className="text-2xl font-black tracking-tight uppercase leading-none">E-RAPORT AL-HIKMAH</h1>
+              <p className="text-emerald-250 text-[10px] mt-2.5 font-bold tracking-[0.25em] uppercase">PONDOK PESANTREN MODERN AL-HIKMAH</p>
             </div>
           </div>
           
-          <div className="p-8 md:p-10">
-            {/* Login Tab selector */}
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/60 shadow-inner mb-8">
-              <button
-                onClick={() => {
-                  setActiveAuthTab('teacher');
-                  setAuthError(null);
-                }}
-                className={`flex-1 py-3 text-[10px] font-black text-center uppercase tracking-widest rounded-xl transition-all duration-250 cursor-pointer ${
-                  activeAuthTab === 'teacher' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                👤 Wali Kelas / Guru
-              </button>
-              <button
-                onClick={() => {
-                  setActiveAuthTab('admin');
-                  setAuthError(null);
-                }}
-                className={`flex-1 py-3 text-[10px] font-black text-center uppercase tracking-widest rounded-xl transition-all duration-250 cursor-pointer ${
-                  activeAuthTab === 'admin' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-800'
-                }`}
-              >
-                👑 Administrator
-              </button>
+          <div className="p-8 md:p-12 space-y-8">
+            <div className="text-center space-y-2">
+              <span className="px-3.5 py-1.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/25 rounded-full font-black text-[9px] uppercase tracking-widest inline-block leading-none">
+                Sistem Penilaian Kelas Terdistribusi
+              </span>
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">PILIH BIMBINGAN KELAS ANDA</h2>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">Silakan tentukan kelas wali binaan Anda di bawah ini:</p>
             </div>
 
-            {/* ERROR DISPLAY */}
-            {authError && (
-              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl text-[10px] font-black uppercase text-rose-600 flex items-center gap-2 animate-pulse">
-                ⚠️ {authError}
-              </div>
-            )}
-
-            {activeAuthTab === 'teacher' ? (
-              <form onSubmit={handleTeacherLogIn} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Pilih Kelas Baru / Binaan Anda</label>
+            {/* FULLCOLOR BEAUTIFUL DROPDOWN SELECTOR */}
+            <div className="space-y-4">
+              <div className="relative group">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 via-blue-600 to-indigo-600 rounded-2xl blur opacity-25 group-hover:opacity-45 transition duration-1000 group-hover:duration-200"></div>
+                <div className="relative bg-white rounded-2xl p-1">
                   <select
-                    required
-                    className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold text-slate-700 cursor-pointer"
-                    value={teacherFormWaliKelas}
-                    onChange={e => setTeacherFormWaliKelas(e.target.value)}
+                    className="w-full px-5 py-4 text-xs font-black text-slate-705 uppercase bg-slate-50 border border-transparent rounded-xl focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-350 cursor-pointer"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleSelectClass(e.target.value);
+                      }
+                    }}
+                    defaultValue=""
                   >
-                    <option value="">-- Silakan Pilih Kelas Anda --</option>
-                    {CLASSES.map((cls) => (
-                      <option key={cls} value={cls}>
-                        Kelas {cls}
-                      </option>
-                    ))}
+                    <option value="" disabled className="text-slate-400">-- Pilih Kelas Binaan --</option>
+                    {CLASSES.map((cls) => {
+                      return (
+                        <option 
+                          key={cls} 
+                          value={cls} 
+                          className="font-bold text-slate-800 uppercase text-xs py-2 bg-white"
+                        >
+                          📚 Kelas {cls}
+                        </option>
+                      );
+                    })}
                   </select>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider ml-1 mt-1 block">
-                    ⚡ Cukup pilih kelas bimbingan Anda untuk langsung memuat data terkait.
-                  </p>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full mt-4 py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer block text-center"
-                >
-                  MASUK KE WORKSPACE KELAS 🚀
-                </button>
-              </form>
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1 text-center">
-                    Gunakan akun Google Anda untuk mengakses panel admin Al-Hikmah terpusat.
-                  </p>
-                </div>
-                
-                {/* Real Google Button */}
-                <button
-                  onClick={handleGoogleSignIn}
-                  className="w-full py-4 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 border-2 border-slate-200 font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.48 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.92-2.75 3.49-4.51 6.76-4.51z"/>
-                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.43c-.28 1.44-1.1 2.67-2.34 3.51l3.64 2.82c2.14-1.97 3.76-4.87 3.76-8.48z"/>
-                    <path fill="#FBBC05" d="M5.24 14.55C4.99 13.81 4.86 13.01 4.86 12s.13-1.81.38-2.55L1.39 6.46C.5 8.12 0 9.99 0 12s.5 3.88 1.39 5.54l3.85-2.99z"/>
-                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.64-2.82c-1.01.68-2.3 1.09-3.96 1.09-3.27 0-5.84-2.11-6.83-4.99l-3.85 2.99C3.37 20.33 7.35 23 12 23z"/>
-                  </svg>
-                  MASUK DENGAN AKUN GOOGLE
-                </button>
-
-                <div className="relative flex py-2 items-center">
-                  <div className="flex-grow border-t border-slate-200"></div>
-                  <span className="flex-shrink mx-4 text-slate-400 font-extrabold text-[9px] uppercase tracking-wider">MASUK VIA GOOGLE SIMULATOR</span>
-                  <div className="flex-grow border-t border-slate-200"></div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Email Google Admin (Simulasi)</label>
-                    <input
-                      type="email"
-                      className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-bold text-slate-700"
-                      placeholder="Masukkan alamat email Google..."
-                      value={adminAuthInputEmail}
-                      onChange={e => setAdminAuthInputEmail(e.target.value)}
-                    />
-                    <p className="text-[8px] text-slate-400 font-semibold px-1">Tip: Jika Google popup terblokir oleh iframe preview sandbox, ketik email Google Anda di atas & klik tombol di bawah.</p>
-                  </div>
-                  <button
-                    onClick={handleManualEmailLogin}
-                    className="w-full py-4 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer block text-center"
-                  >
-                    MASUK KODE SIMULATOR
-                  </button>
                 </div>
               </div>
-            )}
+
+              {/* Informative instructions block with visual layout */}
+              <div className="grid grid-cols-3 gap-3 pt-4">
+                <div className="bg-emerald-500/5 rounded-2xl p-4 text-center border border-emerald-500/20 shadow-sm">
+                  <span className="text-xl block mb-1">🟢</span>
+                  <span className="block text-[10px] font-black text-emerald-800 uppercase leading-none tracking-tight">MTs</span>
+                </div>
+                <div className="bg-blue-500/5 rounded-2xl p-4 text-center border border-blue-500/20 shadow-sm">
+                  <span className="text-xl block mb-1">🔵</span>
+                  <span className="block text-[10px] font-black text-blue-850 uppercase leading-none tracking-tight">SMP</span>
+                </div>
+                <div className="bg-indigo-500/5 rounded-2xl p-4 text-center border border-indigo-500/20 shadow-sm">
+                  <span className="text-xl block mb-1">🟣</span>
+                  <span className="block text-[10px] font-black text-indigo-800 uppercase leading-none tracking-tight">SMA</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer decoration */}
+            <div className="text-center pt-2 border-t border-slate-100 flex items-center justify-between text-slate-400">
+              <span className="text-[9px] font-black uppercase tracking-widest leading-none">
+                ⚡ Auto-Save & Cloud Sync
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-widest leading-none">
+                Versi 1.3-Direct (No-Auth)
+              </span>
+            </div>
           </div>
         </motion.div>
-      </div>
-    );
-  }
-
-  if (!selectedClass) {
-    if (currentTeacher) {
-      return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans relative overflow-x-hidden">
-          {/* Subtle decorative background circles */}
-          <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/5 rounded-full pointer-events-none blur-3xl"></div>
-          <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-500/5 rounded-full pointer-events-none blur-3xl"></div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            className="max-w-md w-full bg-white rounded-[32px] border border-slate-200/80 p-8 md:p-10 shadow-[0_20px_50px_rgba(8,112,184,0.05)] text-center space-y-6"
-          >
-            <div className="w-20 h-20 bg-indigo-50 text-indigo-700 rounded-2xl flex items-center justify-center text-3xl mx-auto shadow-md">
-              👤
-            </div>
-            
-            <div className="space-y-2">
-              <span className="text-[10px] tracking-widest font-black text-indigo-500 uppercase">AKSES GURU KELAS</span>
-              <h2 className="text-xl font-black text-slate-800 capitalize leading-tight">Selamat Datang, {currentTeacher.username}</h2>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
-                Anda terdaftar sebagai Wali Kelas <span className="text-slate-600 font-extrabold">{currentTeacher.waliKelas}</span>
-              </p>
-            </div>
-
-            <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-2 text-left">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider">Tugas Wali Kelas:</span>
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full font-black text-[9px] uppercase tracking-wider">
-                  Kelas {currentTeacher.waliKelas}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <button
-                onClick={() => handleSelectClass(currentTeacher.waliKelas)}
-                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer block text-center"
-              >
-                MASUK KE WORKSPACE KELAS 🚀
-              </button>
-              
-              <button
-                onClick={handleLogout}
-                className="w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs tracking-widest uppercase rounded-xl transition-all cursor-pointer block text-center border border-slate-200"
-              >
-                KELUAR AKUN
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Mengarahkan Sesi Anda...</p>
-        </div>
       </div>
     );
   }
@@ -3616,43 +3477,29 @@ export default function App() {
             <Printer size={18} /> CETAK SEMUA KELAS (PDF)
           </button>
 
-          {/* Sync & Logout Controls */}
-          {currentTeacher && (
-            <button 
-              onClick={handleManualSync}
-              disabled={syncStatus === 'syncing' || filteredStudents.length === 0}
-              className={`w-full text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-xl ${
-                syncStatus === 'success' ? 'bg-emerald-600 shadow-emerald-100' :
-                syncStatus === 'error' ? 'bg-rose-600 shadow-rose-100' :
-                syncStatus === 'syncing' ? 'bg-indigo-500 shadow-indigo-100 cursor-not-allowed' :
-                'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-150 hover:translate-y-[-2px]'
-              }`}
-            >
-              <RefreshCw size={18} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
-              {syncStatus === 'syncing' ? 'SEDANG MENULIS DATA...' :
-               syncStatus === 'success' ? 'SINKRON DATA SUKSES ✅' :
-               syncStatus === 'error' ? 'SINKRON DATA GAGAL ❌' :
-               'SINKRONISASI SANTRI'}
-            </button>
-          )}
-
-          {currentUserEmail && (
-            <button 
-              onClick={() => {
-                setIsAdminViewActive(true);
-                handleClearClass();
-              }}
-              className="w-full bg-blue-700 hover:bg-blue-800 text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-lg hover:translate-y-[-1px]"
-            >
-              ⬅️ PANEL MONITOR ADMIN
-            </button>
-          )}
+          {/* Sync & Direct Navigation Controls */}
+          <button 
+            onClick={handleManualSync}
+            disabled={syncStatus === 'syncing' || filteredStudents.length === 0}
+            className={`w-full text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-xl ${
+              syncStatus === 'success' ? 'bg-emerald-600 shadow-emerald-100' :
+              syncStatus === 'error' ? 'bg-rose-600 shadow-rose-100' :
+              syncStatus === 'syncing' ? 'bg-indigo-500 shadow-indigo-100 cursor-not-allowed' :
+              'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-150 hover:translate-y-[-2px]'
+            }`}
+          >
+            <RefreshCw size={18} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
+            {syncStatus === 'syncing' ? 'SEDANG MENULIS DATA...' :
+             syncStatus === 'success' ? 'SINKRON DATA SUKSES ✅' :
+             syncStatus === 'error' ? 'SINKRON DATA GAGAL ❌' :
+             'SINKRONISASI SANTRI'}
+          </button>
 
           <button 
-            onClick={handleLogout}
-            className="w-full bg-slate-900 hover:bg-slate-950 text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-lg hover:translate-y-[-1px]"
+            onClick={handleClearClass}
+            className="w-full bg-slate-905 hover:bg-slate-950 text-slate-800 p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all border border-slate-200 hover:bg-slate-100 cursor-pointer"
           >
-            <LogOut size={18} /> KELUAR AKUN
+            <ChevronLeft size={18} /> GANTI PILIHAN KELAS
           </button>
         </div>
       </motion.aside>
