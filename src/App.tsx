@@ -113,12 +113,15 @@ const ReportTemplate = ({
   autoSaveStudent, setStudentsList, currentUserEmail = null
 }: ReportTemplateProps) => {
   const waliKelasToPrint = useMemo(() => {
+    if (globalWaliKelas) {
+      return globalWaliKelas;
+    }
     const jk = (student.identity?.jenisKelamin || '').trim().toUpperCase();
     const isPutra = jk.startsWith('L') || jk.startsWith('PUTRA');
     if (isPutra) {
-      return globalWaliKelasPutra || globalWaliKelas || '..........................';
+      return globalWaliKelasPutra || '..........................';
     } else {
-      return globalWaliKelasPutri || globalWaliKelas || '..........................';
+      return globalWaliKelasPutri || '..........................';
     }
   }, [student, globalWaliKelas, globalWaliKelasPutra, globalWaliKelasPutri]);
 
@@ -1672,7 +1675,7 @@ export default function App() {
         body: JSON.stringify({ 
           className: selectedClass, 
           students: studentsList,
-          waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+          waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri 
         })
       }).catch(err => console.warn('Pencatatan backup lokal tertunda:', err));
     }
@@ -1807,7 +1810,7 @@ export default function App() {
           body: JSON.stringify({ 
             className: selectedClass, 
             students: fullList,
-            waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+            waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri 
           })
         });
       }
@@ -2050,7 +2053,7 @@ export default function App() {
               body: JSON.stringify({ 
                 className: selectedClass, 
                 students: updated,
-                waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+                waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri 
               })
             }).catch(err => console.warn('Pencatatan backup lokal tertunda:', err));
           }
@@ -2220,7 +2223,7 @@ export default function App() {
             body: JSON.stringify({ 
               className: selectedClass, 
               students: updatedStudents,
-              waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+              waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri 
             })
           });
         }
@@ -2514,7 +2517,7 @@ export default function App() {
             body: JSON.stringify({ 
               className: selectedClass, 
               students: updatedStudents,
-              waliKelas: globalWaliKelasPutra || globalWaliKelasPutri || globalWaliKelas 
+              waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri 
             })
           });
         }
@@ -3717,44 +3720,7 @@ export default function App() {
           </AnimatePresence>
         )}
 
-        {/* MULTI STUDENT ADD MODAL */}
-        {isBulkAddOpen && (
-          <AnimatePresence>
-            <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
-              <div className="flex min-h-full items-center justify-center p-4">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkAddOpen(false)} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" />
-                <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col">
-                  <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100">
-                    <div>
-                      <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">INPUT DATA SANTRI SEKALIGUS</h2>
-                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">Masukkan daftar nama santri (Satu nama per baris)</p>
-                    </div>
-                    <button onClick={() => setIsBulkAddOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
-                  </div>
-                  <div className="p-8">
-                    <textarea 
-                      className="w-full h-80 p-6 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all uppercase placeholder:normal-case"
-                      placeholder="Contoh:&#10;Abdullah&#10;Abdurrahman&#10;Ahmad..."
-                      value={bulkData}
-                      onChange={e => setBulkData(e.target.value)}
-                    />
-                    <div className="mt-6 flex gap-4">
-                      <button 
-                        onClick={() => handleBulkAddStudents(bulkData)}
-                        className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black tracking-widest shadow-xl shadow-blue-100 transition-all active:scale-95 uppercase flex items-center justify-center gap-2"
-                      >
-                        <Plus size={20} /> Tambahkan Santri
-                      </button>
-                      <button onClick={() => setIsBulkAddOpen(false)} className="px-8 py-4 bg-white text-slate-400 font-black rounded-2xl border border-slate-200 hover:bg-slate-50 transition-all uppercase">Batal</button>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-          </AnimatePresence>
-        )}
-
-        {/* BULK GRADES MODAL */}
+         {/* BULK GRADES MODAL */}
         {isBulkGradesOpen && (
           <AnimatePresence>
             <div className="fixed inset-0 z-[200] overflow-y-auto no-print">
@@ -4637,22 +4603,7 @@ export default function App() {
               </div>
 
               {/* Bento Grid layout for Mass Inputs */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Card 1: Input Data Santri Sekaligus */}
-                <div className="bg-white rounded-[28px] p-6 border border-slate-100 hover:border-blue-200 transition-all hover:translate-y-[-2px] hover:shadow-lg hover:shadow-slate-100/50 flex flex-col justify-between">
-                  <div>
-                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl shadow-sm mb-4">✍️</div>
-                    <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider font-sans">Input Data Santri Sekaligus</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1.5 leading-relaxed">Masukkan daftar nama santri baru secara cepat dalam satu baris per nama.</p>
-                  </div>
-                  <button 
-                    onClick={() => setIsBulkAddOpen(true)}
-                    className="w-full mt-6 py-3 bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-600 font-extrabold text-[10px] tracking-widest uppercase rounded-xl transition-all border border-blue-100 cursor-pointer text-center font-sans"
-                  >
-                    Buka Input Santri
-                  </button>
-                </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Card 2: Input Nilai Massal */}
                 <div className="bg-white rounded-[28px] p-6 border border-slate-100 hover:border-blue-200 transition-all hover:translate-y-[-2px] hover:shadow-lg hover:shadow-slate-100/50 flex flex-col justify-between">
                   <div>
@@ -4770,21 +4721,12 @@ export default function App() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Wali Kelas Santri Putra</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Nama Wali Kelas</label>
                     <input 
                       className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
-                      placeholder="NAMA WALI PUTRA..."
-                      value={globalWaliKelasPutra}
-                      onChange={e => handleUpdateGlobalWaliKelasPutra(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Wali Kelas Santri Putri</label>
-                    <input 
-                      className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
-                      placeholder="NAMA WALI PUTRI..."
-                      value={globalWaliKelasPutri}
-                      onChange={e => handleUpdateGlobalWaliKelasPutri(e.target.value)}
+                      placeholder="NAMA WALI KELAS..."
+                      value={globalWaliKelas}
+                      onChange={e => handleUpdateGlobalWaliKelas(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
