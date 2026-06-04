@@ -1378,73 +1378,51 @@ export default function App() {
       'al_hikmah_custom_logo'
     ];
 
+    const updateSafely = (keyStr: string, value: string) => {
+      const activeId = document.activeElement?.id;
+      if (keyStr === `wali_kelas_${selectedClass}`) {
+        if (activeId !== 'setting_wali_kelas') setGlobalWaliKelas(value);
+      } else if (keyStr === `wali_kelas_putra_${selectedClass}`) {
+        if (activeId !== 'setting_wali_kelas_putra') setGlobalWaliKelasPutra(value);
+      } else if (keyStr === `wali_kelas_putri_${selectedClass}`) {
+        if (activeId !== 'setting_wali_kelas_putri') setGlobalWaliKelasPutri(value);
+      } else if (keyStr === `nama_kelas_${selectedClass}`) {
+        if (activeId !== 'setting_nama_kelas') setGlobalNamaKelas(value);
+      } else if (keyStr === `tanggal_raport_${selectedClass}`) {
+        if (activeId !== 'setting_tanggal_raport') setGlobalTanggalRaport(value);
+      } else if (keyStr === `kepala_kepasentrenan_${selectedClass}`) {
+        if (activeId !== 'setting_kepala_kepasentrenan') setGlobalKepala(value);
+      } else if (keyStr === `tanggal_kenaikan_${selectedClass}`) {
+        if (activeId !== 'setting_tanggal_kenaikan') setGlobalTanggalKenaikan(value);
+      } else if (keyStr === 'al_hikmah_custom_logo') {
+        setLogoUrl(value);
+      }
+    };
+
+    const getFallbackVal = (keyStr: string, cachedVal: string | null) => {
+      if (cachedVal !== null) return cachedVal;
+      if (keyStr === `tanggal_raport_${selectedClass}`) return '20 Desember 2025';
+      if (keyStr === `tanggal_kenaikan_${selectedClass}`) return '21 Juni 2026';
+      return '';
+    };
+
     const unsubscribers = configKeys.map(key => {
       return onSnapshot(doc(db, 'configs', key), (snapshot) => {
         if (snapshot.exists()) {
           const val = snapshot.data().value || '';
           safeLocalStorageSetItem(`raport_config_cache_${key}`, val);
-          const activeId = document.activeElement?.id;
-          if (key === `wali_kelas_${selectedClass}`) {
-            if (activeId !== 'setting_wali_kelas') setGlobalWaliKelas(val);
-          } else if (key === `wali_kelas_putra_${selectedClass}`) {
-            if (activeId !== 'setting_wali_kelas_putra') setGlobalWaliKelasPutra(val);
-          } else if (key === `wali_kelas_putri_${selectedClass}`) {
-            if (activeId !== 'setting_wali_kelas_putri') setGlobalWaliKelasPutri(val);
-          } else if (key === `nama_kelas_${selectedClass}`) {
-            if (activeId !== 'setting_nama_kelas') setGlobalNamaKelas(val);
-          } else if (key === `tanggal_raport_${selectedClass}`) {
-            if (activeId !== 'setting_tanggal_raport') setGlobalTanggalRaport(val);
-          } else if (key === `kepala_kepasentrenan_${selectedClass}`) {
-            if (activeId !== 'setting_kepala_kepasentrenan') setGlobalKepala(val);
-          } else if (key === `tanggal_kenaikan_${selectedClass}`) {
-            if (activeId !== 'setting_tanggal_kenaikan') setGlobalTanggalKenaikan(val);
-          } else if (key === 'al_hikmah_custom_logo') {
-            setLogoUrl(val);
-          }
+          updateSafely(key, val);
         } else {
           // Defaults if not in Firebase - check cache first
           const cachedVal = localStorage.getItem(`raport_config_cache_${key}`);
-          if (cachedVal !== null) {
-            if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(cachedVal);
-            if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(cachedVal);
-            if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(cachedVal);
-            if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(cachedVal);
-            if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(cachedVal);
-            if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(cachedVal);
-            if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(cachedVal);
-            if (key === 'al_hikmah_custom_logo') setLogoUrl(cachedVal);
-          } else {
-            // Explicitly clear key when no database/cache value exists
-            if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas('');
-            if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra('');
-            if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri('');
-            if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas('');
-            if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala('');
-            if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport('20 Desember 2025');
-            if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan('21 Juni 2026');
-          }
+          const fallback = getFallbackVal(key, cachedVal);
+          updateSafely(key, fallback);
         }
       }, (error) => {
         handleFirestoreError(error, OperationType.GET, `configs/${key}`);
         const cachedVal = localStorage.getItem(`raport_config_cache_${key}`);
-        if (cachedVal !== null) {
-          if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(cachedVal);
-          if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(cachedVal);
-          if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(cachedVal);
-          if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(cachedVal);
-          if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(cachedVal);
-          if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(cachedVal);
-          if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(cachedVal);
-          if (key === 'al_hikmah_custom_logo') setLogoUrl(cachedVal);
-        } else {
-          if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas('');
-          if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra('');
-          if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri('');
-          if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas('');
-          if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala('');
-          if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport('20 Desember 2025');
-          if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan('21 Juni 2026');
-        }
+        const fallback = getFallbackVal(key, cachedVal);
+        updateSafely(key, fallback);
       });
     });
 
