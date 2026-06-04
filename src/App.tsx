@@ -1010,65 +1010,34 @@ export default function App() {
     }
   };
 
-  // Login handler for designated teacher accounts (single name field login, no password/username needed)
-  const handleTeacherLogIn = async (e: React.FormEvent) => {
+  // Login handler for designated teacher accounts (single class choice selection, no credentials needed)
+  const handleTeacherLogIn = (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    const enteredName = teacherInputUsername.trim();
-    if (!enteredName) {
-      setAuthError("Nama Lengkap wajib diisi");
+    const selectedClassVal = teacherFormWaliKelas.trim();
+    if (!selectedClassVal) {
+      setAuthError("Harap pilih kelas terlebih dahulu");
       return;
     }
 
-    try {
-      const res = await fetch('/api/auth/teacher-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: enteredName
-        })
-      });
+    const teacherInfo = {
+      username: `Wali Kelas ${selectedClassVal}`,
+      name: `Wali Kelas ${selectedClassVal}`,
+      waliKelas: selectedClassVal
+    };
 
-      let resData;
-      try {
-        const contentType = res.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          resData = await res.json();
-        } else {
-          const text = await res.text();
-          resData = { error: text || `HTTP Error ${res.status}` };
-        }
-      } catch (errParsing) {
-        resData = { error: `Gagal memproses respon server (${res.status})` };
-      }
+    setCurrentTeacher(teacherInfo);
+    localStorage.setItem('raport_current_teacher', JSON.stringify(teacherInfo));
 
-      if (res.ok) {
-        const teacherInfo = resData.teacher;
-        setCurrentTeacher(teacherInfo);
-        localStorage.setItem('raport_current_teacher', JSON.stringify(teacherInfo));
-        setIsAuthModalOpen(false);
-        setTeacherInputUsername('');
-        setTeacherInputPassword('');
-        setAuthError(null);
+    showConfirm({
+      title: 'Masuk Berhasil',
+      message: `Selamat datang di Workspace Kelas ${selectedClassVal}! Anda sekarang dapat mengisi dan mengelola dokumen raport kelas Anda.`,
+      cancelText: 'Lanjut',
+      confirmText: 'Selesai',
+      onConfirm: () => {}
+    });
 
-        showConfirm({
-          title: 'Sukses Masuk',
-          message: `Selamat datang Wali Kelas ${teacherInfo.waliKelas}! Anda sekarang dapat mengisi dan melihat seluruh identitas santri kelas Anda.`,
-          cancelText: 'Lanjut',
-          confirmText: 'OK',
-          onConfirm: () => {}
-        });
-
-        if (teacherInfo.waliKelas) {
-          handleSelectClass(teacherInfo.waliKelas);
-        }
-      } else {
-        setAuthError(resData.error || "Gagal masuk. Nama guru tidak terdaftar.");
-      }
-    } catch (err) {
-      console.error("Gagal melakukan login guru:", err);
-      setAuthError("Koneksi gagal atau server terputus.");
-    }
+    handleSelectClass(selectedClassVal);
   };
 
   const handleManualSync = async () => {
@@ -3297,24 +3266,29 @@ export default function App() {
             {activeAuthTab === 'teacher' ? (
               <form onSubmit={handleTeacherLogIn} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Nama Lengkap Guru</label>
-                  <input
-                    type="text"
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 block">Pilih Kelas Baru / Binaan Anda</label>
+                  <select
                     required
-                    className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold text-slate-700"
-                    placeholder="Masukkan nama lengkap sesuai yang diinput Admin..."
-                    value={teacherInputUsername}
-                    onChange={e => setTeacherInputUsername(e.target.value)}
-                  />
+                    className="w-full px-4 py-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold text-slate-700 cursor-pointer"
+                    value={teacherFormWaliKelas}
+                    onChange={e => setTeacherFormWaliKelas(e.target.value)}
+                  >
+                    <option value="">-- Silakan Pilih Kelas Anda --</option>
+                    {CLASSES.map((cls) => (
+                      <option key={cls} value={cls}>
+                        Kelas {cls}
+                      </option>
+                    ))}
+                  </select>
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider ml-1 mt-1 block">
-                    ⚡ Cukup masukkan nama Anda tanpa kata sandi / username
+                    ⚡ Cukup pilih kelas bimbingan Anda untuk langsung memuat data terkait.
                   </p>
                 </div>
                 <button
                   type="submit"
                   className="w-full mt-4 py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs tracking-widest uppercase rounded-xl transition-all shadow-md cursor-pointer block text-center"
                 >
-                  MASUK SEBAGAI GURU KELAS
+                  MASUK KE WORKSPACE KELAS 🚀
                 </button>
               </form>
             ) : (
