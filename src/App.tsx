@@ -1055,44 +1055,7 @@ export default function App() {
   };
 
   const flushPendingSaves = async () => {
-    const keys = Object.keys(configSaveTimeouts.current);
-    const promises = keys.map(async (key) => {
-      let val = '';
-      if (key.startsWith('wali_kelas_')) {
-        const cls = key.replace('wali_kelas_putra_', '').replace('wali_kelas_putri_', '').replace('wali_kelas_', '');
-        if (selectedClass === cls) {
-          if (key === `wali_kelas_${cls}`) val = globalWaliKelas;
-          if (key === `wali_kelas_putra_${cls}`) val = globalWaliKelasPutra;
-          if (key === `wali_kelas_putri_${cls}`) val = globalWaliKelasPutri;
-        }
-      } else if (key.startsWith('nama_kelas_')) {
-        const cls = key.replace('nama_kelas_', '');
-        if (selectedClass === cls) val = globalNamaKelas;
-      } else if (key.startsWith('tanggal_raport_')) {
-        const cls = key.replace('tanggal_raport_', '');
-        if (selectedClass === cls) val = globalTanggalRaport;
-      } else if (key.startsWith('kepala_kepasentrenan_')) {
-        const cls = key.replace('kepala_kepasentrenan_', '');
-        if (selectedClass === cls) val = globalKepala;
-      } else if (key.startsWith('tanggal_kenaikan_')) {
-        const cls = key.replace('tanggal_kenaikan_', '');
-        if (selectedClass === cls) val = globalTanggalKenaikan;
-      }
-
-      if (val) {
-        if (configSaveTimeouts.current[key]) {
-          clearTimeout(configSaveTimeouts.current[key]);
-          delete configSaveTimeouts.current[key];
-        }
-        try {
-          await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
-        } catch (e) {
-          console.warn('Gagal flush save untuk ' + key, e);
-        }
-      }
-    });
-
-    await Promise.all(promises);
+    // No-op: Automatic background saving has been disabled in favor of manual saves.
   };
 
   const handleLogout = () => {
@@ -1353,7 +1316,7 @@ export default function App() {
     return () => window.removeEventListener('firestore-error', handleErr);
   }, []);
 
-  // Fetch configs from Firebase
+  // Fetch configs from Firebase (ONE-TIME LOAD ON CLASS SELECT)
   useEffect(() => {
     // Reset all class-specific config states to prevent bleeding from the previous class
     setGlobalWaliKelas('');
@@ -1366,7 +1329,6 @@ export default function App() {
 
     if (!selectedClass) return;
 
-    // Config keys to listen to
     const configKeys = [
       `wali_kelas_${selectedClass}`,
       `wali_kelas_putra_${selectedClass}`,
@@ -1378,27 +1340,6 @@ export default function App() {
       'al_hikmah_custom_logo'
     ];
 
-    const updateSafely = (keyStr: string, value: string) => {
-      const activeId = document.activeElement?.id;
-      if (keyStr === `wali_kelas_${selectedClass}`) {
-        if (activeId !== 'setting_wali_kelas') setGlobalWaliKelas(value);
-      } else if (keyStr === `wali_kelas_putra_${selectedClass}`) {
-        if (activeId !== 'setting_wali_kelas_putra') setGlobalWaliKelasPutra(value);
-      } else if (keyStr === `wali_kelas_putri_${selectedClass}`) {
-        if (activeId !== 'setting_wali_kelas_putri') setGlobalWaliKelasPutri(value);
-      } else if (keyStr === `nama_kelas_${selectedClass}`) {
-        if (activeId !== 'setting_nama_kelas') setGlobalNamaKelas(value);
-      } else if (keyStr === `tanggal_raport_${selectedClass}`) {
-        if (activeId !== 'setting_tanggal_raport') setGlobalTanggalRaport(value);
-      } else if (keyStr === `kepala_kepasentrenan_${selectedClass}`) {
-        if (activeId !== 'setting_kepala_kepasentrenan') setGlobalKepala(value);
-      } else if (keyStr === `tanggal_kenaikan_${selectedClass}`) {
-        if (activeId !== 'setting_tanggal_kenaikan') setGlobalTanggalKenaikan(value);
-      } else if (keyStr === 'al_hikmah_custom_logo') {
-        setLogoUrl(value);
-      }
-    };
-
     const getFallbackVal = (keyStr: string, cachedVal: string | null) => {
       if (cachedVal !== null) return cachedVal;
       if (keyStr === `tanggal_raport_${selectedClass}`) return '20 Desember 2025';
@@ -1406,27 +1347,50 @@ export default function App() {
       return '';
     };
 
-    const unsubscribers = configKeys.map(key => {
-      return onSnapshot(doc(db, 'configs', key), (snapshot) => {
-        if (snapshot.exists()) {
-          const val = snapshot.data().value || '';
-          safeLocalStorageSetItem(`raport_config_cache_${key}`, val);
-          updateSafely(key, val);
-        } else {
-          // Defaults if not in Firebase - check cache first
+    const loadConfigs = async () => {
+      for (const key of configKeys) {
+        try {
+          const snapshot = await getDoc(doc(db, 'configs', key));
+          if (snapshot.exists()) {
+            const val = snapshot.data().value || '';
+            safeLocalStorageSetItem(`raport_config_cache_${key}`, val);
+            if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(val);
+            else if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(val);
+            else if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(val);
+            else if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(val);
+            else if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(val);
+            else if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(val);
+            else if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(val);
+            else if (key === 'al_hikmah_custom_logo') setLogoUrl(val);
+          } else {
+            const cachedVal = localStorage.getItem(`raport_config_cache_${key}`);
+            const fallback = getFallbackVal(key, cachedVal);
+            if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(fallback);
+            else if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(fallback);
+            else if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(fallback);
+            else if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(fallback);
+            else if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(fallback);
+            else if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(fallback);
+            else if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(fallback);
+            else if (key === 'al_hikmah_custom_logo') setLogoUrl(fallback);
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `configs/${key}`);
           const cachedVal = localStorage.getItem(`raport_config_cache_${key}`);
           const fallback = getFallbackVal(key, cachedVal);
-          updateSafely(key, fallback);
+          if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(fallback);
+          else if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(fallback);
+          else if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(fallback);
+          else if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(fallback);
+          else if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(fallback);
+          else if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(fallback);
+          else if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(fallback);
+          else if (key === 'al_hikmah_custom_logo') setLogoUrl(fallback);
         }
-      }, (error) => {
-        handleFirestoreError(error, OperationType.GET, `configs/${key}`);
-        const cachedVal = localStorage.getItem(`raport_config_cache_${key}`);
-        const fallback = getFallbackVal(key, cachedVal);
-        updateSafely(key, fallback);
-      });
-    });
+      }
+    };
 
-    return () => unsubscribers.forEach(unsub => unsub());
+    loadConfigs();
   }, [selectedClass]);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1435,6 +1399,8 @@ export default function App() {
       try {
         const base64 = await compressImage(file, 200, 200);
         if (base64) {
+          setLogoUrl(base64);
+          safeLocalStorageSetItem('al_hikmah_custom_logo', base64);
           await setDoc(doc(db, 'configs', 'al_hikmah_custom_logo'), { value: base64, updatedAt: new Date().toISOString() });
         }
       } catch (error) {
@@ -1563,100 +1529,61 @@ export default function App() {
 
   const handleUpdateGlobalWaliKelas = (val: string) => {
     setGlobalWaliKelas(val);
-    if (!selectedClass) return;
-    const key = `wali_kelas_${selectedClass}`;
-    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
-    configSaveTimeouts.current[key] = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
-      }
-    }, 800);
   };
 
   const handleUpdateGlobalWaliKelasPutra = (val: string) => {
     setGlobalWaliKelasPutra(val);
-    if (!selectedClass) return;
-    const key = `wali_kelas_putra_${selectedClass}`;
-    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
-    configSaveTimeouts.current[key] = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
-      }
-    }, 800);
   };
 
   const handleUpdateGlobalWaliKelasPutri = (val: string) => {
     setGlobalWaliKelasPutri(val);
-    if (!selectedClass) return;
-    const key = `wali_kelas_putri_${selectedClass}`;
-    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
-    configSaveTimeouts.current[key] = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
-      }
-    }, 800);
   };
 
   const handleUpdateGlobalNamaKelas = (val: string) => {
     setGlobalNamaKelas(val);
-    if (!selectedClass) return;
-    const key = `nama_kelas_${selectedClass}`;
-    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
-    configSaveTimeouts.current[key] = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
-      }
-    }, 800);
   };
 
   const handleUpdateGlobalTanggalRaport = (val: string) => {
     setGlobalTanggalRaport(val);
-    if (!selectedClass) return;
-    const key = `tanggal_raport_${selectedClass}`;
-    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
-    configSaveTimeouts.current[key] = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
-      }
-    }, 800);
   };
 
   const handleUpdateGlobalKepala = (val: string) => {
     setGlobalKepala(val);
-    if (!selectedClass) return;
-    const key = `kepala_kepasentrenan_${selectedClass}`;
-    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
-    configSaveTimeouts.current[key] = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
-      }
-    }, 800);
   };
 
   const handleUpdateGlobalTanggalKenaikan = (val: string) => {
     setGlobalTanggalKenaikan(val);
+  };
+
+  const [configSaveStatus, setConfigSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+
+  const handleSaveAllConfigs = async () => {
     if (!selectedClass) return;
-    const key = `tanggal_kenaikan_${selectedClass}`;
-    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
-    configSaveTimeouts.current[key] = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
+    setConfigSaveStatus('saving');
+    try {
+      const updates = [
+        { key: `wali_kelas_${selectedClass}`, value: globalWaliKelas },
+        { key: `wali_kelas_putra_${selectedClass}`, value: globalWaliKelasPutra },
+        { key: `wali_kelas_putri_${selectedClass}`, value: globalWaliKelasPutri },
+        { key: `nama_kelas_${selectedClass}`, value: globalNamaKelas },
+        { key: `tanggal_raport_${selectedClass}`, value: globalTanggalRaport },
+        { key: `kepala_kepasentrenan_${selectedClass}`, value: globalKepala },
+        { key: `tanggal_kenaikan_${selectedClass}`, value: globalTanggalKenaikan }
+      ];
+
+      for (const update of updates) {
+        await setDoc(doc(db, 'configs', update.key), { value: update.value, updatedAt: new Date().toISOString() });
+        safeLocalStorageSetItem(`raport_config_cache_${update.key}`, update.value);
       }
-    }, 800);
+
+      setConfigSaveStatus('success');
+      setTimeout(() => setConfigSaveStatus('idle'), 3000);
+    } catch (error) {
+      console.error('Failed to save configs:', error);
+      setConfigSaveStatus('error');
+      setTimeout(() => setConfigSaveStatus('idle'), 5000);
+      handleFirestoreError(error, OperationType.WRITE, `configs_batch_${selectedClass}`);
+    }
   };
 
   const handleProcessPromotion = async () => {
@@ -4868,6 +4795,46 @@ export default function App() {
                       onChange={e => handleUpdateGlobalTanggalKenaikan(e.target.value)}
                     />
                   </div>
+                </div>
+
+                {/* Manual Save Button for Report Settings */}
+                <div className="flex justify-start sm:justify-end pt-4 border-t border-slate-100">
+                  <button
+                    id="btn_simpan_config"
+                    onClick={handleSaveAllConfigs}
+                    disabled={configSaveStatus === 'saving'}
+                    className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 cursor-pointer ${
+                      configSaveStatus === 'saving'
+                        ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
+                        : configSaveStatus === 'success'
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                        : configSaveStatus === 'error'
+                        ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-100'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100'
+                    }`}
+                  >
+                    {configSaveStatus === 'saving' ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        MENYIMPAN...
+                      </>
+                    ) : configSaveStatus === 'success' ? (
+                      <>
+                        <Save size={14} />
+                        SETTING BERHASIL DISIMPAN!
+                      </>
+                    ) : configSaveStatus === 'error' ? (
+                      <>
+                        <Save size={14} />
+                        GAGAL MENYIMPAN! COBA LAGI
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        SIMPAN SETTING ADMINISTRATIF
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 {/* Logo Customizer */}
