@@ -113,12 +113,19 @@ async function safeWrite(): Promise<void> {
       if (!db.data) throw new Error("Database not initialized");
       const { class: className } = req.query;
       
-      let students = db.data.students;
       if (className) {
-        students = students.filter(s => s.class === className);
+        // Primary: Check class backup
+        const backup = db.data.classesBackup?.[className as string];
+        if (backup && backup.students) {
+          return res.json(backup.students);
+        }
+        
+        // Secondary fallback
+        const students = (db.data.students || []).filter(s => s.class === className);
+        return res.json(students);
       }
       
-      res.json(students);
+      res.json(db.data.students || []);
     } catch (error: any) {
       console.error("Get Students Error:", error);
       res.status(500).json({ message: "Internal server error" });

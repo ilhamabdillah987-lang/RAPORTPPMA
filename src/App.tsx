@@ -1698,7 +1698,7 @@ export default function App() {
 
   // Synchronize student list to client-side localStorage cache and back up to local Express server
   useEffect(() => {
-    if (selectedClass && studentsList.length > 0) {
+    if (selectedClass && !isLoading) {
       safeLocalStorageSetItem(`raport_students_cache_${selectedClass}`, JSON.stringify(studentsList));
       
       const timer = setTimeout(() => {
@@ -1715,7 +1715,7 @@ export default function App() {
 
       return () => clearTimeout(timer);
     }
-  }, [studentsList, selectedClass, globalWaliKelas, globalWaliKelasPutra, globalWaliKelasPutri]);
+  }, [studentsList, selectedClass, isLoading, globalWaliKelas, globalWaliKelasPutra, globalWaliKelasPutri]);
 
   const pullBackupFromServer = async (classNameStr: string, quiet = false) => {
     if (!classNameStr) return;
@@ -2042,6 +2042,8 @@ export default function App() {
         } else {
           nextList.push(payload);
         }
+        // Save to local cache right away to avoid any lag or race conditions
+        safeLocalStorageSetItem(`raport_students_cache_${selectedClass}`, JSON.stringify(nextList));
         return nextList;
       });
 
@@ -2053,10 +2055,6 @@ export default function App() {
       if (!isEdit) {
         setSearchTerm('');
         setCurrentIndex(studentsList.length);
-      }
-      
-      if (selectedClass) {
-        fetchStudents(selectedClass);
       }
       
       if (!stayOpen) {
