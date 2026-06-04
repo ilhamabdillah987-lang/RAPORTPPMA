@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import XLSXStyle from 'xlsx-js-style';
 import { Student, Subject, StudentIdentity } from './types';
@@ -763,6 +763,7 @@ const compressImage = (file: File, maxWidth = 300, maxHeight = 400): Promise<str
 };
 
 export default function App() {
+  const configSaveTimeouts = useRef<{ [key: string]: any }>({});
   const CLASSES = [
     '7 MTs Putra', '7 MTs Putri', '7 MTs Putra & Putri',
     '7 SMP Putra', '7 SMP Putri', '7 SMP Putra & Putri',
@@ -1053,6 +1054,47 @@ export default function App() {
     }
   };
 
+  const flushPendingSaves = async () => {
+    const keys = Object.keys(configSaveTimeouts.current);
+    const promises = keys.map(async (key) => {
+      let val = '';
+      if (key.startsWith('wali_kelas_')) {
+        const cls = key.replace('wali_kelas_putra_', '').replace('wali_kelas_putri_', '').replace('wali_kelas_', '');
+        if (selectedClass === cls) {
+          if (key === `wali_kelas_${cls}`) val = globalWaliKelas;
+          if (key === `wali_kelas_putra_${cls}`) val = globalWaliKelasPutra;
+          if (key === `wali_kelas_putri_${cls}`) val = globalWaliKelasPutri;
+        }
+      } else if (key.startsWith('nama_kelas_')) {
+        const cls = key.replace('nama_kelas_', '');
+        if (selectedClass === cls) val = globalNamaKelas;
+      } else if (key.startsWith('tanggal_raport_')) {
+        const cls = key.replace('tanggal_raport_', '');
+        if (selectedClass === cls) val = globalTanggalRaport;
+      } else if (key.startsWith('kepala_kepasentrenan_')) {
+        const cls = key.replace('kepala_kepasentrenan_', '');
+        if (selectedClass === cls) val = globalKepala;
+      } else if (key.startsWith('tanggal_kenaikan_')) {
+        const cls = key.replace('tanggal_kenaikan_', '');
+        if (selectedClass === cls) val = globalTanggalKenaikan;
+      }
+
+      if (val) {
+        if (configSaveTimeouts.current[key]) {
+          clearTimeout(configSaveTimeouts.current[key]);
+          delete configSaveTimeouts.current[key];
+        }
+        try {
+          await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
+        } catch (e) {
+          console.warn('Gagal flush save untuk ' + key, e);
+        }
+      }
+    });
+
+    await Promise.all(promises);
+  };
+
   const handleLogout = () => {
     showConfirm({
       title: 'Konfirmasi Keluar',
@@ -1060,6 +1102,26 @@ export default function App() {
       cancelText: 'Batal',
       confirmText: 'Keluar Sekarang',
       onConfirm: async () => {
+        // Immediately flush any configuration and student backups to the server before signing out!
+        if (selectedClass && studentsList.length > 0) {
+          try {
+            await fetch('/api/backup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                className: selectedClass, 
+                students: studentsList,
+                waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri 
+              })
+            });
+          } catch (e) {
+            console.warn('Backup on logout error:', e);
+          }
+        }
+
+        // Also flush any pending debounced config saves!
+        await flushPendingSaves();
+
         try {
           await signOut(auth);
         } catch (e) {
@@ -1321,14 +1383,24 @@ export default function App() {
         if (snapshot.exists()) {
           const val = snapshot.data().value || '';
           safeLocalStorageSetItem(`raport_config_cache_${key}`, val);
-          if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(val);
-          if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(val);
-          if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(val);
-          if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(val);
-          if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(val);
-          if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(val);
-          if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(val);
-          if (key === 'al_hikmah_custom_logo') setLogoUrl(val);
+          const activeId = document.activeElement?.id;
+          if (key === `wali_kelas_${selectedClass}`) {
+            if (activeId !== 'setting_wali_kelas') setGlobalWaliKelas(val);
+          } else if (key === `wali_kelas_putra_${selectedClass}`) {
+            if (activeId !== 'setting_wali_kelas_putra') setGlobalWaliKelasPutra(val);
+          } else if (key === `wali_kelas_putri_${selectedClass}`) {
+            if (activeId !== 'setting_wali_kelas_putri') setGlobalWaliKelasPutri(val);
+          } else if (key === `nama_kelas_${selectedClass}`) {
+            if (activeId !== 'setting_nama_kelas') setGlobalNamaKelas(val);
+          } else if (key === `tanggal_raport_${selectedClass}`) {
+            if (activeId !== 'setting_tanggal_raport') setGlobalTanggalRaport(val);
+          } else if (key === `kepala_kepasentrenan_${selectedClass}`) {
+            if (activeId !== 'setting_kepala_kepasentrenan') setGlobalKepala(val);
+          } else if (key === `tanggal_kenaikan_${selectedClass}`) {
+            if (activeId !== 'setting_tanggal_kenaikan') setGlobalTanggalKenaikan(val);
+          } else if (key === 'al_hikmah_custom_logo') {
+            setLogoUrl(val);
+          }
         } else {
           // Defaults if not in Firebase - check cache first
           const cachedVal = localStorage.getItem(`raport_config_cache_${key}`);
@@ -1511,81 +1583,102 @@ export default function App() {
     setWorkspaceTab('students');
   };
 
-  const handleUpdateGlobalWaliKelas = async (val: string) => {
+  const handleUpdateGlobalWaliKelas = (val: string) => {
     setGlobalWaliKelas(val);
-    if (selectedClass) {
+    if (!selectedClass) return;
+    const key = `wali_kelas_${selectedClass}`;
+    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
+    configSaveTimeouts.current[key] = setTimeout(async () => {
       try {
-        await setDoc(doc(db, 'configs', `wali_kelas_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/wali_kelas_${selectedClass}`);
+        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
       }
-    }
+    }, 800);
   };
 
-  const handleUpdateGlobalWaliKelasPutra = async (val: string) => {
+  const handleUpdateGlobalWaliKelasPutra = (val: string) => {
     setGlobalWaliKelasPutra(val);
-    if (selectedClass) {
+    if (!selectedClass) return;
+    const key = `wali_kelas_putra_${selectedClass}`;
+    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
+    configSaveTimeouts.current[key] = setTimeout(async () => {
       try {
-        await setDoc(doc(db, 'configs', `wali_kelas_putra_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/wali_kelas_putra_${selectedClass}`);
+        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
       }
-    }
+    }, 800);
   };
 
-  const handleUpdateGlobalWaliKelasPutri = async (val: string) => {
+  const handleUpdateGlobalWaliKelasPutri = (val: string) => {
     setGlobalWaliKelasPutri(val);
-    if (selectedClass) {
+    if (!selectedClass) return;
+    const key = `wali_kelas_putri_${selectedClass}`;
+    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
+    configSaveTimeouts.current[key] = setTimeout(async () => {
       try {
-        await setDoc(doc(db, 'configs', `wali_kelas_putri_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/wali_kelas_putri_${selectedClass}`);
+        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
       }
-    }
+    }, 800);
   };
 
-  const handleUpdateGlobalNamaKelas = async (val: string) => {
+  const handleUpdateGlobalNamaKelas = (val: string) => {
     setGlobalNamaKelas(val);
-    if (selectedClass) {
+    if (!selectedClass) return;
+    const key = `nama_kelas_${selectedClass}`;
+    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
+    configSaveTimeouts.current[key] = setTimeout(async () => {
       try {
-        await setDoc(doc(db, 'configs', `nama_kelas_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/nama_kelas_${selectedClass}`);
+        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
       }
-    }
+    }, 800);
   };
 
-  const handleUpdateGlobalTanggalRaport = async (val: string) => {
+  const handleUpdateGlobalTanggalRaport = (val: string) => {
     setGlobalTanggalRaport(val);
-    if (selectedClass) {
+    if (!selectedClass) return;
+    const key = `tanggal_raport_${selectedClass}`;
+    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
+    configSaveTimeouts.current[key] = setTimeout(async () => {
       try {
-        await setDoc(doc(db, 'configs', `tanggal_raport_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/tanggal_raport_${selectedClass}`);
+        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
       }
-    }
+    }, 800);
   };
 
-  const handleUpdateGlobalKepala = async (val: string) => {
+  const handleUpdateGlobalKepala = (val: string) => {
     setGlobalKepala(val);
-    if (selectedClass) {
+    if (!selectedClass) return;
+    const key = `kepala_kepasentrenan_${selectedClass}`;
+    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
+    configSaveTimeouts.current[key] = setTimeout(async () => {
       try {
-        await setDoc(doc(db, 'configs', `kepala_kepasentrenan_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/kepala_kepasentrenan_${selectedClass}`);
+        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
       }
-    }
+    }, 800);
   };
 
-  const handleUpdateGlobalTanggalKenaikan = async (val: string) => {
+  const handleUpdateGlobalTanggalKenaikan = (val: string) => {
     setGlobalTanggalKenaikan(val);
-    if (selectedClass) {
+    if (!selectedClass) return;
+    const key = `tanggal_kenaikan_${selectedClass}`;
+    if (configSaveTimeouts.current[key]) clearTimeout(configSaveTimeouts.current[key]);
+    configSaveTimeouts.current[key] = setTimeout(async () => {
       try {
-        await setDoc(doc(db, 'configs', `tanggal_kenaikan_${selectedClass}`), { value: val, updatedAt: new Date().toISOString() });
+        await setDoc(doc(db, 'configs', key), { value: val, updatedAt: new Date().toISOString() });
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `configs/tanggal_kenaikan_${selectedClass}`);
+        handleFirestoreError(error, OperationType.WRITE, `configs/${key}`);
       }
-    }
+    }, 800);
   };
 
   const handleProcessPromotion = async () => {
@@ -4750,6 +4843,7 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Nama Kelas</label>
                     <input 
+                      id="setting_nama_kelas"
                       className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
                       placeholder="X (SEPULUH)..."
                       value={globalNamaKelas}
@@ -4759,6 +4853,7 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Tanggal Raport</label>
                     <input 
+                      id="setting_tanggal_raport"
                       className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
                       placeholder="20 DESEMBER 2025..."
                       value={globalTanggalRaport}
@@ -4768,6 +4863,7 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Nama Wali Kelas</label>
                     <input 
+                      id="setting_wali_kelas"
                       className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
                       placeholder="NAMA WALI KELAS..."
                       value={globalWaliKelas}
@@ -4777,6 +4873,7 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Kepala Kepesantrenan</label>
                     <input 
+                      id="setting_kepala_kepasentrenan"
                       className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
                       placeholder="NAMA KEPALA..."
                       value={globalKepala}
@@ -4786,6 +4883,7 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Tgl Kenaikan/Kelulusan</label>
                     <input 
+                      id="setting_tanggal_kenaikan"
                       className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
                       placeholder="21 JUNI 2026..."
                       value={globalTanggalKenaikan}
