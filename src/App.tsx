@@ -1694,15 +1694,20 @@ export default function App() {
   useEffect(() => {
     if (selectedClass && studentsList.length > 0) {
       safeLocalStorageSetItem(`raport_students_cache_${selectedClass}`, JSON.stringify(studentsList));
-      fetch('/api/backup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          className: selectedClass, 
-          students: studentsList,
-          waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri 
-        })
-      }).catch(err => console.warn('Pencatatan backup lokal tertunda:', err));
+      
+      const timer = setTimeout(() => {
+        fetch('/api/backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            className: selectedClass, 
+            students: studentsList,
+            waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri 
+          })
+        }).catch(err => console.warn('Pencatatan backup lokal tertunda:', err));
+      }, 2000);
+
+      return () => clearTimeout(timer);
     }
   }, [studentsList, selectedClass, globalWaliKelas, globalWaliKelasPutra, globalWaliKelasPutri]);
 

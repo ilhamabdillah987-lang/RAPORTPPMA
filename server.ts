@@ -36,11 +36,26 @@ const adapter = new JSONFile<Data>(path.join(process.cwd(), 'db.json'));
 const defaultData: Data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
 const db = new Low<Data>(adapter, defaultData);
 
+let writeQueue = Promise.resolve();
+async function safeWrite(): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    writeQueue = writeQueue
+      .then(async () => {
+        await db.write();
+      })
+      .then(resolve)
+      .catch((err) => {
+        console.error("[safeWriteError]", err);
+        reject(err);
+      });
+  });
+}
+
 (async () => {
   await db.read();
   if (!db.data) {
     db.data = defaultData;
-    await db.write();
+    await safeWrite();
   } else {
     let changed = false;
     if (!db.data.classesBackup) {
@@ -60,7 +75,7 @@ const db = new Low<Data>(adapter, defaultData);
       changed = true;
     }
     if (changed) {
-      await db.write();
+      await safeWrite();
     }
   }
 
@@ -83,7 +98,7 @@ const db = new Low<Data>(adapter, defaultData);
     }
     
     db.data.students = migratedStudents;
-    await db.write();
+    await safeWrite();
     console.log(`Berhasil memigrasi ${migratedStudents.length} santri ke array utama.`);
   }
 })();
@@ -119,7 +134,7 @@ const db = new Low<Data>(adapter, defaultData);
         id: student.id || Date.now().toString()
       };
       db.data.students.push(newStudent);
-      await db.write();
+      await safeWrite();
       res.status(201).json(newStudent);
     } catch (error: any) {
       console.error("Create Student Error:", error);
@@ -176,7 +191,7 @@ const db = new Low<Data>(adapter, defaultData);
         db.data.classesBackup[cls].updatedAt = new Date().toISOString();
       }
 
-      await db.write();
+      await safeWrite();
       res.json(finalStudent);
     } catch (error: any) {
       console.error("Update Student Error:", error);
@@ -203,7 +218,7 @@ const db = new Low<Data>(adapter, defaultData);
         db.data.classesBackup[classLabel].updatedAt = new Date().toISOString();
       }
 
-      await db.write();
+      await safeWrite();
       res.status(204).send();
     } catch (error: any) {
       console.error("Delete Student Error:", error);
@@ -234,7 +249,7 @@ const db = new Low<Data>(adapter, defaultData);
         db.data.configs = {};
       }
       db.data.configs[key] = value;
-      await db.write();
+      await safeWrite();
       res.json({ success: true, key, value });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -272,7 +287,7 @@ const db = new Low<Data>(adapter, defaultData);
         db.data.students.push(...students);
       }
 
-      await db.write();
+      await safeWrite();
       res.json({ success: true, className, count: (students || []).length });
     } catch (err: any) {
       console.error("Backup error:", err);
@@ -294,7 +309,7 @@ const db = new Low<Data>(adapter, defaultData);
             updatedAt: new Date().toISOString(),
             waliKelas: ""
           };
-          await db.write();
+          await safeWrite();
           return res.json(db.data.classesBackup[className]);
         }
         return res.status(404).json({ error: "Backup data kelas tidak ditemukan" });
@@ -427,7 +442,7 @@ const db = new Low<Data>(adapter, defaultData);
         db.data.classesBackup[cls].waliKelas = preservedUsername.toLowerCase();
       }
 
-      await db.write();
+      await safeWrite();
 
       res.status(201).json({ success: true, teacher: { username: preservedUsername, waliKelas: cls } });
     } catch (err: any) {
@@ -472,7 +487,7 @@ const db = new Low<Data>(adapter, defaultData);
       }
 
       db.data.teachers[idx] = teacher;
-      await db.write();
+      await safeWrite();
 
       res.json({ success: true, teacher: { username: teacher.username, name: teacher.name || teacher.username, waliKelas: teacher.waliKelas } });
     } catch (err: any) {
@@ -500,7 +515,7 @@ const db = new Low<Data>(adapter, defaultData);
       }
 
       db.data.teachers.splice(idx, 1);
-      await db.write();
+      await safeWrite();
 
       res.json({ success: true, message: `Guru ${username} berhasil dihapus` });
     } catch (err: any) {
