@@ -9,7 +9,7 @@ import XLSXStyle from 'xlsx-js-style';
 import { Student, Subject, StudentIdentity } from './types';
 import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User as LucideUser, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu, LogIn, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot } from './firebase';
+import { db, auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, getAccessToken } from './firebase';
 
 enum OperationType {
   CREATE = 'create',
@@ -805,6 +805,7 @@ export default function App() {
   const [adminClassesStats, setAdminClassesStats] = useState<any[]>([]);
   const [isAdminDataLoading, setIsAdminDataLoading] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [googleSheetsActive, setGoogleSheetsActive] = useState(false);
   const [selectedAdminClassDetail, setSelectedAdminClassDetail] = useState<string | null>(null);
   const [adminSelectedClassStudents, setAdminSelectedClassStudents] = useState<any[]>([]);
 
@@ -867,7 +868,18 @@ export default function App() {
 
   // Sync Firebase authentication
   useEffect(() => {
-    // Authenticated state is bypassable in this simplified view mode
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUserEmail(user.email);
+        localStorage.setItem('raport_admin_email', user.email || '');
+        setGoogleSheetsActive(!!getAccessToken());
+      } else {
+        setCurrentUserEmail(null);
+        localStorage.removeItem('raport_admin_email');
+        setGoogleSheetsActive(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   // Redirect admin back to monitoring view if no class is selected
@@ -950,6 +962,7 @@ export default function App() {
         if (email) {
           localStorage.setItem('raport_admin_email', email);
         }
+        setGoogleSheetsActive(true);
         setIsAuthModalOpen(false);
         setIsAdminViewActive(true);
       }
@@ -1096,6 +1109,7 @@ export default function App() {
         setCurrentTeacher(null);
         setSelectedClass('');
         setIsAdminViewActive(false);
+        setGoogleSheetsActive(false);
       }
     });
   };
@@ -3294,6 +3308,44 @@ export default function App() {
                   <span className="text-xl block mb-1">🟣</span>
                   <span className="block text-[10px] font-black text-indigo-800 uppercase leading-none tracking-tight">SMA</span>
                 </div>
+              </div>
+
+              {/* Google Sheets status section */}
+              <div className="pt-6 border-t border-slate-100 flex flex-col gap-3">
+                {googleSheetsActive ? (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-3xl flex items-center justify-between gap-3 text-left">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">📊</span>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-emerald-800 block leading-tight">DATABASE GOOGLE SHEETS AKTIF</span>
+                        <span className="text-[9px] font-bold text-emerald-600 block mt-0.5">Tersambung ke Raport_Al_Hikmah_Database</span>
+                      </div>
+                    </div>
+                    <span className="px-2 py-1 bg-emerald-600 text-white font-extrabold text-[8px] tracking-wider uppercase rounded-md leading-none">TERHUBUNG</span>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-3xl flex flex-col gap-3 text-left">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl">📊</span>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-slate-600 block leading-tight">GOOGLE SHEETS BELUM AKTIF</span>
+                        <span className="text-[9px] font-bold text-slate-400 block mt-0.5 leading-relaxed">Hubungkan kearsipan Google Drive untuk menyimpan data pengisian langsung ke Google Sheets pribadi Anda secara otomatis.</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await handleGoogleSignIn(); 
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] tracking-widest uppercase rounded-xl transition-all shadow-md transform hover:translate-y-[-1px] cursor-pointer"
+                    >
+                      🚀 HUBUNGKAN GOOGLE SHEETS
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
