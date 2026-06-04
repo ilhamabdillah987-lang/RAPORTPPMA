@@ -124,10 +124,23 @@ export async function setDoc(docRef: any, data: any, options?: any) {
     return;
   }
   
-  // Bypass individual student server sync!
-  // All modifications are instantly stored in the local cache,
-  // and safely backed up as a class bundle via the background /api/backup POST query.
-  return Promise.resolve();
+  if (docRef.path === 'students') {
+    const res = await fetch(`/api/students/${encodeURIComponent(docRef.id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      let errMsg = res.statusText;
+      try {
+        const errJson = await res.json();
+        if (errJson && (errJson.message || errJson.error)) {
+          errMsg = errJson.message || errJson.error;
+        }
+      } catch (_) {}
+      throw new Error(`Gagal menyimpan data santri: ${errMsg}`);
+    }
+  }
 }
 
 export async function updateDoc(docRef: any, data: any) {
@@ -135,8 +148,14 @@ export async function updateDoc(docRef: any, data: any) {
 }
 
 export async function deleteDoc(docRef: any) {
-  // Bypass individual student server delete, rely on classesBackup sync
-  return Promise.resolve();
+  if (docRef.path === 'students') {
+    const res = await fetch(`/api/students/${encodeURIComponent(docRef.id)}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      throw new Error(`Gagal menghapus data santri: ${res.statusText}`);
+    }
+  }
 }
 
 export function onSnapshot(docRef: any, callback: (snapshot: any) => void, onError?: (error: any) => void) {
