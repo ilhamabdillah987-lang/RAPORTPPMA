@@ -1680,7 +1680,13 @@ export default function App() {
   useEffect(() => {
     if (!editingStudent || !editingStudent.id) return;
 
-    // REAL-TIME UI UPDATE: Update local list immediately as user types
+    // IF inside the editing modal (isModalOpen === true), DO NOT auto-save to server or update global list on every keystroke.
+    // This stops the huge write bottlenecks/conflicts on server, keeps UI lightning-fast, and avoids random save failures.
+    if (isModalOpen) {
+      return;
+    }
+
+    // REAL-TIME UI UPDATE: Update local list immediately as user types (only used when editing cells directly on the main dashboard)
     setStudentsList(prev => prev.map(s => s.id === editingStudent.id ? { ...s, ...editingStudent } as Student : s));
 
     const timer = setTimeout(() => {
@@ -1688,7 +1694,7 @@ export default function App() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [editingStudent]);
+  }, [editingStudent, isModalOpen]);
 
   // Synchronize student list to client-side localStorage cache and back up to local Express server
   useEffect(() => {
@@ -1786,10 +1792,7 @@ export default function App() {
     }
   };
 
-  const handleCloseModal = async () => {
-    if (editingStudent && editingStudent.id && saveStatus === 'saving') {
-      await autoSaveStudent(editingStudent);
-    }
+  const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingStudent(null);
     setSaveStatus('idle');

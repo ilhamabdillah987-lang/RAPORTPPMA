@@ -38,16 +38,16 @@ const db = new Low<Data>(adapter, defaultData);
 
 let writeQueue = Promise.resolve();
 async function safeWrite(): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<void>((resolve) => {
     writeQueue = writeQueue
       .then(async () => {
-        await db.write();
+        try {
+          await db.write();
+        } catch (err) {
+          console.warn("[safeWriteError - Handled Gracefully]", err);
+        }
       })
-      .then(resolve)
-      .catch((err) => {
-        console.error("[safeWriteError]", err);
-        reject(err);
-      });
+      .then(resolve);
   });
 }
 
