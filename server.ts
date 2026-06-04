@@ -123,7 +123,7 @@ const db = new Low<Data>(adapter, defaultData);
       res.status(201).json(newStudent);
     } catch (error: any) {
       console.error("Create Student Error:", error);
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: `Gagal membuat data santri: ${error.message || error}` });
     }
   });
 
@@ -180,7 +180,7 @@ const db = new Low<Data>(adapter, defaultData);
       res.json(finalStudent);
     } catch (error: any) {
       console.error("Update Student Error:", error);
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: `Gagal memperbarui data santri: ${error.message || error}` });
     }
   });
 

@@ -112,7 +112,14 @@ export async function setDoc(docRef: any, data: any, options?: any) {
       body: JSON.stringify(data)
     });
     if (!res.ok) {
-      throw new Error(`Gagal menyimpan konfigurasi: ${res.statusText}`);
+      let errMsg = res.statusText;
+      try {
+        const errJson = await res.json();
+        if (errJson && (errJson.message || errJson.error)) {
+          errMsg = errJson.message || errJson.error;
+        }
+      } catch (_) {}
+      throw new Error(`Gagal menyimpan konfigurasi: ${errMsg}`);
     }
     return;
   }
@@ -123,7 +130,14 @@ export async function setDoc(docRef: any, data: any, options?: any) {
     body: JSON.stringify(data)
   });
   if (!res.ok) {
-    throw new Error(`Gagal menyimpan data santri: ${res.statusText}`);
+    let errMsg = res.statusText;
+    try {
+      const errJson = await res.json();
+      if (errJson && (errJson.message || errJson.error)) {
+        errMsg = errJson.message || errJson.error;
+      }
+    } catch (_) {}
+    throw new Error(`Gagal menyimpan data santri: ${errMsg}`);
   }
 }
 

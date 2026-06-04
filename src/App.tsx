@@ -1239,6 +1239,7 @@ export default function App() {
   const [editingStudent, setEditingStudent] = useState<Partial<Student> | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'grades' | 'identity' | 'extra'>('basic');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [selectedSubjectIndex, setSelectedSubjectIndex] = useState(0);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -1491,6 +1492,7 @@ export default function App() {
   const autoSaveStudent = async (student: Partial<Student>) => {
     if (!student.id) return;
     setSaveStatus('saving');
+    setSaveErrorMessage(null);
     try {
       const cleaned = cleanUndefined(student);
       await setDoc(doc(db, 'students', student.id), { ...cleaned, updatedAt: new Date().toISOString() }, { merge: true });
@@ -1498,6 +1500,7 @@ export default function App() {
     } catch (e) {
       console.warn('Auto save failed:', e);
       setSaveStatus('error');
+      setSaveErrorMessage(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -2018,6 +2021,9 @@ export default function App() {
       updatedAt: new Date().toISOString()
     } as Student;
 
+    setSaveStatus('saving');
+    setSaveErrorMessage(null);
+
     try {
       // Optimistically update local UI state immediately
       setStudentsList(prev => {
@@ -2034,6 +2040,8 @@ export default function App() {
       const cleanedPayload = cleanUndefined(payload);
       await setDoc(doc(db, 'students', studentId), cleanedPayload, { merge: true });
       
+      setSaveStatus('saved');
+
       if (!isEdit) {
         setSearchTerm('');
         setCurrentIndex(studentsList.length);
@@ -2049,6 +2057,9 @@ export default function App() {
         setSaveStatus('idle');
       }
     } catch (e) {
+      console.error('Save failed:', e);
+      setSaveStatus('error');
+      setSaveErrorMessage(e instanceof Error ? e.message : String(e));
       handleFirestoreError(e, OperationType.WRITE, `students/${studentId}`);
     }
   };
@@ -4138,6 +4149,11 @@ export default function App() {
                                saveStatus === 'saved' ? 'Tersimpan Otomatis' : 
                                saveStatus === 'error' ? 'Gagal Menyimpan' : 'Siap'}
                             </span>
+                            {saveStatus === 'error' && saveErrorMessage && (
+                              <span className="text-[10px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full font-medium" title={saveErrorMessage}>
+                                ({saveErrorMessage})
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
