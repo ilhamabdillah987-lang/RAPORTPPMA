@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // Allow flexible access to public configuration parameters and academic records
+    match /students/{studentId} {
+      allow read, write: if true;
+    }
+
+    match /configs/{key} {
+      allow read, write: if true;
+    }
+
+    match /teachers/{username} {
+      allow read, write: if true;
+    }
+
+    match /classes_backup/{className} {
+      allow read, write: if true;
+    }
+  }
+}

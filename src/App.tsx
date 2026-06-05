@@ -805,6 +805,7 @@ export default function App() {
   const [adminClassesStats, setAdminClassesStats] = useState<any[]>([]);
   const [isAdminDataLoading, setIsAdminDataLoading] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'MTs' | 'SMP' | 'SMA'>('all');
   const [googleSheetsActive, setGoogleSheetsActive] = useState(false);
   const [selectedAdminClassDetail, setSelectedAdminClassDetail] = useState<string | null>(null);
   const [adminSelectedClassStudents, setAdminSelectedClassStudents] = useState<any[]>([]);
@@ -893,6 +894,11 @@ export default function App() {
   // Redirect admin back to monitoring view if no class is selected
   useEffect(() => {
     // Admin features inactive, direct entry only
+  }, [selectedClass]);
+
+  // Automatic central server database status sync on mount and class toggle
+  useEffect(() => {
+    fetchStatusSummary();
   }, [selectedClass]);
 
   const fetchAdminStats = async () => {
@@ -3325,21 +3331,108 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Informative instructions block with visual layout */}
+              {/* Category Interaction Selector */}
               <div className="grid grid-cols-3 gap-3 pt-4">
-                <div className="bg-emerald-500/5 rounded-2xl p-4 text-center border border-emerald-500/20 shadow-sm">
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setSelectedCategory(selectedCategory === 'MTs' ? 'all' : 'MTs')}
+                  className={`rounded-2xl p-4 text-center border transition-all cursor-pointer shadow-sm ${
+                    selectedCategory === 'MTs' 
+                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-md shadow-emerald-150' 
+                      : 'bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/25 text-emerald-800'
+                  }`}
+                >
                   <span className="text-xl block mb-1">🟢</span>
-                  <span className="block text-[10px] font-black text-emerald-800 uppercase leading-none tracking-tight">MTs</span>
-                </div>
-                <div className="bg-blue-500/5 rounded-2xl p-4 text-center border border-blue-500/20 shadow-sm">
+                  <span className={`block text-[10px] font-black uppercase leading-none tracking-tight ${
+                    selectedCategory === 'MTs' ? 'text-white' : 'text-emerald-850'
+                  }`}>MTs</span>
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setSelectedCategory(selectedCategory === 'SMP' ? 'all' : 'SMP')}
+                  className={`rounded-2xl p-4 text-center border transition-all cursor-pointer shadow-sm ${
+                    selectedCategory === 'SMP' 
+                      ? 'bg-blue-600 text-white border-blue-700 shadow-md shadow-blue-150' 
+                      : 'bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/25 text-blue-800'
+                  }`}
+                >
                   <span className="text-xl block mb-1">🔵</span>
-                  <span className="block text-[10px] font-black text-blue-850 uppercase leading-none tracking-tight">SMP</span>
-                </div>
-                <div className="bg-indigo-500/5 rounded-2xl p-4 text-center border border-indigo-500/20 shadow-sm">
+                  <span className={`block text-[10px] font-black uppercase leading-none tracking-tight ${
+                    selectedCategory === 'SMP' ? 'text-white' : 'text-blue-850'
+                  }`}>SMP</span>
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setSelectedCategory(selectedCategory === 'SMA' ? 'all' : 'SMA')}
+                  className={`rounded-2xl p-4 text-center border transition-all cursor-pointer shadow-sm ${
+                    selectedCategory === 'SMA' 
+                      ? 'bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-150' 
+                      : 'bg-indigo-500/5 hover:bg-indigo-500/10 border-indigo-500/25 text-indigo-805'
+                  }`}
+                >
                   <span className="text-xl block mb-1">🟣</span>
-                  <span className="block text-[10px] font-black text-indigo-800 uppercase leading-none tracking-tight">SMA</span>
-                </div>
+                  <span className={`block text-[10px] font-black uppercase leading-none tracking-tight ${
+                    selectedCategory === 'SMA' ? 'text-white' : 'text-indigo-800'
+                  }`}>SMA</span>
+                </motion.button>
               </div>
+
+              {/* Dynamic Sub-Classes Interactive Selection Grid */}
+              {selectedCategory !== 'all' && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-3 pt-2 overflow-hidden"
+                >
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest block border-b border-slate-100 pb-1.5">
+                    📂 Pilih Tingkat Kelas {selectedCategory} Binaan Anda:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                    {CLASSES.filter(cls => cls.includes(selectedCategory)).map((cls) => {
+                      const classStats = monitorStats?.classes?.find((c: any) => c.name === cls);
+                      const hasData = classStats?.hasData;
+                      const count = classStats?.studentCount || 0;
+                      return (
+                        <motion.button
+                          key={cls}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleSelectClass(cls)}
+                          className={`p-3.5 rounded-xl border text-left flex items-center justify-between text-xs font-black uppercase tracking-tight transition-all cursor-pointer ${
+                            hasData 
+                              ? 'bg-emerald-50 hover:bg-emerald-600 hover:text-white border-emerald-100 text-emerald-800' 
+                              : 'bg-slate-50 hover:bg-blue-600 hover:text-white border-slate-100 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <span>🏫 Kelas {cls}</span>
+                            <span className={`text-[8px] font-extrabold ${hasData ? 'text-emerald-600 hover:text-white/80' : 'text-slate-405'}`}>
+                              {hasData ? `✅ Terisi (${count} Santri)` : '⏳ Belum Diinput'}
+                            </span>
+                          </div>
+                          <span>➡️</span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </div>
+
+            {/* Admin entry point buttons */}
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setAdminAuthInputEmail('admin@alhikmah.id');
+                  setIsAuthModalOpen(true);
+                }}
+                className="w-full py-4 px-4 bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-black hover:to-indigo-900 text-white font-black text-[10px] tracking-widest uppercase rounded-2xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                👑 PORTAL PEMANTAUAN TERPUSAT / ADMIN
+              </button>
             </div>
 
             {/* Footer decoration */}
@@ -3348,7 +3441,7 @@ export default function App() {
                 ⚡ Auto-Save & Cloud Sync
               </span>
               <span className="text-[9px] font-black uppercase tracking-widest leading-none">
-                Versi Standalone (No-Auth)
+                Versi Terintegrasi (Firestore)
               </span>
             </div>
           </div>
@@ -4914,6 +5007,69 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* PORTAL AUTHENTICATION MODAL */}
+      {isAuthModalOpen && (
+        <AnimatePresence>
+          <div className="fixed inset-0 z-[1000] overflow-y-auto no-print">
+            <div className="flex min-h-full items-center justify-center p-4 font-sans">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={() => setIsAuthModalOpen(false)} 
+                className="fixed inset-0 bg-slate-900/45 backdrop-blur-sm" 
+              />
+              
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl p-8 overflow-hidden border border-slate-100 flex flex-col gap-5 z-10 text-left"
+              >
+                <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
+                  <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl shadow-inner font-bold">👑</div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Login Portal Admin</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Akses Pemantauan Database Terpusat</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed text-slate-500">
+                    Sistem akan mencatat kontribusi koordinasi Anda. Silakan masukkan email administrator Anda untuk memantau pengisian kelas:
+                  </p>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-100 pb-1 font-sans">Email Administrator</label>
+                    <input 
+                      type="email"
+                      className="w-full px-4 py-3 text-xs bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100/50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+                      placeholder="admin@alhikmah.id"
+                      value={adminAuthInputEmail}
+                      onChange={e => setAdminAuthInputEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-4">
+                  <button 
+                    onClick={() => setIsAuthModalOpen(false)} 
+                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all cursor-pointer border border-slate-200 text-center"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    onClick={handleManualEmailLogin} 
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all shadow-md shadow-blue-200 text-center cursor-pointer"
+                  >
+                    Masuk Sekarang
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </AnimatePresence>
+      )}
 
       {/* CUSTOM CONFIRMATION DIALOG MODAL */}
       {confirmModal.isOpen && (

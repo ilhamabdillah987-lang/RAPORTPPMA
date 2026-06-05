@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "student": {
+      "title": "Student Record",
+      "description": "Student academic profile and report card data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "nomorInduk": { "type": "string" },
+        "class": { "type": "string" },
+        "semester": { "type": "string" },
+        "tahunPelajaran": { "type": "string" },
+        "subjects": { "type": "array" },
+        "behavior": { "type": "object" },
+        "attendance": { "type": "object" },
+        "extracurriculars": { "type": "array" },
+        "waliKelas": { "type": "string" },
+        "identity": { "type": "object" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "config": {
+      "title": "System Configuration",
+      "description": "Global settings and report values per class level",
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" }
+      }
+    },
+    "teacher": {
+      "title": "Teacher Profile",
+      "description": "Information and credentials of designated class coordinators",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "name": { "type": "string" },
+        "pwdHash": { "type": "string" },
+        "waliKelas": { "type": "string" }
+      }
+    },
+    "classBackup": {
+      "title": "Classroom Backup Packet",
+      "description": "Compact class-level snapshot of all student records and the wali kelas designation",
+      "type": "object",
+      "properties": {
+        "students": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "waliKelas": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "student",
+      "description": "Access point for individual student profiles"
+    },
+    "/configs/{key}": {
+      "schema": "config",
+      "description": "Access point for global configurations and headings"
+    },
+    "/teachers/{username}": {
+      "schema": "teacher",
+      "description": "Access point for teacher login credentials"
+    },
+    "/classes_backup/{className}": {
+      "schema": "classBackup",
+      "description": "Access point for compact class package backups"
+    }
+  }
+}

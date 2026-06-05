@@ -6,6 +6,21 @@ import dotenv from "dotenv";
 import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
 import bcrypt from "bcryptjs";
+import fs from "fs";
+
+// Initialize Firebase SDK
+import { initializeApp } from "firebase/app";
+import { 
+  getFirestore, 
+  collection as firestoreCollection, 
+  doc as firestoreDoc, 
+  getDoc as firestoreGetDoc, 
+  getDocs as firestoreGetDocs, 
+  setDoc as firestoreSetDoc, 
+  deleteDoc as firestoreDeleteDoc, 
+  query as firestoreQuery, 
+  where as firestoreWhere 
+} from "firebase/firestore";
 
 dotenv.config();
 
@@ -31,10 +46,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// Explicit lowdb setup
+// Setup Firebase Firestore connection
+let firebaseApp: any = null;
+let firestoreDb: any = null;
+
+try {
+  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(firebaseConfigPath)) {
+    const config = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf8"));
+    firebaseApp = initializeApp(config);
+    firestoreDb = getFirestore(firebaseApp, config.firestoreDatabaseId);
+    console.log("[Server] Connected to persistent Firestore with DB ID:", config.firestoreDatabaseId);
+  } else {
+    console.warn("[Server] firebase-applet-config.json not found. Operating with local lowdb fallback.");
+  }
+} catch (err) {
+  console.error("[Server] Firebase configuration or initialization error:", err);
+}
+
+// Explicit lowdb setup (used as robust offline fallback)
 const adapter = new JSONFile<Data>(path.join(process.cwd(), 'db.json'));
 const defaultData: Data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
-const db = new Low<Data>(adapter, defaultData);
+const dbLocal = new Low<Data>(adapter, defaultData);
 
 let writeQueue = Promise.resolve();
 async function safeWrite(): Promise<void> {
@@ -42,7 +75,7 @@ async function safeWrite(): Promise<void> {
     writeQueue = writeQueue
       .then(async () => {
         try {
-          await db.write();
+          await dbLocal.write();
         } catch (err) {
           console.warn("[safeWriteError - Handled Gracefully]", err);
         }
@@ -52,80 +85,79 @@ async function safeWrite(): Promise<void> {
 }
 
 (async () => {
-  await db.read();
-  if (!db.data) {
-    db.data = defaultData;
+  await dbLocal.read();
+  if (!dbLocal.data) {
+    dbLocal.data = defaultData;
     await safeWrite();
   } else {
     let changed = false;
-    if (!db.data.classesBackup) {
-      db.data.classesBackup = {};
+    if (!dbLocal.data.classesBackup) {
+      dbLocal.data.classesBackup = {};
       changed = true;
     }
-    if (!db.data.configs) {
-      db.data.configs = {};
+    if (!dbLocal.data.configs) {
+      dbLocal.data.configs = {};
       changed = true;
     }
-    if (!db.data.students) {
-      db.data.students = [];
+    if (!dbLocal.data.students) {
+      dbLocal.data.students = [];
       changed = true;
     }
-    if (!db.data.teachers) {
-      db.data.teachers = [];
+    if (!dbLocal.data.teachers) {
+      dbLocal.data.teachers = [];
       changed = true;
     }
     if (changed) {
       await safeWrite();
     }
   }
-
-  // Dynamic migration: If students list is empty but backups are populated, populate students primary array
-  if (db.data && db.data.classesBackup && (!db.data.students || db.data.students.length === 0)) {
-    console.log("Migrasi data backup ke data utama...");
-    const migratedStudents: any[] = [];
-    const seenIds = new Set<string>();
-    
-    for (const className of Object.keys(db.data.classesBackup)) {
-      const backupInfo = db.data.classesBackup[className];
-      if (backupInfo && backupInfo.students) {
-        for (const student of backupInfo.students) {
-          if (student && student.id && !seenIds.has(student.id)) {
-            seenIds.add(student.id);
-            migratedStudents.push(student);
-          }
-        }
-      }
-    }
-    
-    db.data.students = migratedStudents;
-    await safeWrite();
-    console.log(`Berhasil memigrasi ${migratedStudents.length} santri ke array utama.`);
-  }
 })();
 
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", usingCloudDatabase: !!firestoreDb });
   });
 
   // Public Student Routes
   app.get("/api/students", async (req, res) => {
     try {
-      if (!db.data) throw new Error("Database not initialized");
       const { class: className } = req.query;
       
-      if (className) {
-        // Primary: Check class backup
-        const backup = db.data.classesBackup?.[className as string];
-        if (backup && backup.students) {
-          return res.json(backup.students);
+      if (firestoreDb) {
+        if (className) {
+          // Check classes_backup collection first
+          const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", className as string);
+          const backupSnap = await firestoreGetDoc(backupDocRef);
+          if (backupSnap.exists()) {
+            const data = backupSnap.data();
+            if (data && data.students && data.students.length > 0) {
+              return res.json(data.students);
+            }
+          }
+          
+          // Fallback to querying students directly
+          const colRef = firestoreCollection(firestoreDb, "students");
+          const q = firestoreQuery(colRef, firestoreWhere("class", "==", className as string));
+          const snap = await firestoreGetDocs(q);
+          const students = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          return res.json(students);
+        } else {
+          const colRef = firestoreCollection(firestoreDb, "students");
+          const snap = await firestoreGetDocs(colRef);
+          const students = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          return res.json(students);
         }
-        
-        // Secondary fallback
-        const students = (db.data.students || []).filter(s => s.class === className);
-        return res.json(students);
+      } else {
+        if (!dbLocal.data) throw new Error("Database not initialized");
+        if (className) {
+          const backup = dbLocal.data.classesBackup?.[className as string];
+          if (backup && backup.students) {
+            return res.json(backup.students);
+          }
+          const students = (dbLocal.data.students || []).filter(s => s.class === className);
+          return res.json(students);
+        }
+        res.json(dbLocal.data.students || []);
       }
-      
-      res.json(db.data.students || []);
     } catch (error: any) {
       console.error("Get Students Error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -134,14 +166,43 @@ async function safeWrite(): Promise<void> {
 
   app.post("/api/students", async (req, res) => {
     try {
-      if (!db.data) throw new Error("Database not initialized");
       const student = req.body;
+      const studentId = student.id || Date.now().toString();
       const newStudent = {
         ...student,
-        id: student.id || Date.now().toString()
+        id: studentId,
+        updatedAt: new Date().toISOString()
       };
-      db.data.students.push(newStudent);
-      await safeWrite();
+
+      if (firestoreDb) {
+        const docRef = firestoreDoc(firestoreDb, "students", studentId);
+        await firestoreSetDoc(docRef, newStudent, { merge: true });
+
+        // Update class packet backup as well
+        if (newStudent.class) {
+          const cls = newStudent.class;
+          const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", cls);
+          const backupSnap = await firestoreGetDoc(backupDocRef);
+          let currentStudents: any[] = [];
+          let currentWali = "";
+          if (backupSnap.exists()) {
+            const backupData = backupSnap.data() || {};
+            currentStudents = backupData.students || [];
+            currentWali = backupData.waliKelas || "";
+          }
+          currentStudents = currentStudents.filter(s => s.id !== studentId);
+          currentStudents.push(newStudent);
+          await firestoreSetDoc(backupDocRef, {
+            students: currentStudents,
+            updatedAt: new Date().toISOString(),
+            waliKelas: currentWali
+          }, { merge: true });
+        }
+      } else {
+        if (!dbLocal.data) throw new Error("Database not initialized");
+        dbLocal.data.students.push(newStudent);
+        await safeWrite();
+      }
       res.status(201).json(newStudent);
     } catch (error: any) {
       console.error("Create Student Error:", error);
@@ -154,51 +215,91 @@ async function safeWrite(): Promise<void> {
     const studentUpdate = req.body;
     
     try {
-      if (!db.data) throw new Error("Database not initialized");
-      if (!db.data.students) db.data.students = [];
+      let finalStudent: any;
 
-      const index = db.data.students.findIndex(s => s.id === id);
-      
-      let finalStudent;
-      if (index === -1) {
-        // Upsert if not found
-        finalStudent = {
-          ...studentUpdate,
-          id,
-          updatedAt: new Date().toISOString()
-        };
-        db.data.students.push(finalStudent);
-      } else {
-        // Merge with existing
-        finalStudent = {
-          ...db.data.students[index],
-          ...studentUpdate,
-          id, // ensure ID doesn't change
-          updatedAt: new Date().toISOString()
-        };
-        db.data.students[index] = finalStudent;
-      }
-
-      // Also let's update this student in db.data.classesBackup directory
-      if (finalStudent.class) {
-        const cls = finalStudent.class;
-        if (!db.data.classesBackup) db.data.classesBackup = {};
-        if (!db.data.classesBackup[cls]) {
-          db.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString() };
-        }
-        
-        const clsStudents = db.data.classesBackup[cls].students || [];
-        const sIndex = clsStudents.findIndex(s => s.id === id);
-        if (sIndex === -1) {
-          clsStudents.push(finalStudent);
+      if (firestoreDb) {
+        const docRef = firestoreDoc(firestoreDb, "students", id);
+        const docSnap = await firestoreGetDoc(docRef);
+        if (docSnap.exists()) {
+          finalStudent = {
+            ...docSnap.data(),
+            ...studentUpdate,
+            id,
+            updatedAt: new Date().toISOString()
+          };
         } else {
-          clsStudents[sIndex] = finalStudent;
+          finalStudent = {
+            ...studentUpdate,
+            id,
+            updatedAt: new Date().toISOString()
+          };
         }
-        db.data.classesBackup[cls].students = clsStudents;
-        db.data.classesBackup[cls].updatedAt = new Date().toISOString();
+        await firestoreSetDoc(docRef, finalStudent, { merge: true });
+
+        if (finalStudent.class) {
+          const cls = finalStudent.class;
+          const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", cls);
+          const backupSnap = await firestoreGetDoc(backupDocRef);
+          let currentStudents: any[] = [];
+          let currentWali = "";
+          if (backupSnap.exists()) {
+            const backupData = backupSnap.data() || {};
+            currentStudents = backupData.students || [];
+            currentWali = backupData.waliKelas || "";
+          }
+          const sIndex = currentStudents.findIndex(s => s.id === id);
+          if (sIndex === -1) {
+            currentStudents.push(finalStudent);
+          } else {
+            currentStudents[sIndex] = finalStudent;
+          }
+          await firestoreSetDoc(backupDocRef, {
+            students: currentStudents,
+            updatedAt: new Date().toISOString(),
+            waliKelas: currentWali
+          }, { merge: true });
+        }
+      } else {
+        if (!dbLocal.data) throw new Error("Database not initialized");
+        if (!dbLocal.data.students) dbLocal.data.students = [];
+
+        const index = dbLocal.data.students.findIndex(s => s.id === id);
+        if (index === -1) {
+          finalStudent = {
+            ...studentUpdate,
+            id,
+            updatedAt: new Date().toISOString()
+          };
+          dbLocal.data.students.push(finalStudent);
+        } else {
+          finalStudent = {
+            ...dbLocal.data.students[index],
+            ...studentUpdate,
+            id,
+            updatedAt: new Date().toISOString()
+          };
+          dbLocal.data.students[index] = finalStudent;
+        }
+
+        if (finalStudent.class) {
+          const cls = finalStudent.class;
+          if (!dbLocal.data.classesBackup) dbLocal.data.classesBackup = {};
+          if (!dbLocal.data.classesBackup[cls]) {
+            dbLocal.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString() };
+          }
+          const clsStudents = dbLocal.data.classesBackup[cls].students || [];
+          const sIndex = clsStudents.findIndex(s => s.id === id);
+          if (sIndex === -1) {
+            clsStudents.push(finalStudent);
+          } else {
+            clsStudents[sIndex] = finalStudent;
+          }
+          dbLocal.data.classesBackup[cls].students = clsStudents;
+          dbLocal.data.classesBackup[cls].updatedAt = new Date().toISOString();
+        }
+        await safeWrite();
       }
 
-      await safeWrite();
       res.json(finalStudent);
     } catch (error: any) {
       console.error("Update Student Error:", error);
@@ -209,23 +310,45 @@ async function safeWrite(): Promise<void> {
   app.delete("/api/students/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      if (!db.data) throw new Error("Database not initialized");
-      const index = db.data.students.findIndex(s => s.id === id);
-      
-      if (index === -1) {
-        return res.status(404).json({ message: "Student not found" });
+      if (firestoreDb) {
+        const docRef = firestoreDoc(firestoreDb, "students", id);
+        const docSnap = await firestoreGetDoc(docRef);
+        if (docSnap.exists()) {
+          const student = docSnap.data();
+          await firestoreDeleteDoc(docRef);
+
+          if (student.class) {
+            const cls = student.class;
+            const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", cls);
+            const backupSnap = await firestoreGetDoc(backupDocRef);
+            if (backupSnap.exists()) {
+              const backupData = backupSnap.data() || {};
+              const currentStudents = (backupData.students || []).filter((s: any) => s.id !== id);
+              await firestoreSetDoc(backupDocRef, {
+                students: currentStudents,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+            }
+          }
+        }
+      } else {
+        if (!dbLocal.data) throw new Error("Database not initialized");
+        const index = dbLocal.data.students.findIndex(s => s.id === id);
+        
+        if (index === -1) {
+          return res.status(404).json({ message: "Student not found" });
+        }
+
+        const classLabel = dbLocal.data.students[index].class;
+        dbLocal.data.students.splice(index, 1);
+
+        if (classLabel && dbLocal.data.classesBackup && dbLocal.data.classesBackup[classLabel]) {
+          dbLocal.data.classesBackup[classLabel].students = (dbLocal.data.classesBackup[classLabel].students || []).filter(s => s.id !== id);
+          dbLocal.data.classesBackup[classLabel].updatedAt = new Date().toISOString();
+        }
+
+        await safeWrite();
       }
-
-      const classLabel = db.data.students[index].class;
-      db.data.students.splice(index, 1);
-
-      // Also clean up from classesBackup
-      if (classLabel && db.data.classesBackup && db.data.classesBackup[classLabel]) {
-        db.data.classesBackup[classLabel].students = (db.data.classesBackup[classLabel].students || []).filter(s => s.id !== id);
-        db.data.classesBackup[classLabel].updatedAt = new Date().toISOString();
-      }
-
-      await safeWrite();
       res.status(204).send();
     } catch (error: any) {
       console.error("Delete Student Error:", error);
@@ -234,10 +357,20 @@ async function safeWrite(): Promise<void> {
   });
 
   // Get configuration key
-  app.get("/api/configs/:key", (req, res) => {
+  app.get("/api/configs/:key", async (req, res) => {
     try {
       const { key } = req.params;
-      const value = db.data?.configs?.[key] || "";
+      let value = "";
+      
+      if (firestoreDb) {
+        const docRef = firestoreDoc(firestoreDb, "configs", key);
+        const docSnap = await firestoreGetDoc(docRef);
+        if (docSnap.exists()) {
+          value = docSnap.data().value || "";
+        }
+      } else {
+        value = dbLocal.data?.configs?.[key] || "";
+      }
       res.json({ value });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -249,21 +382,27 @@ async function safeWrite(): Promise<void> {
     try {
       const { key } = req.params;
       const { value } = req.body;
-      if (!db.data) {
-        db.data = { students: [], classesBackup: {}, configs: {} };
+      
+      if (firestoreDb) {
+        const docRef = firestoreDoc(firestoreDb, "configs", key);
+        await firestoreSetDoc(docRef, { value }, { merge: true });
+      } else {
+        if (!dbLocal.data) {
+          dbLocal.data = { students: [], classesBackup: {}, configs: {} };
+        }
+        if (!dbLocal.data.configs) {
+          dbLocal.data.configs = {};
+        }
+        dbLocal.data.configs[key] = value;
+        await safeWrite();
       }
-      if (!db.data.configs) {
-        db.data.configs = {};
-      }
-      db.data.configs[key] = value;
-      await safeWrite();
       res.json({ success: true, key, value });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // Background Backup Endpoint (Stores client state to db.json local backup)
+  // Background Backup Endpoint
   app.post("/api/backup", async (req, res) => {
     try {
       const { className, students, waliKelas } = req.body;
@@ -271,30 +410,49 @@ async function safeWrite(): Promise<void> {
         return res.status(400).json({ error: "Missing className" });
       }
 
-      if (!db.data) {
-        db.data = { students: [], classesBackup: {}, configs: {} };
-      }
-      if (!db.data.classesBackup) {
-        db.data.classesBackup = {};
-      }
+      if (firestoreDb) {
+        const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", className);
+        const backupSnap = await firestoreGetDoc(backupDocRef);
+        let existingWali = "";
+        if (backupSnap.exists()) {
+          existingWali = backupSnap.data().waliKelas || "";
+        }
+        await firestoreSetDoc(backupDocRef, {
+          students: students || [],
+          updatedAt: new Date().toISOString(),
+          waliKelas: waliKelas || existingWali
+        }, { merge: true });
 
-      // Merge current students array to existing classesBackup
-      db.data.classesBackup[className] = {
-        students: students || [],
-        updatedAt: new Date().toISOString(),
-        waliKelas: waliKelas || db.data.classesBackup[className]?.waliKelas || ""
-      };
+        if (students && Array.isArray(students)) {
+          for (const s of students) {
+            if (s && s.id) {
+              const studentDocRef = firestoreDoc(firestoreDb, "students", s.id);
+              await firestoreSetDoc(studentDocRef, { ...s, updatedAt: new Date().toISOString() }, { merge: true });
+            }
+          }
+        }
+      } else {
+        if (!dbLocal.data) {
+          dbLocal.data = { students: [], classesBackup: {}, configs: {} };
+        }
+        if (!dbLocal.data.classesBackup) {
+          dbLocal.data.classesBackup = {};
+        }
 
-      // Also synchronize into db.data.students to ensure they match perfectly
-      if (students && Array.isArray(students)) {
-        if (!db.data.students) db.data.students = [];
-        // Filtering out other students of this class
-        db.data.students = db.data.students.filter(s => s.class !== className);
-        // Pushing all current students of this class
-        db.data.students.push(...students);
+        dbLocal.data.classesBackup[className] = {
+          students: students || [],
+          updatedAt: new Date().toISOString(),
+          waliKelas: waliKelas || dbLocal.data.classesBackup[className]?.waliKelas || ""
+        };
+
+        if (students && Array.isArray(students)) {
+          if (!dbLocal.data.students) dbLocal.data.students = [];
+          dbLocal.data.students = dbLocal.data.students.filter(s => s.class !== className);
+          dbLocal.data.students.push(...students);
+        }
+
+        await safeWrite();
       }
-
-      await safeWrite();
       res.json({ success: true, className, count: (students || []).length });
     } catch (err: any) {
       console.error("Backup error:", err);
@@ -302,39 +460,76 @@ async function safeWrite(): Promise<void> {
     }
   });
 
-  // Get Class-Specific Backup JSON Data (for client sync)
+  // Get Class-Specific Backup JSON Data
   app.get("/api/backup/:className", async (req, res) => {
     try {
       const { className } = req.params;
-      if (!db.data || !db.data.classesBackup || !db.data.classesBackup[className] || !db.data.classesBackup[className].students || db.data.classesBackup[className].students.length === 0) {
-        // Fallback: search main students list
-        const classStudents = db.data?.students?.filter(s => s.class === className) || [];
+      
+      if (firestoreDb) {
+        const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", className);
+        const backupSnap = await firestoreGetDoc(backupDocRef);
+        if (backupSnap.exists()) {
+          return res.json(backupSnap.data());
+        }
+        
+        // Query as secondary fallback
+        const colRef = firestoreCollection(firestoreDb, "students");
+        const q = firestoreQuery(colRef, firestoreWhere("class", "==", className));
+        const snap = await firestoreGetDocs(q);
+        const classStudents = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (classStudents.length > 0) {
-          if (!db.data.classesBackup) db.data.classesBackup = {};
-          db.data.classesBackup[className] = {
+          const backupInfo = {
             students: classStudents,
             updatedAt: new Date().toISOString(),
             waliKelas: ""
           };
-          await safeWrite();
-          return res.json(db.data.classesBackup[className]);
+          await firestoreSetDoc(backupDocRef, backupInfo, { merge: true });
+          return res.json(backupInfo);
         }
         return res.status(404).json({ error: "Backup data kelas tidak ditemukan" });
+      } else {
+        if (!dbLocal.data || !dbLocal.data.classesBackup || !dbLocal.data.classesBackup[className] || !dbLocal.data.classesBackup[className].students || dbLocal.data.classesBackup[className].students.length === 0) {
+          const classStudents = dbLocal.data?.students?.filter(s => s.class === className) || [];
+          if (classStudents.length > 0) {
+            if (!dbLocal.data.classesBackup) dbLocal.data.classesBackup = {};
+            dbLocal.data.classesBackup[className] = {
+              students: classStudents,
+              updatedAt: new Date().toISOString(),
+              waliKelas: ""
+            };
+            await safeWrite();
+            return res.json(dbLocal.data.classesBackup[className]);
+          }
+          return res.status(404).json({ error: "Backup data kelas tidak ditemukan" });
+        }
+        res.json(dbLocal.data.classesBackup[className]);
       }
-      res.json(db.data.classesBackup[className]);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
   // Download Class JSON Backup Route
-  app.get("/api/classes-download/:className", (req, res) => {
+  app.get("/api/classes-download/:className", async (req, res) => {
     try {
       const { className } = req.params;
-      if (!db.data || !db.data.classesBackup || !db.data.classesBackup[className]) {
+      let data: any = null;
+
+      if (firestoreDb) {
+        const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", className);
+        const backupSnap = await firestoreGetDoc(backupDocRef);
+        if (backupSnap.exists()) {
+          data = backupSnap.data();
+        }
+      } else {
+        if (dbLocal.data && dbLocal.data.classesBackup && dbLocal.data.classesBackup[className]) {
+          data = dbLocal.data.classesBackup[className];
+        }
+      }
+
+      if (!data) {
         return res.status(404).send("Backup data kelas tidak ditemukan");
       }
-      const data = db.data.classesBackup[className];
       res.setHeader('Content-disposition', `attachment; filename=Raport_Backup_Kelas_${className.replace(/\s+/g, '_')}.json`);
       res.setHeader('Content-type', 'application/json');
       res.send(JSON.stringify(data, null, 2));
@@ -344,7 +539,7 @@ async function safeWrite(): Promise<void> {
   });
 
   // Status Summary API
-  app.get("/api/status-summary", (req, res) => {
+  app.get("/api/status-summary", async (req, res) => {
     try {
       const predefinedClasses = [
         '7 MTs Putra', '7 MTs Putri', '7 MTs Putra & Putri',
@@ -358,7 +553,17 @@ async function safeWrite(): Promise<void> {
         '12 SMA Putra', '12 SMA Putri', '12 SMA Putra & Putri',
         'ALUMNI'
       ];
-      const backups = db.data?.classesBackup || {};
+      
+      let backups: any = {};
+      if (firestoreDb) {
+        const colRef = firestoreCollection(firestoreDb, "classes_backup");
+        const snap = await firestoreGetDocs(colRef);
+        snap.forEach(doc => {
+          backups[doc.id] = doc.data();
+        });
+      } else {
+        backups = dbLocal.data?.classesBackup || {};
+      }
       
       const classSummary = predefinedClasses.map(cls => {
         const backup = backups[cls];
@@ -387,12 +592,18 @@ async function safeWrite(): Promise<void> {
   // --- Teacher Management & Auth APIs ---
 
   // Get all teachers
-  app.get("/api/teachers", (req, res) => {
+  app.get("/api/teachers", async (req, res) => {
     try {
-      if (!db.data || !db.data.teachers) {
-        return res.json([]);
+      let teachersList: any[] = [];
+      if (firestoreDb) {
+        const colRef = firestoreCollection(firestoreDb, "teachers");
+        const snap = await firestoreGetDocs(colRef);
+        teachersList = snap.docs.map(doc => doc.data());
+      } else {
+        teachersList = dbLocal.data?.teachers || [];
       }
-      const mapped = db.data.teachers.map(t => ({
+
+      const mapped = teachersList.map(t => ({
         username: t && t.username ? t.username : "unknown",
         name: t && t.name ? t.name : (t && t.username ? t.username : "unknown"),
         waliKelas: t && t.waliKelas ? t.waliKelas : ""
@@ -415,43 +626,66 @@ async function safeWrite(): Promise<void> {
 
       const preservedUsername = username.trim();
 
-      if (!db.data) {
-        db.data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
-      }
-      if (!db.data.teachers) {
-        db.data.teachers = [];
-      }
+      if (firestoreDb) {
+        const docRef = firestoreDoc(firestoreDb, "teachers", preservedUsername.toLowerCase());
+        const docSnap = await firestoreGetDoc(docRef);
+        if (docSnap.exists()) {
+          return res.status(400).json({ error: "Username sudah digunakan" });
+        }
 
-      const exists = db.data.teachers.some(t => t && t.username && t.username.toLowerCase() === preservedUsername.toLowerCase());
-      if (exists) {
-        return res.status(400).json({ error: "Username sudah digunakan" });
-      }
+        const salt = bcrypt.genSaltSync(10);
+        const hash = bcrypt.hashSync(password, salt);
 
-      // Hash password
-      const salt = bcrypt.genSaltSync(10);
-      const hash = bcrypt.hashSync(password, salt);
+        const newTeacher = {
+          username: preservedUsername,
+          name: (name || username).trim(),
+          pwdHash: hash,
+          waliKelas: waliKelas.trim()
+        };
 
-      const newTeacher = {
-        username: preservedUsername,
-        name: (name || username).trim(),
-        pwdHash: hash,
-        waliKelas: waliKelas.trim()
-      };
+        await firestoreSetDoc(docRef, newTeacher, { merge: true });
 
-      db.data.teachers.push(newTeacher);
+        const cls = waliKelas.trim();
+        const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", cls);
+        await firestoreSetDoc(backupDocRef, { waliKelas: preservedUsername.toLowerCase() }, { merge: true });
 
-      // Link wali kelas designation to classesBackup
-      if (!db.data.classesBackup) db.data.classesBackup = {};
-      const cls = waliKelas.trim();
-      if (!db.data.classesBackup[cls]) {
-        db.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString(), waliKelas: preservedUsername.toLowerCase() };
       } else {
-        db.data.classesBackup[cls].waliKelas = preservedUsername.toLowerCase();
+        if (!dbLocal.data) {
+          dbLocal.data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
+        }
+        if (!dbLocal.data.teachers) {
+          dbLocal.data.teachers = [];
+        }
+
+        const exists = dbLocal.data.teachers.some(t => t && t.username && t.username.toLowerCase() === preservedUsername.toLowerCase());
+        if (exists) {
+          return res.status(400).json({ error: "Username sudah digunakan" });
+        }
+
+        const salt = bcrypt.genSaltSync(10);
+        const hash = bcrypt.hashSync(password, salt);
+
+        const newTeacher = {
+          username: preservedUsername,
+          name: (name || username).trim(),
+          pwdHash: hash,
+          waliKelas: waliKelas.trim()
+        };
+
+        dbLocal.data.teachers.push(newTeacher);
+
+        if (!dbLocal.data.classesBackup) dbLocal.data.classesBackup = {};
+        const cls = waliKelas.trim();
+        if (!dbLocal.data.classesBackup[cls]) {
+          dbLocal.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString(), waliKelas: preservedUsername.toLowerCase() };
+        } else {
+          dbLocal.data.classesBackup[cls].waliKelas = preservedUsername.toLowerCase();
+        }
+
+        await safeWrite();
       }
 
-      await safeWrite();
-
-      res.status(201).json({ success: true, teacher: { username: preservedUsername, waliKelas: cls } });
+      res.status(201).json({ success: true, teacher: { username: preservedUsername, waliKelas: waliKelas.trim() } });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -463,40 +697,61 @@ async function safeWrite(): Promise<void> {
       const { username } = req.params;
       const { password, waliKelas, name } = req.body;
       
-      if (!db.data || !db.data.teachers) {
-        return res.status(404).json({ error: "Data teachers tidak ditemukan" });
-      }
-
-      const idx = db.data.teachers.findIndex(t => t && t.username && t.username.toLowerCase() === username.toLowerCase());
-      if (idx === -1) {
-        return res.status(404).json({ error: "Guru tidak ditemukan" });
-      }
-
-      const teacher = db.data.teachers[idx];
-      if (name) {
-        teacher.name = name.trim();
-      }
-      if (waliKelas) {
-        teacher.waliKelas = waliKelas.trim();
-        // Also update this waliKelas designated teacher in classesBackup
-        if (!db.data.classesBackup) db.data.classesBackup = {};
-        const cls = waliKelas.trim();
-        if (!db.data.classesBackup[cls]) {
-          db.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString(), waliKelas: username.toLowerCase() };
-        } else {
-          db.data.classesBackup[cls].waliKelas = username.toLowerCase();
+      if (firestoreDb) {
+        const docRef = firestoreDoc(firestoreDb, "teachers", username.toLowerCase());
+        const docSnap = await firestoreGetDoc(docRef);
+        if (!docSnap.exists()) {
+          return res.status(404).json({ error: "Guru tidak ditemukan" });
         }
+
+        const teacher = docSnap.data();
+        if (name) teacher.name = name.trim();
+        if (waliKelas) {
+          teacher.waliKelas = waliKelas.trim();
+          const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", waliKelas.trim());
+          await firestoreSetDoc(backupDocRef, { waliKelas: username.toLowerCase() }, { merge: true });
+        }
+        if (password && password.trim().length > 0) {
+          const salt = bcrypt.genSaltSync(10);
+          teacher.pwdHash = bcrypt.hashSync(password, salt);
+        }
+
+        await firestoreSetDoc(docRef, teacher, { merge: true });
+        return res.json({ success: true, teacher: { username: teacher.username, name: teacher.name || teacher.username, waliKelas: teacher.waliKelas } });
+      } else {
+        if (!dbLocal.data || !dbLocal.data.teachers) {
+          return res.status(404).json({ error: "Data teachers tidak ditemukan" });
+        }
+
+        const idx = dbLocal.data.teachers.findIndex(t => t && t.username && t.username.toLowerCase() === username.toLowerCase());
+        if (idx === -1) {
+          return res.status(404).json({ error: "Guru tidak ditemukan" });
+        }
+
+        const teacher = dbLocal.data.teachers[idx];
+        if (name) {
+          teacher.name = name.trim();
+        }
+        if (waliKelas) {
+          teacher.waliKelas = waliKelas.trim();
+          if (!dbLocal.data.classesBackup) dbLocal.data.classesBackup = {};
+          const cls = waliKelas.trim();
+          if (!dbLocal.data.classesBackup[cls]) {
+            dbLocal.data.classesBackup[cls] = { students: [], updatedAt: new Date().toISOString(), waliKelas: username.toLowerCase() };
+          } else {
+            dbLocal.data.classesBackup[cls].waliKelas = username.toLowerCase();
+          }
+        }
+
+        if (password && password.trim().length > 0) {
+          const salt = bcrypt.genSaltSync(10);
+          teacher.pwdHash = bcrypt.hashSync(password, salt);
+        }
+
+        dbLocal.data.teachers[idx] = teacher;
+        await safeWrite();
+        res.json({ success: true, teacher: { username: teacher.username, name: teacher.name || teacher.username, waliKelas: teacher.waliKelas } });
       }
-
-      if (password && password.trim().length > 0) {
-        const salt = bcrypt.genSaltSync(10);
-        teacher.pwdHash = bcrypt.hashSync(password, salt);
-      }
-
-      db.data.teachers[idx] = teacher;
-      await safeWrite();
-
-      res.json({ success: true, teacher: { username: teacher.username, name: teacher.name || teacher.username, waliKelas: teacher.waliKelas } });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -506,24 +761,44 @@ async function safeWrite(): Promise<void> {
   app.delete("/api/teachers/:username", async (req, res) => {
     try {
       const { username } = req.params;
-      if (!db.data || !db.data.teachers) {
-        return res.status(404).json({ error: "Guru tidak ditemukan" });
+      
+      if (firestoreDb) {
+        const docRef = firestoreDoc(firestoreDb, "teachers", username.toLowerCase());
+        const docSnap = await firestoreGetDoc(docRef);
+        if (!docSnap.exists()) {
+          return res.status(404).json({ error: "Guru tidak ditemukan" });
+        }
+
+        const teacher = docSnap.data();
+        const cls = teacher.waliKelas;
+        if (cls) {
+          const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", cls);
+          const backupSnap = await firestoreGetDoc(backupDocRef);
+          if (backupSnap.exists() && backupSnap.data().waliKelas === username.toLowerCase()) {
+            await firestoreSetDoc(backupDocRef, { waliKelas: "-" }, { merge: true });
+          }
+        }
+
+        await firestoreDeleteDoc(docRef);
+      } else {
+        if (!dbLocal.data || !dbLocal.data.teachers) {
+          return res.status(404).json({ error: "Guru tidak ditemukan" });
+        }
+
+        const idx = dbLocal.data.teachers.findIndex(t => t && t.username && t.username.toLowerCase() === username.toLowerCase());
+        if (idx === -1) {
+          return res.status(404).json({ error: "Guru tidak ditemukan" });
+        }
+
+        const teacher = dbLocal.data.teachers[idx];
+        const cls = teacher.waliKelas;
+        if (cls && dbLocal.data.classesBackup && dbLocal.data.classesBackup[cls] && dbLocal.data.classesBackup[cls].waliKelas === username.toLowerCase()) {
+          dbLocal.data.classesBackup[cls].waliKelas = "-";
+        }
+
+        dbLocal.data.teachers.splice(idx, 1);
+        await safeWrite();
       }
-
-      const idx = db.data.teachers.findIndex(t => t && t.username && t.username.toLowerCase() === username.toLowerCase());
-      if (idx === -1) {
-        return res.status(404).json({ error: "Guru tidak ditemukan" });
-      }
-
-      const teacher = db.data.teachers[idx];
-      const cls = teacher.waliKelas;
-      if (cls && db.data.classesBackup && db.data.classesBackup[cls] && db.data.classesBackup[cls].waliKelas === username.toLowerCase()) {
-        db.data.classesBackup[cls].waliKelas = "-";
-      }
-
-      db.data.teachers.splice(idx, 1);
-      await safeWrite();
-
       res.json({ success: true, message: `Guru ${username} berhasil dihapus` });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -538,12 +813,20 @@ async function safeWrite(): Promise<void> {
         return res.status(400).json({ error: "Nama guru diperlukan untuk masuk" });
       }
 
-      if (!db.data || !db.data.teachers) {
-        return res.status(400).json({ error: "Data guru belum diinisialisasi di sistem" });
+      let teachersList: any[] = [];
+      if (firestoreDb) {
+        const colRef = firestoreCollection(firestoreDb, "teachers");
+        const snap = await firestoreGetDocs(colRef);
+        teachersList = snap.docs.map(doc => doc.data());
+      } else {
+        if (!dbLocal.data || !dbLocal.data.teachers) {
+          return res.status(400).json({ error: "Data guru belum diinisialisasi di sistem" });
+        }
+        teachersList = dbLocal.data.teachers;
       }
 
       const normalizedInput = loginIdentifier.toLowerCase().replace(/\s+/g, '');
-      const teacher = db.data.teachers.find(t => {
+      const teacher = teachersList.find(t => {
         if (!t) return false;
         const normName = t.name ? t.name.toLowerCase().replace(/\s+/g, '') : '';
         const normUser = t.username ? t.username.toLowerCase().replace(/\s+/g, '') : '';
@@ -581,7 +864,22 @@ async function safeWrite(): Promise<void> {
       '12 SMA Putra', '12 SMA Putri', '12 SMA Putra & Putri',
       'ALUMNI'
     ];
-    const backups = db.data?.classesBackup || {};
+    
+    let backups: any = {};
+    if (firestoreDb) {
+      try {
+        const colRef = firestoreCollection(firestoreDb, "classes_backup");
+        const snap = await firestoreGetDocs(colRef);
+        snap.forEach(doc => {
+          backups[doc.id] = doc.data();
+        });
+      } catch (err) {
+        console.warn("Status endpoint error reading Firestore:", err);
+        backups = dbLocal.data?.classesBackup || {};
+      }
+    } else {
+      backups = dbLocal.data?.classesBackup || {};
+    }
     
     // Calculate Stats
     let totalClassesWithData = 0;
