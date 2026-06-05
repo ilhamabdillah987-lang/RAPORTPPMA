@@ -9,7 +9,7 @@ import XLSXStyle from 'xlsx-js-style';
 import { Student, Subject, StudentIdentity } from './types';
 import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User as LucideUser, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu, LogIn, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, auth, signOut, onAuthStateChanged, User as FirebaseUser, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot } from './firebase';
+import { db, auth, signOut, onAuthStateChanged, User as FirebaseUser, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, waitForPendingWrites } from './firebase';
 
 enum OperationType {
   CREATE = 'create',
@@ -1059,7 +1059,7 @@ export default function App() {
   const handleLogout = () => {
     showConfirm({
       title: 'Konfirmasi Keluar',
-      message: 'Apakah Anda yakin ingin keluar dari sistem Raport Al-Hikmah?',
+      message: 'Apakah Anda yakin ingin keluar dari sistem Raport Al-Hikmah? Seluruh antrean penyimpanan data ke cloud akan dipastikan 100% aman sebelum pendaftaran sesi diakhiri.',
       cancelText: 'Batal',
       confirmText: 'Keluar Sekarang',
       onConfirm: async () => {
@@ -1082,6 +1082,13 @@ export default function App() {
 
         // Also flush any pending debounced config saves!
         await flushPendingSaves();
+
+        // Wait to make sure all Firestore/API pending writes are 100% received and settled
+        try {
+          await waitForPendingWrites(db);
+        } catch (pwErr) {
+          console.warn('Gagal menunda logout untuk pending writes:', pwErr);
+        }
 
         try {
           await signOut(auth);
@@ -1598,6 +1605,94 @@ export default function App() {
   }, [
     selectedClass,
     isConfigsLoading,
+    globalWaliKelas,
+    globalWaliKelasPutra,
+    globalWaliKelasPutri,
+    globalNamaKelas,
+    globalTanggalRaport,
+    globalKepala,
+    globalTanggalKenaikan
+  ]);
+
+  // Browser beforeunload / unload listener for emergency save (Simpan Darurat) before exit/refresh
+  useEffect(() => {
+    const handleEmergencySave = () => {
+      if (!selectedClass || studentsList.length === 0) return;
+
+      const payload = {
+        className: selectedClass,
+        students: studentsList,
+        waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri
+      };
+
+      const bodyString = JSON.stringify(payload);
+      let beaconSent = false;
+      
+      // Try navigator.sendBeacon first (ideal for unload events as they execute non-blockingly but guarantee delivery)
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        try {
+          const blob = new Blob([bodyString], { type: 'application/json' });
+          beaconSent = navigator.sendBeacon('/api/backup', blob);
+        } catch (e) {
+          console.warn('Emergency save beacon failed, falling back:', e);
+        }
+      }
+
+      // Fallback to fetch with keepalive setting (modern standard for page out-of-process fetches)
+      if (!beaconSent) {
+        try {
+          fetch('/api/backup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: bodyString,
+            keepalive: true
+          }).catch(() => {});
+        } catch (fErr) {
+          console.warn('Keepalive emergency write failed:', fErr);
+        }
+      }
+
+      // Also emergency save recent classroom settings configurations
+      const updates = [
+        { key: `wali_kelas_${selectedClass}`, value: globalWaliKelas },
+        { key: `wali_kelas_putra_${selectedClass}`, value: globalWaliKelasPutra },
+        { key: `wali_kelas_putri_${selectedClass}`, value: globalWaliKelasPutri },
+        { key: `nama_kelas_${selectedClass}`, value: globalNamaKelas },
+        { key: `tanggal_raport_${selectedClass}`, value: globalTanggalRaport },
+        { key: `kepala_kepasentrenan_${selectedClass}`, value: globalKepala },
+        { key: `tanggal_kenaikan_${selectedClass}`, value: globalTanggalKenaikan }
+      ];
+
+      for (const update of updates) {
+        try {
+          fetch(`/api/configs/${encodeURIComponent(update.key)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: update.value }),
+            keepalive: true
+          }).catch(() => {});
+        } catch (err) {}
+      }
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      handleEmergencySave();
+    };
+
+    const handleUnload = () => {
+      handleEmergencySave();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('unload', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('unload', handleUnload);
+    };
+  }, [
+    selectedClass,
+    studentsList,
     globalWaliKelas,
     globalWaliKelasPutra,
     globalWaliKelasPutri,

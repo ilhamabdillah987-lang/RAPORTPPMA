@@ -10,6 +10,37 @@ export type User = {
   emailVerified: boolean;
 };
 
+// Pending writes tracker for Firestore synchronization
+let pendingWritesCount = 0;
+let pendingListeners: (() => void)[] = [];
+
+export function registerPendingWrite() {
+  pendingWritesCount++;
+}
+
+export function resolvePendingWrite() {
+  if (pendingWritesCount > 0) {
+    pendingWritesCount--;
+  }
+  if (pendingWritesCount === 0) {
+    const list = [...pendingListeners];
+    pendingListeners = [];
+    list.forEach(resolve => resolve());
+  }
+}
+
+export async function waitForPendingWrites(dbInstance: any): Promise<void> {
+  if (pendingWritesCount <= 0) {
+    // Mini delay to ensure everything gets settled
+    await new Promise(resolve => setTimeout(resolve, 150));
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    pendingListeners.push(resolve);
+  });
+  await new Promise(resolve => setTimeout(resolve, 150));
+}
+
 export const signOut = async (authInst?: any) => {
   // Standalone mode is always active
   return Promise.resolve();
@@ -100,27 +131,32 @@ export async function getDoc(docRef: any) {
 
 // Writes documents to the server-side Lowdb database
 export async function setDoc(docRef: any, data: any, options?: any) {
-  if (docRef.path === 'configs') {
-    const res = await fetch(`/api/configs/${encodeURIComponent(docRef.id)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-      throw new Error(`Gagal menyimpan konfigurasi: ${res.statusText}`);
+  registerPendingWrite();
+  try {
+    if (docRef.path === 'configs') {
+      const res = await fetch(`/api/configs/${encodeURIComponent(docRef.id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        throw new Error(`Gagal menyimpan konfigurasi: ${res.statusText}`);
+      }
+      return;
     }
-    return;
-  }
 
-  if (docRef.path === 'students') {
-    const res = await fetch(`/api/students/${encodeURIComponent(docRef.id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-      throw new Error(`Gagal menyimpan data santri: ${res.statusText}`);
+    if (docRef.path === 'students') {
+      const res = await fetch(`/api/students/${encodeURIComponent(docRef.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        throw new Error(`Gagal menyimpan data santri: ${res.statusText}`);
+      }
     }
+  } finally {
+    resolvePendingWrite();
   }
 }
 
@@ -132,13 +168,18 @@ export async function updateDoc(docRef: any, data: any) {
 
 // Deletes a student from the server-side Lowdb database
 export async function deleteDoc(docRef: any) {
-  if (docRef.path === 'students') {
-    const res = await fetch(`/api/students/${encodeURIComponent(docRef.id)}`, {
-      method: 'DELETE'
-    });
-    if (!res.ok) {
-      throw new Error(`Gagal menghapus data santri: ${res.statusText}`);
+  registerPendingWrite();
+  try {
+    if (docRef.path === 'students') {
+      const res = await fetch(`/api/students/${encodeURIComponent(docRef.id)}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        throw new Error(`Gagal menghapus data santri: ${res.statusText}`);
+      }
     }
+  } finally {
+    resolvePendingWrite();
   }
 }
 
