@@ -21,6 +21,7 @@ import {
   query as firestoreQuery, 
   where as firestoreWhere 
 } from "firebase/firestore";
+import { sql } from "@vercel/postgres";
 
 dotenv.config();
 
@@ -45,6 +46,54 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
+
+// Setup Vercel Database connection
+const isVercelDb = !!process.env.POSTGRES_URL;
+
+async function initVercelDb() {
+  if (!isVercelDb) {
+    console.log("[Server] Vercel Database (POSTGRES_URL) not detected. Operating in hybrid Local/Firestore mode.");
+    return;
+  }
+  try {
+    console.log("[Server] Initializing Vercel Postgres tables...");
+    await sql`
+      CREATE TABLE IF NOT EXISTS students (
+        id VARCHAR(100) PRIMARY KEY,
+        name VARCHAR(255),
+        class VARCHAR(100),
+        data JSONB,
+        updated_at VARCHAR(100)
+      );
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS classes_backup (
+        class_name VARCHAR(100) PRIMARY KEY,
+        data JSONB,
+        updated_at VARCHAR(100)
+      );
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS configs (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT,
+        updated_at VARCHAR(100)
+      );
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS teachers (
+        username VARCHAR(100) PRIMARY KEY,
+        name VARCHAR(255),
+        pwd_hash TEXT,
+        wali_kelas VARCHAR(100),
+        updated_at VARCHAR(100)
+      );
+    `;
+    console.log("[Server] Vercel Postgres tables verified & initialized successfully.");
+  } catch (err) {
+    console.error("[Server] Critical failure during Vercel Postgres initialization:", err);
+  }
+}
 
 // Setup Firebase Firestore connection
 let firebaseApp: any = null;
@@ -85,6 +134,7 @@ async function safeWrite(): Promise<void> {
 }
 
 (async () => {
+  await initVercelDb();
   await dbLocal.read();
   if (!dbLocal.data) {
     dbLocal.data = defaultData;
@@ -114,7 +164,7 @@ async function safeWrite(): Promise<void> {
 })();
 
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", usingCloudDatabase: !!firestoreDb });
+    res.json({ status: "ok", usingCloudDatabase: isVercelDb || !!firestoreDb, databaseType: isVercelDb ? "vercel-postgres" : (firestoreDb ? "firestore" : "local-lowdb") });
   });
 
   // Public Student Routes
@@ -122,7 +172,25 @@ async function safeWrite(): Promise<void> {
     try {
       const { class: className } = req.query;
       
-      if (firestoreDb) {
+      if (isVercelDb) {
+        if (className) {
+          const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${className as string}`;
+          if (backupRes.rows.length > 0) {
+            const data = backupRes.rows[0].data;
+            if (data && data.students && data.students.length > 0) {
+              return res.json(data.students);
+            }
+          }
+          
+          const studentsRes = await sql`SELECT data FROM students WHERE class = ${className as string}`;
+          const students = studentsRes.rows.map(row => row.data);
+          return res.json(students);
+        } else {
+          const studentsRes = await sql`SELECT data FROM students`;
+          const students = studentsRes.rows.map(row => row.data);
+          return res.json(students);
+        }
+      } else if (firestoreDb) {
         if (className) {
           // Check classes_backup collection first
           const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", className as string);
@@ -174,7 +242,44 @@ async function safeWrite(): Promise<void> {
         updatedAt: new Date().toISOString()
       };
 
-      if (firestoreDb) {
+      if (isVercelDb) {
+        await sql`
+          INSERT INTO students (id, name, class, data, updated_at)
+          VALUES (${studentId}, ${newStudent.name || ""}, ${newStudent.class || ""}, ${JSON.stringify(newStudent)}, ${newStudent.updatedAt})
+          ON CONFLICT (id) DO UPDATE SET 
+            name = EXCLUDED.name,
+            class = EXCLUDED.class,
+            data = EXCLUDED.data,
+            updated_at = EXCLUDED.updated_at
+        `;
+
+        // Update class packet backup as well
+        if (newStudent.class) {
+          const cls = newStudent.class;
+          const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${cls}`;
+          let currentStudents: any[] = [];
+          let currentWali = "";
+          if (backupRes.rows.length > 0) {
+            const backupData = backupRes.rows[0].data || {};
+            currentStudents = backupData.students || [];
+            currentWali = backupData.waliKelas || "";
+          }
+          currentStudents = currentStudents.filter(s => s.id !== studentId);
+          currentStudents.push(newStudent);
+          const updatedBackup = {
+            students: currentStudents,
+            updatedAt: new Date().toISOString(),
+            waliKelas: currentWali
+          };
+          await sql`
+            INSERT INTO classes_backup (class_name, data, updated_at)
+            VALUES (${cls}, ${JSON.stringify(updatedBackup)}, ${updatedBackup.updatedAt})
+            ON CONFLICT (class_name) DO UPDATE SET
+              data = EXCLUDED.data,
+              updated_at = EXCLUDED.updated_at
+          `;
+        }
+      } else if (firestoreDb) {
         const docRef = firestoreDoc(firestoreDb, "students", studentId);
         await firestoreSetDoc(docRef, newStudent, { merge: true });
 
@@ -217,7 +322,61 @@ async function safeWrite(): Promise<void> {
     try {
       let finalStudent: any;
 
-      if (firestoreDb) {
+      if (isVercelDb) {
+        let existingStudent: any = null;
+        const studentRes = await sql`SELECT data FROM students WHERE id = ${id}`;
+        if (studentRes.rows.length > 0) {
+          existingStudent = studentRes.rows[0].data;
+        }
+
+        finalStudent = {
+          ...(existingStudent || {}),
+          ...studentUpdate,
+          id,
+          updatedAt: new Date().toISOString()
+        };
+
+        await sql`
+          INSERT INTO students (id, name, class, data, updated_at)
+          VALUES (${id}, ${finalStudent.name || ""}, ${finalStudent.class || ""}, ${JSON.stringify(finalStudent)}, ${finalStudent.updatedAt})
+          ON CONFLICT (id) DO UPDATE SET 
+            name = EXCLUDED.name,
+            class = EXCLUDED.class,
+            data = EXCLUDED.data,
+            updated_at = EXCLUDED.updated_at
+        `;
+
+        // Update class packet backup
+        if (finalStudent.class) {
+          const cls = finalStudent.class;
+          const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${cls}`;
+          let currentStudents: any[] = [];
+          let currentWali = "";
+          if (backupRes.rows.length > 0) {
+            const backupData = backupRes.rows[0].data || {};
+            currentStudents = backupData.students || [];
+            currentWali = backupData.waliKelas || "";
+          }
+          const sIndex = currentStudents.findIndex(s => s.id === id);
+          if (sIndex === -1) {
+            currentStudents.push(finalStudent);
+          } else {
+            currentStudents[sIndex] = finalStudent;
+          }
+          const updatedBackup = {
+            students: currentStudents,
+            updatedAt: new Date().toISOString(),
+            waliKelas: currentWali
+          };
+          await sql`
+            INSERT INTO classes_backup (class_name, data, updated_at)
+            VALUES (${cls}, ${JSON.stringify(updatedBackup)}, ${updatedBackup.updatedAt})
+            ON CONFLICT (class_name) DO UPDATE SET
+              data = EXCLUDED.data,
+              updated_at = EXCLUDED.updated_at
+          `;
+        }
+      } else if (firestoreDb) {
         const docRef = firestoreDoc(firestoreDb, "students", id);
         const docSnap = await firestoreGetDoc(docRef);
         if (docSnap.exists()) {
@@ -310,7 +469,34 @@ async function safeWrite(): Promise<void> {
   app.delete("/api/students/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const studentRes = await sql`SELECT data FROM students WHERE id = ${id}`;
+        if (studentRes.rows.length > 0) {
+          const student = studentRes.rows[0].data;
+          await sql`DELETE FROM students WHERE id = ${id}`;
+
+          if (student.class) {
+            const cls = student.class;
+            const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${cls}`;
+            if (backupRes.rows.length > 0) {
+              const backupData = backupRes.rows[0].data || {};
+              const currentStudents = (backupData.students || []).filter((s: any) => s.id !== id);
+              const updatedBackup = {
+                ...backupData,
+                students: currentStudents,
+                updatedAt: new Date().toISOString()
+              };
+              await sql`
+                INSERT INTO classes_backup (class_name, data, updated_at)
+                VALUES (${cls}, ${JSON.stringify(updatedBackup)}, ${updatedBackup.updatedAt})
+                ON CONFLICT (class_name) DO UPDATE SET
+                  data = EXCLUDED.data,
+                  updated_at = EXCLUDED.updated_at
+              `;
+            }
+          }
+        }
+      } else if (firestoreDb) {
         const docRef = firestoreDoc(firestoreDb, "students", id);
         const docSnap = await firestoreGetDoc(docRef);
         if (docSnap.exists()) {
@@ -362,7 +548,12 @@ async function safeWrite(): Promise<void> {
       const { key } = req.params;
       let value = "";
       
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const configRes = await sql`SELECT value FROM configs WHERE key = ${key}`;
+        if (configRes.rows.length > 0) {
+          value = configRes.rows[0].value || "";
+        }
+      } else if (firestoreDb) {
         const docRef = firestoreDoc(firestoreDb, "configs", key);
         const docSnap = await firestoreGetDoc(docRef);
         if (docSnap.exists()) {
@@ -383,7 +574,16 @@ async function safeWrite(): Promise<void> {
       const { key } = req.params;
       const { value } = req.body;
       
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const updatedAt = new Date().toISOString();
+        await sql`
+          INSERT INTO configs (key, value, updated_at)
+          VALUES (${key}, ${value}, ${updatedAt})
+          ON CONFLICT (key) DO UPDATE SET
+            value = EXCLUDED.value,
+            updated_at = EXCLUDED.updated_at
+        `;
+      } else if (firestoreDb) {
         const docRef = firestoreDoc(firestoreDb, "configs", key);
         await firestoreSetDoc(docRef, { value }, { merge: true });
       } else {
@@ -410,7 +610,42 @@ async function safeWrite(): Promise<void> {
         return res.status(400).json({ error: "Missing className" });
       }
 
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${className}`;
+        let existingWali = "";
+        if (backupRes.rows.length > 0) {
+          existingWali = backupRes.rows[0].data?.waliKelas || "";
+        }
+        const updatedBackup = {
+          students: students || [],
+          updatedAt: new Date().toISOString(),
+          waliKelas: waliKelas || existingWali
+        };
+        await sql`
+          INSERT INTO classes_backup (class_name, data, updated_at)
+          VALUES (${className}, ${JSON.stringify(updatedBackup)}, ${updatedBackup.updatedAt})
+          ON CONFLICT (class_name) DO UPDATE SET
+            data = EXCLUDED.data,
+            updated_at = EXCLUDED.updated_at
+        `;
+
+        if (students && Array.isArray(students)) {
+          for (const s of students) {
+            if (s && s.id) {
+              const updatedAt = new Date().toISOString();
+              await sql`
+                INSERT INTO students (id, name, class, data, updated_at)
+                VALUES (${s.id}, ${s.name || ""}, ${s.class || ""}, ${JSON.stringify(s)}, ${updatedAt})
+                ON CONFLICT (id) DO UPDATE SET 
+                  name = EXCLUDED.name,
+                  class = EXCLUDED.class,
+                  data = EXCLUDED.data,
+                  updated_at = EXCLUDED.updated_at
+              `;
+            }
+          }
+        }
+      } else if (firestoreDb) {
         const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", className);
         const backupSnap = await firestoreGetDoc(backupDocRef);
         let existingWali = "";
@@ -465,7 +700,32 @@ async function safeWrite(): Promise<void> {
     try {
       const { className } = req.params;
       
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${className}`;
+        if (backupRes.rows.length > 0) {
+          return res.json(backupRes.rows[0].data);
+        }
+        
+        // Query as secondary fallback
+        const studentsRes = await sql`SELECT data FROM students WHERE class = ${className}`;
+        const classStudents = studentsRes.rows.map(row => row.data);
+        if (classStudents.length > 0) {
+          const backupInfo = {
+            students: classStudents,
+            updatedAt: new Date().toISOString(),
+            waliKelas: ""
+          };
+          await sql`
+            INSERT INTO classes_backup (class_name, data, updated_at)
+            VALUES (${className}, ${JSON.stringify(backupInfo)}, ${backupInfo.updatedAt})
+            ON CONFLICT (class_name) DO UPDATE SET
+              data = EXCLUDED.data,
+              updated_at = EXCLUDED.updated_at
+          `;
+          return res.json(backupInfo);
+        }
+        return res.status(404).json({ error: "Backup data kelas tidak ditemukan" });
+      } else if (firestoreDb) {
         const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", className);
         const backupSnap = await firestoreGetDoc(backupDocRef);
         if (backupSnap.exists()) {
@@ -515,7 +775,12 @@ async function safeWrite(): Promise<void> {
       const { className } = req.params;
       let data: any = null;
 
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${className}`;
+        if (backupRes.rows.length > 0) {
+          data = backupRes.rows[0].data;
+        }
+      } else if (firestoreDb) {
         const backupDocRef = firestoreDoc(firestoreDb, "classes_backup", className);
         const backupSnap = await firestoreGetDoc(backupDocRef);
         if (backupSnap.exists()) {
@@ -555,7 +820,12 @@ async function safeWrite(): Promise<void> {
       ];
       
       let backups: any = {};
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const backupRes = await sql`SELECT class_name, data FROM classes_backup`;
+        backupRes.rows.forEach(row => {
+          backups[row.class_name] = row.data;
+        });
+      } else if (firestoreDb) {
         const colRef = firestoreCollection(firestoreDb, "classes_backup");
         const snap = await firestoreGetDocs(colRef);
         snap.forEach(doc => {
@@ -595,7 +865,15 @@ async function safeWrite(): Promise<void> {
   app.get("/api/teachers", async (req, res) => {
     try {
       let teachersList: any[] = [];
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const teachersRes = await sql`SELECT username, name, pwd_hash, wali_kelas FROM teachers`;
+        teachersList = teachersRes.rows.map(row => ({
+          username: row.username,
+          name: row.name,
+          pwdHash: row.pwd_hash,
+          waliKelas: row.wali_kelas
+        }));
+      } else if (firestoreDb) {
         const colRef = firestoreCollection(firestoreDb, "teachers");
         const snap = await firestoreGetDocs(colRef);
         teachersList = snap.docs.map(doc => doc.data());
@@ -626,7 +904,53 @@ async function safeWrite(): Promise<void> {
 
       const preservedUsername = username.trim();
 
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const teacherRes = await sql`SELECT username FROM teachers WHERE LOWER(username) = LOWER(${preservedUsername})`;
+        if (teacherRes.rows.length > 0) {
+          return res.status(400).json({ error: "Username sudah digunakan" });
+        }
+
+        const salt = bcrypt.genSaltSync(10);
+        const hash = bcrypt.hashSync(password, salt);
+
+        const newTeacher = {
+          username: preservedUsername,
+          name: (name || username).trim(),
+          pwdHash: hash,
+          waliKelas: waliKelas.trim()
+        };
+
+        const updatedAt = new Date().toISOString();
+        await sql`
+          INSERT INTO teachers (username, name, pwd_hash, wali_kelas, updated_at)
+          VALUES (${preservedUsername.toLowerCase()}, ${newTeacher.name}, ${newTeacher.pwdHash}, ${newTeacher.waliKelas}, ${updatedAt})
+          ON CONFLICT (username) DO UPDATE SET
+            name = EXCLUDED.name,
+            pwd_hash = EXCLUDED.pwd_hash,
+            wali_kelas = EXCLUDED.wali_kelas,
+            updated_at = EXCLUDED.updated_at
+        `;
+
+        const cls = waliKelas.trim();
+        const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${cls}`;
+        let currentStudents: any[] = [];
+        if (backupRes.rows.length > 0) {
+          const backupData = backupRes.rows[0].data || {};
+          currentStudents = backupData.students || [];
+        }
+        const updatedBackup = {
+          students: currentStudents,
+          updatedAt: new Date().toISOString(),
+          waliKelas: preservedUsername.toLowerCase()
+        };
+        await sql`
+          INSERT INTO classes_backup (class_name, data, updated_at)
+          VALUES (${cls}, ${JSON.stringify(updatedBackup)}, ${updatedBackup.updatedAt})
+          ON CONFLICT (class_name) DO UPDATE SET
+            data = EXCLUDED.data,
+            updated_at = EXCLUDED.updated_at
+        `;
+      } else if (firestoreDb) {
         const docRef = firestoreDoc(firestoreDb, "teachers", preservedUsername.toLowerCase());
         const docSnap = await firestoreGetDoc(docRef);
         if (docSnap.exists()) {
@@ -697,7 +1021,59 @@ async function safeWrite(): Promise<void> {
       const { username } = req.params;
       const { password, waliKelas, name } = req.body;
       
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const teacherRes = await sql`SELECT username, name, pwd_hash, wali_kelas FROM teachers WHERE LOWER(username) = LOWER(${username})`;
+        if (teacherRes.rows.length === 0) {
+          return res.status(404).json({ error: "Guru tidak ditemukan" });
+        }
+
+        const teacher = {
+          username: teacherRes.rows[0].username,
+          name: teacherRes.rows[0].name,
+          pwdHash: teacherRes.rows[0].pwd_hash,
+          waliKelas: teacherRes.rows[0].wali_kelas
+        };
+
+        if (name) teacher.name = name.trim();
+        if (waliKelas) {
+          teacher.waliKelas = waliKelas.trim();
+          
+          const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${waliKelas.trim()}`;
+          let currentStudents: any[] = [];
+          if (backupRes.rows.length > 0) {
+            currentStudents = backupRes.rows[0].data?.students || [];
+          }
+          const updatedBackup = {
+            students: currentStudents,
+            updatedAt: new Date().toISOString(),
+            waliKelas: username.toLowerCase()
+          };
+          await sql`
+            INSERT INTO classes_backup (class_name, data, updated_at)
+            VALUES (${waliKelas.trim()}, ${JSON.stringify(updatedBackup)}, ${updatedBackup.updatedAt})
+            ON CONFLICT (class_name) DO UPDATE SET
+              data = EXCLUDED.data,
+              updated_at = EXCLUDED.updated_at
+          `;
+        }
+        if (password && password.trim().length > 0) {
+          const salt = bcrypt.genSaltSync(10);
+          teacher.pwdHash = bcrypt.hashSync(password, salt);
+        }
+
+        const updatedAt = new Date().toISOString();
+        await sql`
+          INSERT INTO teachers (username, name, pwd_hash, wali_kelas, updated_at)
+          VALUES (${teacher.username.toLowerCase()}, ${teacher.name}, ${teacher.pwdHash}, ${teacher.waliKelas}, ${updatedAt})
+          ON CONFLICT (username) DO UPDATE SET
+            name = EXCLUDED.name,
+            pwd_hash = EXCLUDED.pwd_hash,
+            wali_kelas = EXCLUDED.wali_kelas,
+            updated_at = EXCLUDED.updated_at
+        `;
+
+        return res.json({ success: true, teacher: { username: teacher.username, name: teacher.name || teacher.username, waliKelas: teacher.waliKelas } });
+      } else if (firestoreDb) {
         const docRef = firestoreDoc(firestoreDb, "teachers", username.toLowerCase());
         const docSnap = await firestoreGetDoc(docRef);
         if (!docSnap.exists()) {
@@ -762,7 +1138,42 @@ async function safeWrite(): Promise<void> {
     try {
       const { username } = req.params;
       
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const teacherRes = await sql`SELECT username, name, pwd_hash, wali_kelas FROM teachers WHERE LOWER(username) = LOWER(${username})`;
+        if (teacherRes.rows.length === 0) {
+          return res.status(404).json({ error: "Guru tidak ditemukan" });
+        }
+
+        const teacher = {
+          username: teacherRes.rows[0].username,
+          name: teacherRes.rows[0].name,
+          pwdHash: teacherRes.rows[0].pwd_hash,
+          waliKelas: teacherRes.rows[0].wali_kelas
+        };
+
+        const cls = teacher.waliKelas;
+        if (cls) {
+          const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${cls}`;
+          if (backupRes.rows.length > 0) {
+            const backupData = backupRes.rows[0].data || {};
+            if (backupData.waliKelas === username.toLowerCase()) {
+              const updatedBackup = {
+                ...backupData,
+                waliKelas: "-"
+              };
+              await sql`
+                INSERT INTO classes_backup (class_name, data, updated_at)
+                VALUES (${cls}, ${JSON.stringify(updatedBackup)}, ${new Date().toISOString()})
+                ON CONFLICT (class_name) DO UPDATE SET
+                  data = EXCLUDED.data,
+                  updated_at = EXCLUDED.updated_at
+              `;
+            }
+          }
+        }
+
+        await sql`DELETE FROM teachers WHERE LOWER(username) = LOWER(${username})`;
+      } else if (firestoreDb) {
         const docRef = firestoreDoc(firestoreDb, "teachers", username.toLowerCase());
         const docSnap = await firestoreGetDoc(docRef);
         if (!docSnap.exists()) {
@@ -814,7 +1225,15 @@ async function safeWrite(): Promise<void> {
       }
 
       let teachersList: any[] = [];
-      if (firestoreDb) {
+      if (isVercelDb) {
+        const teachersRes = await sql`SELECT username, name, pwd_hash, wali_kelas FROM teachers`;
+        teachersList = teachersRes.rows.map(row => ({
+          username: row.username,
+          name: row.name,
+          pwdHash: row.pwd_hash,
+          waliKelas: row.wali_kelas
+        }));
+      } else if (firestoreDb) {
         const colRef = firestoreCollection(firestoreDb, "teachers");
         const snap = await firestoreGetDocs(colRef);
         teachersList = snap.docs.map(doc => doc.data());
@@ -866,7 +1285,17 @@ async function safeWrite(): Promise<void> {
     ];
     
     let backups: any = {};
-    if (firestoreDb) {
+    if (isVercelDb) {
+      try {
+        const backupRes = await sql`SELECT class_name, data FROM classes_backup`;
+        backupRes.rows.forEach(row => {
+          backups[row.class_name] = row.data;
+        });
+      } catch (err) {
+        console.warn("Status endpoint error reading Vercel Postgres:", err);
+        backups = dbLocal.data?.classesBackup || {};
+      }
+    } else if (firestoreDb) {
       try {
         const colRef = firestoreCollection(firestoreDb, "classes_backup");
         const snap = await firestoreGetDocs(colRef);
