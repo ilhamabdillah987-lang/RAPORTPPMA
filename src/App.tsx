@@ -102,7 +102,7 @@ interface ReportTemplateProps {
   globalWaliKelasPutri?: string;
   globalKepala: string;
   studentRankings: any[];
-  autoSaveStudent: (s: Partial<Student>) => void | Promise<void>;
+  autoSaveStudent: (s: Partial<Student>, immediate?: boolean) => void | Promise<void>;
   setStudentsList: React.Dispatch<React.SetStateAction<Student[]>>;
   currentUserEmail?: string | null;
 }
@@ -319,6 +319,7 @@ const ReportTemplate = ({
                             autoSaveStudent(updated);
                           }
                         }}
+                        onBlur={() => autoSaveStudent(student, true)}
                       />
                       <span className="hidden print:inline">{sub.tulis?.nilai ?? '-'}</span>
                     </td>
@@ -339,6 +340,7 @@ const ReportTemplate = ({
                             autoSaveStudent(updated);
                           }
                         }}
+                        onBlur={() => autoSaveStudent(student, true)}
                       />
                       <span className="hidden print:inline">{sub.lisan?.nilai ?? '-'}</span>
                     </td>
@@ -408,6 +410,7 @@ const ReportTemplate = ({
                       setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
                       autoSaveStudent(updated);
                   }}
+                  onBlur={() => autoSaveStudent(student, true)}
                 />
                 <div className="hidden print:block whitespace-pre-wrap">{student.behavior.spiritual || '-'}</div>
               </td>
@@ -424,6 +427,7 @@ const ReportTemplate = ({
                       setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s));
                       autoSaveStudent(updated);
                   }}
+                  onBlur={() => autoSaveStudent(student, true)}
                 />
                 <div className="hidden print:block whitespace-pre-wrap">{student.behavior.social || '-'}</div>
               </td>
@@ -485,9 +489,9 @@ const ReportTemplate = ({
             </tr>
           </thead>
           <tbody>
-            <tr><td className="pl-4">Sakit</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.sakit} onChange={e => { const updated = {...student, attendance: {...student.attendance, sakit: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{student.attendance.sakit}</span></td></tr>
-            <tr><td className="pl-4">Izin</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.izin} onChange={e => { const updated = {...student, attendance: {...student.attendance, izin: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{student.attendance.izin}</span></td></tr>
-            <tr><td className="pl-4">Tanpa Keterangan</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.alpha} onChange={e => { const updated = {...student, attendance: {...student.attendance, alpha: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} /><span className="hidden print:inline">{student.attendance.alpha}</span></td></tr>
+            <tr><td className="pl-4">Sakit</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.sakit} onChange={e => { const updated = {...student, attendance: {...student.attendance, sakit: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} onBlur={() => autoSaveStudent(student, true)} /><span className="hidden print:inline">{student.attendance.sakit}</span></td></tr>
+            <tr><td className="pl-4">Izin</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.izin} onChange={e => { const updated = {...student, attendance: {...student.attendance, izin: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} onBlur={() => autoSaveStudent(student, true)} /><span className="hidden print:inline">{student.attendance.izin}</span></td></tr>
+            <tr><td className="pl-4">Tanpa Keterangan</td><td className="p-0"><input type="number" className="w-full text-center py-2 bg-transparent font-bold no-print focus:bg-blue-50/50 outline-none" value={student.attendance.alpha} onChange={e => { const updated = {...student, attendance: {...student.attendance, alpha: parseInt(e.target.value) || 0}}; setStudentsList(prev => prev.map(s => s.id === updated.id ? updated : s)); autoSaveStudent(updated); }} onBlur={() => autoSaveStudent(student, true)} /><span className="hidden print:inline">{student.attendance.alpha}</span></td></tr>
           </tbody>
         </table>
   
@@ -764,6 +768,32 @@ const compressImage = (file: File, maxWidth = 300, maxHeight = 400): Promise<str
 
 export default function App() {
   const configSaveTimeouts = useRef<{ [key: string]: any }>({});
+  const pendingUpdatesRef = useRef<Record<string, { studentId: string; data: any; timer: any }>>({});
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const pendingCount = Object.keys(pendingUpdatesRef.current).length;
+      if (pendingCount > 0) {
+        // Trigger save synchronously or via fire-and-forget
+        const list = Object.values(pendingUpdatesRef.current);
+        list.forEach(({ studentId, data, timer }) => {
+          clearTimeout(timer);
+          delete pendingUpdatesRef.current[studentId];
+          const cleaned = cleanUndefined(data);
+          updateDoc(doc(db, 'students', studentId), { ...cleaned, updatedAt: new Date().toISOString() }).catch(() => {});
+        });
+        
+        e.preventDefault();
+        e.returnValue = 'Data Anda sedang disimpan ke cloud...';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
   const CLASSES = [
     '7 MTs Putra', '7 MTs Putri', '7 MTs Putra & Putri',
     '7 SMP Putra', '7 SMP Putri', '7 SMP Putra & Putri',
@@ -1053,7 +1083,23 @@ export default function App() {
   };
 
   const flushPendingSaves = async () => {
-    // No-op: Automatic background saving has been disabled in favor of manual saves.
+    const list = Object.values(pendingUpdatesRef.current);
+    if (list.length === 0) return;
+    
+    console.log(`Flushing ${list.length} pending student updates...`);
+    const promises = list.map(({ studentId, data, timer }) => {
+      clearTimeout(timer);
+      delete pendingUpdatesRef.current[studentId];
+      const cleaned = cleanUndefined(data);
+      return updateDoc(doc(db, 'students', studentId), { ...cleaned, updatedAt: new Date().toISOString() });
+    });
+    
+    try {
+      await Promise.all(promises);
+      setSaveStatus('saved');
+    } catch (err) {
+      console.warn('Failed to flush some pending saves:', err);
+    }
   };
 
   const handleLogout = () => {
@@ -1512,22 +1558,50 @@ export default function App() {
     return obj;
   };
 
-  const autoSaveStudent = async (student: Partial<Student>) => {
-    if (!student.id) return;
+  const queueStudentUpdate = (studentId: string, dataPatch: any, immediate = false) => {
     setSaveStatus('saving');
-    setSaveErrorMessage(null);
-    try {
-      const cleaned = cleanUndefined(student);
-      await setDoc(doc(db, 'students', student.id), { ...cleaned, updatedAt: new Date().toISOString() }, { merge: true });
-      setSaveStatus('saved');
-    } catch (e) {
-      console.warn('Auto save failed:', e);
-      setSaveStatus('error');
-      setSaveErrorMessage(e instanceof Error ? e.message : String(e));
+    
+    const existing = pendingUpdatesRef.current[studentId];
+    if (existing) {
+      clearTimeout(existing.timer);
+    }
+    
+    const mergedData = existing ? { ...existing.data, ...dataPatch } : dataPatch;
+    
+    const performSave = async () => {
+      delete pendingUpdatesRef.current[studentId];
+      try {
+        const cleaned = cleanUndefined(mergedData);
+        await updateDoc(doc(db, 'students', studentId), { ...cleaned, updatedAt: new Date().toISOString() });
+        if (Object.keys(pendingUpdatesRef.current).length === 0) {
+          setSaveStatus('saved');
+        }
+      } catch (err) {
+        console.warn('Auto save failed during queued write:', err);
+        setSaveStatus('error');
+      }
+    };
+
+    if (immediate) {
+      performSave();
+    } else {
+      const timer = setTimeout(performSave, 400);
+      pendingUpdatesRef.current[studentId] = {
+        studentId,
+        data: mergedData,
+        timer
+      };
     }
   };
 
-  const handleSelectClass = (className: string) => {
+  const autoSaveStudent = async (student: Partial<Student>, immediate = false) => {
+    if (!student.id) return;
+    const { id, ...dataPatch } = student;
+    queueStudentUpdate(id, dataPatch, immediate);
+  };
+
+  const handleSelectClass = async (className: string) => {
+    await flushPendingSaves();
     setSelectedClass(className);
     safeLocalStorageSetItem('selected_class', className);
     setCurrentIndex(0);
@@ -1983,7 +2057,7 @@ export default function App() {
     }
   };
 
-  const handleBulkUpdateGrades = async (studentId: string, subIdx: number, type: 'tulis' | 'lisan', value: number) => {
+  const handleBulkUpdateGrades = async (studentId: string, subIdx: number, type: 'tulis' | 'lisan', value: number, immediate = false) => {
     const student = studentsList.find(s => s.id === studentId);
     if (student) {
       const newSubs = [...student.subjects];
@@ -1994,15 +2068,11 @@ export default function App() {
       
       const updated = { ...student, subjects: newSubs };
       setStudentsList(prev => prev.map(s => s.id === studentId ? updated : s));
-      try {
-        await setDoc(doc(db, 'students', studentId), { subjects: newSubs, updatedAt: new Date().toISOString() }, { merge: true });
-      } catch (e) {
-        handleFirestoreError(e, OperationType.UPDATE, `students/${studentId}`);
-      }
+      queueStudentUpdate(studentId, { subjects: newSubs }, immediate);
     }
   };
 
-  const handleBulkUpdateExtra = async (studentId: string, activityIdx: number, key: 'activity' | 'note', value: string) => {
+  const handleBulkUpdateExtra = async (studentId: string, activityIdx: number, key: 'activity' | 'note', value: string, immediate = false) => {
     const student = studentsList.find(s => s.id === studentId);
     if (student) {
       const newExtras = [...(student.extracurriculars || [])];
@@ -2017,15 +2087,11 @@ export default function App() {
       
       const updated = { ...student, extracurriculars: newExtras };
       setStudentsList(prev => prev.map(s => s.id === studentId ? updated : s));
-      try {
-        await setDoc(doc(db, 'students', studentId), { extracurriculars: newExtras, updatedAt: new Date().toISOString() }, { merge: true });
-      } catch (e) {
-        handleFirestoreError(e, OperationType.UPDATE, `students/${studentId}`);
-      }
+      queueStudentUpdate(studentId, { extracurriculars: newExtras }, immediate);
     }
   };
 
-  const handleBulkUpdateBehavior = async (studentId: string, type: 'spiritual' | 'social', value: string) => {
+  const handleBulkUpdateBehavior = async (studentId: string, type: 'spiritual' | 'social', value: string, immediate = false) => {
     const student = studentsList.find(s => s.id === studentId);
     if (student) {
       const newBehavior = {
@@ -2035,15 +2101,11 @@ export default function App() {
       
       const updated = { ...student, behavior: newBehavior };
       setStudentsList(prev => prev.map(s => s.id === studentId ? updated : s));
-      try {
-        await setDoc(doc(db, 'students', studentId), { behavior: newBehavior, updatedAt: new Date().toISOString() }, { merge: true });
-      } catch (e) {
-        handleFirestoreError(e, OperationType.UPDATE, `students/${studentId}`);
-      }
+      queueStudentUpdate(studentId, { behavior: newBehavior }, immediate);
     }
   };
 
-  const handleBulkUpdateIdentity = async (studentId: string, key: string, value: string) => {
+  const handleBulkUpdateIdentity = async (studentId: string, key: string, value: string, immediate = false) => {
     const student = studentsList.find(s => s.id === studentId);
     if (student) {
       const currentIdentity = student.identity || {
@@ -2062,15 +2124,12 @@ export default function App() {
       
       const updated = { ...student, identity: newIdentity };
       setStudentsList(prev => prev.map(s => s.id === studentId ? updated : s));
-      try {
-        await setDoc(doc(db, 'students', studentId), { identity: newIdentity, updatedAt: new Date().toISOString() }, { merge: true });
-      } catch (e) {
-        handleFirestoreError(e, OperationType.UPDATE, `students/${studentId}`);
-      }
+      queueStudentUpdate(studentId, { identity: newIdentity }, immediate);
     }
   };
 
-  const handleClearClass = () => {
+  const handleClearClass = async () => {
+    await flushPendingSaves();
     setSelectedClass('');
     localStorage.removeItem('selected_class');
     setStudentsList([]);
@@ -3721,23 +3780,7 @@ export default function App() {
             <Printer size={18} /> CETAK SEMUA KELAS (PDF)
           </button>
 
-          {/* Sync & Direct Navigation Controls */}
-          <button 
-            onClick={handleManualSync}
-            disabled={syncStatus === 'syncing' || filteredStudents.length === 0}
-            className={`w-full text-white p-4 rounded-xl text-xs font-black flex items-center justify-center gap-3 transition-all shadow-xl ${
-              syncStatus === 'success' ? 'bg-emerald-600 shadow-emerald-100' :
-              syncStatus === 'error' ? 'bg-rose-600 shadow-rose-100' :
-              syncStatus === 'syncing' ? 'bg-indigo-500 shadow-indigo-100 cursor-not-allowed' :
-              'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-150 hover:translate-y-[-2px]'
-            }`}
-          >
-            <RefreshCw size={18} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
-            {syncStatus === 'syncing' ? 'SEDANG MENULIS DATA...' :
-             syncStatus === 'success' ? 'SINKRON DATA SUKSES ✅' :
-             syncStatus === 'error' ? 'SINKRON DATA GAGAL ❌' :
-             'SINKRONISASI SANTRI'}
-          </button>
+
 
           <button 
             onClick={handleClearClass}
@@ -4232,7 +4275,8 @@ export default function App() {
                                 className="w-full bg-transparent border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none uppercase"
                                 placeholder="..."
                                 value={s.extracurriculars?.[0]?.activity || ''}
-                                onChange={e => handleBulkUpdateExtra(s.id, 0, 'activity', e.target.value.toUpperCase())}
+                                onChange={e => handleBulkUpdateExtra(s.id, 0, 'activity', e.target.value.toUpperCase(), false)}
+                                onBlur={e => handleBulkUpdateExtra(s.id, 0, 'activity', e.target.value.toUpperCase(), true)}
                               />
                             </td>
                             <td className="px-2 py-1">
@@ -4240,7 +4284,8 @@ export default function App() {
                                 className="w-full bg-transparent border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none"
                                 placeholder="..."
                                 value={s.extracurriculars?.[0]?.note || ''}
-                                onChange={e => handleBulkUpdateExtra(s.id, 0, 'note', e.target.value)}
+                                onChange={e => handleBulkUpdateExtra(s.id, 0, 'note', e.target.value, false)}
+                                onBlur={e => handleBulkUpdateExtra(s.id, 0, 'note', e.target.value, true)}
                               />
                             </td>
                           </tr>
@@ -4293,7 +4338,8 @@ export default function App() {
                                 className="w-full bg-transparent border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none min-h-[60px] resize-none"
                                 placeholder="..."
                                 value={s.behavior.spiritual || ''}
-                                onChange={e => handleBulkUpdateBehavior(s.id, 'spiritual', e.target.value)}
+                                onChange={e => handleBulkUpdateBehavior(s.id, 'spiritual', e.target.value, false)}
+                                onBlur={e => handleBulkUpdateBehavior(s.id, 'spiritual', e.target.value, true)}
                               />
                             </td>
                             <td className="px-2 py-1">
@@ -4301,7 +4347,8 @@ export default function App() {
                                 className="w-full bg-transparent border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-lg outline-none min-h-[60px] resize-none"
                                 placeholder="..."
                                 value={s.behavior.social || ''}
-                                onChange={e => handleBulkUpdateBehavior(s.id, 'social', e.target.value)}
+                                onChange={e => handleBulkUpdateBehavior(s.id, 'social', e.target.value, false)}
+                                onBlur={e => handleBulkUpdateBehavior(s.id, 'social', e.target.value, true)}
                               />
                             </td>
                           </tr>
