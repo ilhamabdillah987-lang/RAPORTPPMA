@@ -777,7 +777,7 @@ export default function App() {
     'ALUMNI'
   ];
 
-  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [selectedClass, setSelectedClass] = useState<string>(() => localStorage.getItem('selected_class') || '');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [globalWaliKelas, setGlobalWaliKelas] = useState<string>('');
@@ -813,7 +813,15 @@ export default function App() {
   const [adminSubTab, setAdminSubTab] = useState<'stats' | 'teachers'>('stats');
 
   // Teacher credentials states
-  const [currentTeacher, setCurrentTeacher] = useState<{ username: string; waliKelas: string } | null>(null);
+  const [currentTeacher, setCurrentTeacher] = useState<{ username: string; waliKelas: string } | null>(() => {
+    const cached = localStorage.getItem('raport_current_teacher');
+    try {
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isConfigsLoading, setIsConfigsLoading] = useState(false);
 
   const [teachersList, setTeachersList] = useState<any[]>([]);
   const [isTeachersLoading, setIsTeachersLoading] = useState(false);
@@ -1362,6 +1370,7 @@ export default function App() {
     };
 
     const loadConfigs = async () => {
+      setIsConfigsLoading(true);
       for (const key of configKeys) {
         try {
           const snapshot = await getDoc(doc(db, 'configs', key));
@@ -1402,6 +1411,7 @@ export default function App() {
           else if (key === 'al_hikmah_custom_logo') setLogoUrl(fallback);
         }
       }
+      setIsConfigsLoading(false);
     };
 
     loadConfigs();
@@ -1599,6 +1609,27 @@ export default function App() {
       handleFirestoreError(error, OperationType.WRITE, `configs_batch_${selectedClass}`);
     }
   };
+
+  // Automatic background saving for report settings (configs)
+  useEffect(() => {
+    if (!selectedClass || isConfigsLoading) return;
+
+    const timer = setTimeout(() => {
+      handleSaveAllConfigs();
+    }, 1200); // Save after 1.2s of inactivity
+
+    return () => clearTimeout(timer);
+  }, [
+    selectedClass,
+    isConfigsLoading,
+    globalWaliKelas,
+    globalWaliKelasPutra,
+    globalWaliKelasPutri,
+    globalNamaKelas,
+    globalTanggalRaport,
+    globalKepala,
+    globalTanggalKenaikan
+  ]);
 
   const handleProcessPromotion = async () => {
     if (!selectedClass || studentsList.length === 0) return;
@@ -4811,44 +4842,12 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Manual Save Button for Report Settings */}
+                {/* Auto-saved status indicator for Report Settings */}
                 <div className="flex justify-start sm:justify-end pt-4 border-t border-slate-100">
-                  <button
-                    id="btn_simpan_config"
-                    onClick={handleSaveAllConfigs}
-                    disabled={configSaveStatus === 'saving'}
-                    className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 cursor-pointer ${
-                      configSaveStatus === 'saving'
-                        ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
-                        : configSaveStatus === 'success'
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
-                        : configSaveStatus === 'error'
-                        ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-100'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100'
-                    }`}
-                  >
-                    {configSaveStatus === 'saving' ? (
-                      <>
-                        <RefreshCw size={14} className="animate-spin" />
-                        MENYIMPAN...
-                      </>
-                    ) : configSaveStatus === 'success' ? (
-                      <>
-                        <Save size={14} />
-                        SETTING BERHASIL DISIMPAN!
-                      </>
-                    ) : configSaveStatus === 'error' ? (
-                      <>
-                        <Save size={14} />
-                        GAGAL MENYIMPAN! COBA LAGI
-                      </>
-                    ) : (
-                      <>
-                        <Save size={14} />
-                        SIMPAN SETTING ADMINISTRATIF
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block animate-pulse"></span>
+                    <span>⚡ Pengaturan Diperbarui Secara Otomatis</span>
+                  </div>
                 </div>
 
                 {/* Logo Customizer */}
