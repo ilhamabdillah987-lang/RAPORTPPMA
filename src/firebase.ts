@@ -4,22 +4,10 @@
 
 export const db = { type: 'local_database' };
 export const auth = { currentUser: { uid: 'local-guru', email: 'guru@alhikmah.id', emailVerified: true } };
-export const googleProvider = { type: 'google_provider' };
-
 export type User = {
   uid: string;
   email: string | null;
   emailVerified: boolean;
-};
-
-export const signInWithPopup = async (authInst?: any, providerInst?: any) => {
-  return {
-    user: {
-      uid: 'local-guru',
-      email: 'guru@alhikmah.id',
-      emailVerified: true
-    }
-  };
 };
 
 export const signOut = async (authInst?: any) => {
@@ -38,12 +26,6 @@ export const onAuthStateChanged = (authInst: any, callback: (user: any) => void)
   }, 10);
   return () => {};
 };
-
-export function getAccessToken(): string | null {
-  return null;
-}
-
-export function setAccessToken(token: string | null) {}
 
 export function collection(dbInstance: any, name: string) {
   return { type: 'collection', name };

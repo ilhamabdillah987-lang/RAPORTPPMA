@@ -9,7 +9,7 @@ import XLSXStyle from 'xlsx-js-style';
 import { Student, Subject, StudentIdentity } from './types';
 import { ChevronUp, ChevronDown, Printer, UserCircle, Plus, Edit, Trash2, X, Save, LogOut, Lock, User as LucideUser, Search, Settings, LayoutDashboard, FileText, ChevronRight, ChevronLeft, Menu, LogIn, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, getAccessToken } from './firebase';
+import { db, auth, signOut, onAuthStateChanged, User as FirebaseUser, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot } from './firebase';
 
 enum OperationType {
   CREATE = 'create',
@@ -806,7 +806,6 @@ export default function App() {
   const [isAdminDataLoading, setIsAdminDataLoading] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'MTs' | 'SMP' | 'SMA'>('all');
-  const [googleSheetsActive, setGoogleSheetsActive] = useState(false);
   const [selectedAdminClassDetail, setSelectedAdminClassDetail] = useState<string | null>(null);
   const [adminSelectedClassStudents, setAdminSelectedClassStudents] = useState<any[]>([]);
 
@@ -881,11 +880,9 @@ export default function App() {
       if (user) {
         setCurrentUserEmail(user.email);
         localStorage.setItem('raport_admin_email', user.email || '');
-        setGoogleSheetsActive(!!getAccessToken());
       } else {
         setCurrentUserEmail("guru");
         localStorage.removeItem('raport_admin_email');
-        setGoogleSheetsActive(false);
       }
     });
     return () => unsubscribe();
@@ -966,32 +963,6 @@ export default function App() {
     setIsAdminViewActive(true);
   };
 
-  const handleGoogleSignIn = async () => {
-    setAuthError(null);
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result && result.user) {
-        const email = result.user.email;
-        setCurrentUserEmail(email);
-        if (email) {
-          localStorage.setItem('raport_admin_email', email);
-        }
-        setGoogleSheetsActive(true);
-        setIsAuthModalOpen(false);
-        setIsAdminViewActive(true);
-      }
-    } catch (err) {
-      console.warn("Google Sign-In Error. Fallback support active.", err);
-      showConfirm({
-        title: 'Sign-In Tertunda (Masalah Sandbox)',
-        message: 'Google Sign-In tidak dapat membuka popup karena pembatasan sandbox di web preview ini. Mohon gunakan panel "Masuk via Google Simulator" dengan mengetik email Anda langsung.',
-        cancelText: 'Tutup',
-        confirmText: 'Lanjutkan',
-        onConfirm: () => {}
-      });
-    }
-  };
-
   const handleManualEmailLogin = () => {
     const trimmed = adminAuthInputEmail.trim().toLowerCase();
     if (trimmed) {
@@ -1002,7 +973,7 @@ export default function App() {
     } else {
       showConfirm({
         title: 'Input Tidak Valid',
-        message: 'Ketik email Google atau nama akun simulasi yang valid.',
+        message: 'Ketik email administrator yang valid.',
         cancelText: 'Tutup',
         confirmText: 'Selesai',
         onConfirm: () => {}
@@ -1123,7 +1094,6 @@ export default function App() {
         setCurrentTeacher(null);
         setSelectedClass('');
         setIsAdminViewActive(false);
-        setGoogleSheetsActive(false);
       }
     });
   };
