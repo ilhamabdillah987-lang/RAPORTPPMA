@@ -1045,6 +1045,12 @@ export default function App() {
     if (!selectedClass) return;
     setSyncStatus('syncing');
     try {
+      // Pastikan antrean simpan otomatis di-flush terlebih dahulu ke Firestore
+      await flushPendingSaves();
+      
+      // Update cache lokal juga
+      safeLocalStorageSetItem(`raport_students_cache_${selectedClass}`, JSON.stringify(studentsList));
+
       const res = await fetch('/api/backup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1399,6 +1405,25 @@ export default function App() {
     };
 
     const loadConfigs = async () => {
+      // Optimistic load of config values from local storage cache to minimize UI layout shifts/flickering
+      try {
+        for (const key of configKeys) {
+          const cachedVal = localStorage.getItem(`raport_config_cache_${key}`);
+          if (cachedVal !== null) {
+            if (key === `wali_kelas_${selectedClass}`) setGlobalWaliKelas(cachedVal);
+            else if (key === `wali_kelas_putra_${selectedClass}`) setGlobalWaliKelasPutra(cachedVal);
+            else if (key === `wali_kelas_putri_${selectedClass}`) setGlobalWaliKelasPutri(cachedVal);
+            else if (key === `nama_kelas_${selectedClass}`) setGlobalNamaKelas(cachedVal);
+            else if (key === `tanggal_raport_${selectedClass}`) setGlobalTanggalRaport(cachedVal);
+            else if (key === `kepala_kepasentrenan_${selectedClass}`) setGlobalKepala(cachedVal);
+            else if (key === `tanggal_kenaikan_${selectedClass}`) setGlobalTanggalKenaikan(cachedVal);
+            else if (key === 'al_hikmah_custom_logo') setLogoUrl(cachedVal);
+          }
+        }
+      } catch (err) {
+        console.warn('Gagal memuat awal konfigurasi optimistik:', err);
+      }
+
       setIsConfigsLoading(true);
       for (const key of configKeys) {
         try {
@@ -1474,6 +1499,20 @@ export default function App() {
   }, [selectedClass]);
 
   const fetchStudents = async (className: string) => {
+    // Optimistic loading: pull cached student list first for instant rendering while network works
+    try {
+      const cached = localStorage.getItem(`raport_students_cache_${className}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          console.log(`[Cache] Memuat secara optimistik ${parsed.length} santri Kelas ${className}`);
+          setStudentsList(parsed);
+        }
+      }
+    } catch (err) {
+      console.warn("Gagal meload cache awal santri:", err);
+    }
+
     setIsLoading(true);
     try {
       const q = query(collection(db, 'students'), where('class', '==', className));
@@ -1597,6 +1636,51 @@ export default function App() {
   const autoSaveStudent = async (student: Partial<Student>, immediate = false) => {
     if (!student.id) return;
     const { id, ...dataPatch } = student;
+
+    // --- STRATEGI SAVE LOCAL FIRST (SIMPAN PAKSA KE BROWSER SINKRON) ---
+    if (selectedClass) {
+      try {
+        // 1. Update general cache raport_students_cache_${selectedClass}
+        const cacheKey = `raport_students_cache_${selectedClass}`;
+        const cached = localStorage.getItem(cacheKey);
+        let list: Student[] = [];
+        if (cached) {
+          list = JSON.parse(cached);
+        } else {
+          list = [...studentsList];
+        }
+        const idx = list.findIndex(s => s.id === id);
+        if (idx !== -1) {
+          // Deep apply patch to cached student
+          const target = { ...list[idx] };
+          for (const key in dataPatch) {
+            if (dataPatch[key] !== undefined) {
+              if (typeof dataPatch[key] === 'object' && dataPatch[key] !== null && !Array.isArray(dataPatch[key])) {
+                target[key] = { ...target[key], ...dataPatch[key] };
+              } else {
+                target[key] = dataPatch[key];
+              }
+            }
+          }
+          target.updatedAt = new Date().toISOString();
+          list[idx] = target as Student;
+          localStorage.setItem(cacheKey, JSON.stringify(list));
+        }
+
+        // 2. Simpan juga ke draft_raport global untuk redundansi ekstra sesuai request user
+        const draftCached = localStorage.getItem('draft_raport');
+        const draftData = draftCached ? JSON.parse(draftCached) : {};
+        draftData[id] = {
+          ...(draftData[id] || {}),
+          ...dataPatch,
+          updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem('draft_raport', JSON.stringify(draftData));
+      } catch (err) {
+        console.warn('Gagal melakukan Save-Local-First ke browser:', err);
+      }
+    }
+
     queueStudentUpdate(id, dataPatch, immediate);
   };
 
@@ -1751,10 +1835,16 @@ export default function App() {
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       handleEmergencySave();
+      try {
+        localStorage.setItem('last_session_timestamp', new Date().toISOString());
+      } catch (err) {}
     };
 
     const handleUnload = () => {
       handleEmergencySave();
+      try {
+        localStorage.setItem('last_session_timestamp', new Date().toISOString());
+      } catch (err) {}
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -3745,6 +3835,15 @@ export default function App() {
               className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 lg:cursor-pointer"
             >
               <Trash2 size={16} /> HAPUS DATA
+            </button>
+
+            <button 
+              onClick={handleManualSync}
+              disabled={filteredStudents.length === 0}
+              className={`w-full ${syncStatus === 'syncing' ? 'bg-amber-500' : syncStatus === 'success' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-700 hover:bg-slate-800 shadow-slate-100'} text-white p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg hover:translate-y-[-1px] disabled:opacity-50 cursor-pointer`}
+            >
+              <Save size={16} className={`${syncStatus === 'syncing' ? 'animate-spin' : ''}`} /> 
+              {syncStatus === 'syncing' ? 'SINKRONISASI...' : syncStatus === 'success' ? 'SINKRONISASI BERHASIL' : 'SIMPAN MANUAL KE CLOUD'}
             </button>
           </div>
         </div>
