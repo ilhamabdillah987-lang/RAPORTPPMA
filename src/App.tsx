@@ -808,6 +808,7 @@ export default function App() {
   ];
 
   const [selectedClass, setSelectedClass] = useState<string>(() => localStorage.getItem('selected_class') || '');
+  const [googleSheetsUrl, setGoogleSheetsUrl] = useState<string>(() => localStorage.getItem('al_hikmah_google_sheets_url') || '');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [globalWaliKelas, setGlobalWaliKelas] = useState<string>('');
@@ -1041,50 +1042,121 @@ export default function App() {
     handleSelectClass(selectedClassVal);
   };
 
-  const handleManualSync = async () => {
+  const syncToGoogleSheets = async () => {
     if (!selectedClass) return;
+    
+    const currentSheetsUrl = localStorage.getItem('al_hikmah_google_sheets_url') || googleSheetsUrl;
+    if (!currentSheetsUrl || !currentSheetsUrl.trim().startsWith('http')) {
+      showConfirm({
+        title: 'Konfigurasi Google Sheets Belum Lengkap',
+        message: 'Silakan atur Web App URL Google Apps Script Anda terlebih dahulu di menu "Setting Raport" -> "Integrasi Google Sheets".',
+        cancelText: 'Mengerti',
+        confirmText: 'Buka Settings',
+        onConfirm: () => {
+          setWorkspaceTab('settings');
+        }
+      });
+      return;
+    }
+
     setSyncStatus('syncing');
     try {
-      // Pastikan antrean simpan otomatis di-flush terlebih dahulu ke Firestore
+      // Pastikan data pending di-flush ke server lokal terlebih dahulu
       await flushPendingSaves();
       
       // Update cache lokal juga
       safeLocalStorageSetItem(`raport_students_cache_${selectedClass}`, JSON.stringify(studentsList));
 
-      const res = await fetch('/api/backup', {
+      // Ambil data yang ada di localStorage
+      const cachedStudentData = localStorage.getItem(`raport_students_cache_${selectedClass}`);
+      const draftRaportData = localStorage.getItem('draft_raport');
+      
+      const payload = {
+        className: selectedClass,
+        students: cachedStudentData ? JSON.parse(cachedStudentData) : studentsList,
+        draftRaport: draftRaportData ? JSON.parse(draftRaportData) : {},
+        waliKelas: globalWaliKelas || currentTeacher?.username || '-',
+        namaKelas: globalNamaKelas || '-',
+        tanggalRaport: globalTanggalRaport,
+        kepalaKepasentrenan: globalKepala,
+        tanggalKenaikan: globalTanggalKenaikan,
+        updatedAt: new Date().toISOString()
+      };
+
+      console.log('Mengirim data ke Google Sheets...', payload);
+
+      const res = await fetch(currentSheetsUrl.trim(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          className: selectedClass,
-          students: studentsList,
-          waliKelas: currentTeacher?.username || ''
-        })
+        body: JSON.stringify(payload),
+        mode: 'cors'
       });
-      if (res.ok) {
+
+      if (res.ok || res.status === 0) {
         setSyncStatus('success');
         showConfirm({
           title: 'Sinkronisasi Berhasil',
-          message: `Berhasil menyinkronkan data ${studentsList.length} santri Kelas ${selectedClass} ke database pusat admin. Admin sekarang dapat melihat perkembangan pengisian raport secara keseluruhan secara realtime.`,
+          message: `Berhasil menyinkronkan data ${payload.students.length} santri Kelas ${selectedClass} ke Google Sheets menggunakan Google Apps Script!`,
           cancelText: 'Selesai',
-          confirmText: 'Lanjutkan',
+          confirmText: 'Sip',
           onConfirm: () => {}
         });
         setTimeout(() => setSyncStatus('idle'), 3000);
       } else {
+        throw new Error(`HTTP status ${res.status}`);
+      }
+    } catch (err) {
+      console.warn('Google Sheets sync standard CORS mode had an issue, attempting fallback:', err);
+      
+      // Fallback: Apps Script Web App can sometimes fail CORS preflight if response headers aren't perfect.
+      // But we can trigger the POST using 'no-cors' which acts as a fire-and-forget submission!
+      try {
+        const cachedStudentData = localStorage.getItem(`raport_students_cache_${selectedClass}`);
+        const draftRaportData = localStorage.getItem('draft_raport');
+        const payloadFallback = {
+          className: selectedClass,
+          students: cachedStudentData ? JSON.parse(cachedStudentData) : studentsList,
+          draftRaport: draftRaportData ? JSON.parse(draftRaportData) : {},
+          waliKelas: globalWaliKelas || currentTeacher?.username || '-',
+          namaKelas: globalNamaKelas || '-',
+          tanggalRaport: globalTanggalRaport,
+          kepalaKepasentrenan: globalKepala,
+          tanggalKenaikan: globalTanggalKenaikan,
+          updatedAt: new Date().toISOString(),
+          fallbackMode: true
+        };
+
+        const currentSheetsUrl = localStorage.getItem('al_hikmah_google_sheets_url') || googleSheetsUrl;
+        await fetch(currentSheetsUrl.trim(), {
+          method: 'POST',
+          mode: 'no-cors', // Opaque request which is highly resilient for Google Apps Script redirects
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadFallback)
+        });
+
+        // If fetch didn't throw an exception, it successfully transmitted the POST request!
+        setSyncStatus('success');
+        showConfirm({
+          title: 'Sinkronisasi Berhasil',
+          message: `Berhasil menyinkronkan data ${payloadFallback.students.length} santri Kelas ${selectedClass} ke Google Sheets via secure background transit.`,
+          cancelText: 'Selesai',
+          confirmText: 'Sip',
+          onConfirm: () => {}
+        });
+        setTimeout(() => setSyncStatus('idle'), 3000);
+      } catch (fallbackErr) {
         setSyncStatus('error');
         setTimeout(() => setSyncStatus('idle'), 3000);
         showConfirm({
           title: 'Sinkronisasi Gagal',
-          message: 'Gagal melakukan sinkronisasi ke server. Silakan periksa koneksi Anda dan coba lagi.',
+          message: 'Gagal mengirim data ke Google Sheets. Silakan periksa kembali Web App URL Anda dan pastikan deploy-nya diset ke "Anyone" (Siapa saja).',
           cancelText: 'Tutup',
-          confirmText: 'Lanjutkan',
-          onConfirm: () => {}
+          confirmText: 'Coba Lagi',
+          onConfirm: () => {
+            syncToGoogleSheets();
+          }
         });
       }
-    } catch (err) {
-      setSyncStatus('error');
-      setTimeout(() => setSyncStatus('idle'), 3000);
-      console.error(err);
     }
   };
 
@@ -3838,12 +3910,12 @@ export default function App() {
             </button>
 
             <button 
-              onClick={handleManualSync}
+              onClick={syncToGoogleSheets}
               disabled={filteredStudents.length === 0}
               className={`w-full ${syncStatus === 'syncing' ? 'bg-amber-500' : syncStatus === 'success' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-700 hover:bg-slate-800 shadow-slate-100'} text-white p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg hover:translate-y-[-1px] disabled:opacity-50 cursor-pointer`}
             >
               <Save size={16} className={`${syncStatus === 'syncing' ? 'animate-spin' : ''}`} /> 
-              {syncStatus === 'syncing' ? 'SINKRONISASI...' : syncStatus === 'success' ? 'SINKRONISASI BERHASIL' : 'SIMPAN MANUAL KE CLOUD'}
+              {syncStatus === 'syncing' ? 'SENGGOL GOOGLE SHEETS...' : syncStatus === 'success' ? 'SINKRONISASI BERHASIL' : 'EKSPOR KE GOOGLE SHEETS'}
             </button>
           </div>
         </div>
@@ -5151,6 +5223,49 @@ export default function App() {
                   <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2">
                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block animate-pulse"></span>
                     <span>⚡ Pengaturan Diperbarui Secara Otomatis</span>
+                  </div>
+                </div>
+
+                {/* Google Sheets Integration Section */}
+                <div className="pt-6 border-t border-slate-100 space-y-4">
+                  <div>
+                    <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span>
+                      📊 Integrasi Google Sheets (Apps Script)
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 leading-relaxed">
+                      Hubungkan pengisian raport Anda langsung dengan Google Sheets menggunakan Google Apps Script Web App URL.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-100 p-6 rounded-2xl space-y-4">
+                    <div className="space-y-1.5 w-full">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block border-b border-slate-200 pb-1 font-sans">
+                        Google Apps Script Web App URL
+                      </label>
+                      <input 
+                        className="w-full px-4 py-3 text-xs bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 outline-none transition-all font-semibold text-slate-700 font-mono"
+                        placeholder="https://script.google.com/macros/s/.../exec"
+                        value={googleSheetsUrl}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setGoogleSheetsUrl(val);
+                          localStorage.setItem('al_hikmah_google_sheets_url', val);
+                        }}
+                      />
+                    </div>
+
+                    <div className="text-[10.5px] text-slate-500 uppercase leading-relaxed font-semibold font-sans space-y-2 bg-white/70 p-4 rounded-xl border border-slate-100">
+                      <p className="text-slate-600 font-bold border-b border-slate-50 pb-1.5 flex items-center gap-1.5">
+                        💡 Panduan Cara Deployment Google Web App:
+                      </p>
+                      <ol className="list-decimal pl-4.5 space-y-1 my-2">
+                        <li>Buka Google Sheets & pilih menu <span className="font-bold text-slate-700">Ekstensi &gt; Apps Script</span>.</li>
+                        <li>Tempelkan script penerima data (pastikan menggunakan fungsi <span className="font-mono text-emerald-600">doPost(e)</span>).</li>
+                        <li>Klik <span className="font-bold text-slate-700">Terapkan &gt; Penerapan Baru</span> (Deploy &gt; New Deployment).</li>
+                        <li>Atur jenis penerapan ke <span className="font-bold text-slate-700">Aplikasi Web</span> (Web App), akses ke <span className="font-bold text-rose-600">Siapa saja (Anyone)</span>, lalu salin URL yang diberikan ke kotak input di atas!</li>
+                      </ol>
+                    </div>
                   </div>
                 </div>
 

@@ -95,23 +95,11 @@ async function initVercelDb() {
   }
 }
 
-// Setup Firebase Firestore connection
+// Setup Firebase Firestore connection - completely disabled to avoid quota limits
 let firebaseApp: any = null;
 let firestoreDb: any = null;
 
-try {
-  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(firebaseConfigPath)) {
-    const config = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf8"));
-    firebaseApp = initializeApp(config);
-    firestoreDb = getFirestore(firebaseApp, config.firestoreDatabaseId);
-    console.log("[Server] Connected to persistent Firestore with DB ID:", config.firestoreDatabaseId);
-  } else {
-    console.warn("[Server] firebase-applet-config.json not found. Operating with local lowdb fallback.");
-  }
-} catch (err) {
-  console.error("[Server] Firebase configuration or initialization error:", err);
-}
+console.log("[Server] Firestore connection is completely disabled by configuration to avoid quota errors. The application will use local file database / postgres database.");
 
 // Explicit lowdb setup (used as robust offline fallback)
 const adapter = new JSONFile<Data>(path.join(process.cwd(), 'db.json'));
