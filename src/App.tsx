@@ -2507,25 +2507,125 @@ export default function App() {
     if (studentsList.length === 0) return;
     
     const subjects = studentsList[0].subjects.map(s => s.name);
-    const data = studentsList.map(s => {
-      const row: any = {
-        'NO URUT': s.noUrut,
-        'NAMA SANTRI': s.name,
-        'NIS/NISN': s.nomorInduk
-      };
-      
-      s.subjects.forEach(sub => {
-        row[`${sub.name} (TULIS)`] = sub.tulis?.nilai || 0;
-        row[`${sub.name} (LISAN)`] = sub.lisan?.nilai || 0;
-      });
-      
-      return row;
+    
+    // Construct values array for aoa_to_sheet
+    // Row 1 (Header level 1): NO, NAMA SANTRI, NIS/NISN, and Subject names (merged over 2 columns each)
+    const row1: any[] = ['NO', 'NAMA SANTRI', 'NIS/NISN'];
+    const row2: any[] = ['', '', '']; // Vertical merges
+
+    subjects.forEach(sub => {
+      row1.push(sub.toUpperCase());
+      row1.push(''); // For the horizontal merge
+      row2.push('TULIS');
+      row2.push('LISAN');
     });
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    const aoa: any[][] = [row1, row2];
+
+    // Populate data rows
+    studentsList.forEach((s, index) => {
+      const row: any[] = [
+        index + 1, // NO
+        s.name, // NAMA SANTRI
+        s.nomorInduk || '' // NIS/NISN
+      ];
+
+      s.subjects.forEach(sub => {
+        row.push(sub.tulis?.nilai ?? 0);
+        row.push(sub.lisan?.nilai ?? 0);
+      });
+
+      aoa.push(row);
+    });
+
+    // Create Sheet using sheetJS utils
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Apply Merges
+    const merges = [
+      { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // NO
+      { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // NAMA SANTRI
+      { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }  // NIS/NISN
+    ];
+
+    for (let i = 0; i < subjects.length; i++) {
+      merges.push({
+        s: { r: 0, c: 3 + 2 * i },
+        e: { r: 0, c: 3 + 2 * i + 1 }
+      });
+    }
+    ws['!merges'] = merges;
+
+    // Apply Styling using XLSXStyle
+    const headerStyle = {
+      fill: { fgColor: { rgb: "C4D79B" } }, // Light Green background exactly like Excel screenshot
+      font: { name: "Arial", sz: 10, bold: true, color: { rgb: "000000" } }, // Black text, bold
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: {
+        top: { style: "thin", color: { rgb: "000000" } },
+        bottom: { style: "thin", color: { rgb: "000000" } },
+        left: { style: "thin", color: { rgb: "000000" } },
+        right: { style: "thin", color: { rgb: "000000" } }
+      }
+    };
+
+    const bodyStyle = {
+      fill: { fgColor: { rgb: "FFFF00" } }, // Solid yellow background matching bodyStyle elsewhere & image
+      font: { name: "Arial", sz: 10, color: { rgb: "000000" } },
+      border: {
+        top: { style: "thin", color: { rgb: "000000" } },
+        bottom: { style: "thin", color: { rgb: "000000" } },
+        left: { style: "thin", color: { rgb: "000000" } },
+        right: { style: "thin", color: { rgb: "000000" } }
+      }
+    };
+
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[cellAddress]) {
+          ws[cellAddress] = { t: 's', v: '' }; // Prevent missing cell errors
+        }
+
+        if (R < 2) {
+          // Headers styling
+          ws[cellAddress].s = headerStyle;
+        } else {
+          // Data rows styling
+          const cellStyle = { ...bodyStyle } as any;
+          if (C === 1) {
+            cellStyle.alignment = { horizontal: "left", vertical: "center" };
+          } else {
+            cellStyle.alignment = { horizontal: "center", vertical: "center" };
+          }
+          ws[cellAddress].s = cellStyle;
+        }
+      }
+    }
+
+    // Dynamic width layout helper
+    ws['!cols'] = [
+      { wch: 6 },  // NO
+      { wch: 35 }, // NAMA SANTRI
+      { wch: 16 }  // NIS/NISN
+    ];
+    for (let i = 0; i < subjects.length; i++) {
+      ws['!cols'].push({ wch: 12 }); // TULIS
+      ws['!cols'].push({ wch: 12 }); // LISAN
+    }
+
+    // Dynamic height layouts
+    const rowHeights = [{ hpt: 24 }, { hpt: 20 }];
+    for (let r = 2; r <= range.e.r; r++) {
+      rowHeights.push({ hpt: 19 });
+    }
+    ws['!rows'] = rowHeights;
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "NILAI");
-    XLSX.writeFile(wb, `NILAI_KELAS_${selectedClass.replace(' ', '_')}.xlsx`);
+    XLSXStyle.writeFile(wb, `NILAI_KELAS_${selectedClass.replace(' ', '_')}.xlsx`);
   };
 
   const importGradesFromExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2551,46 +2651,132 @@ export default function App() {
         if (!worksheet) {
           throw new Error('Lembar kerja pertama Excel kosong atau tidak ditemukan.');
         }
-        
-        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
-        if (jsonData.length === 0) {
+
+        // Parse as nested arrays to check header layout row-by-row
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+        if (rows.length === 0) {
           throw new Error('Tidak ada baris data terdeteksi di dalam file Excel.');
         }
 
+        // Identify format: check if it's the dual rows (with 'TULIS' in Row 2)
+        const isNewFormat = rows.length > 1 && 
+                            rows[1] && 
+                            (String(rows[1][3] || '').toUpperCase() === 'TULIS' || 
+                             String(rows[1][4] || '').toUpperCase() === 'LISAN');
+
         const updatedStudents = [...studentsList];
         let matchCount = 0;
-        
-        for (const row of jsonData) {
-          const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']).trim() : '';
-          if (!nameInExcel) continue;
 
-          const excelNis = row['NIS/NISN'] ? String(row['NIS/NISN']).trim() : '';
-          const studentIdx = updatedStudents.findIndex(s => {
-            const matchByName = String(s.name || '').trim().toUpperCase() === nameInExcel.toUpperCase();
-            const matchByNis = excelNis !== '' && s.nomorInduk && String(s.nomorInduk).trim() === excelNis;
-            return matchByNis || matchByName;
-          });
-
-          if (studentIdx !== -1) {
-            matchCount++;
-            const student = updatedStudents[studentIdx];
-            const newSubs = student.subjects.map(sub => {
-              const tulisVal = row[`${sub.name} (TULIS)`];
-              const lisanVal = row[`${sub.name} (LISAN)`];
-              return {
-                ...sub,
-                tulis: typeof tulisVal !== 'undefined' ? { nilai: parseInt(tulisVal) || 0, huruf: getHuruf(parseInt(tulisVal) || 0) } : sub.tulis,
-                lisan: typeof lisanVal !== 'undefined' ? { nilai: parseInt(lisanVal) || 0, huruf: getHuruf(parseInt(lisanVal) || 0) } : sub.lisan,
+        if (isNewFormat) {
+          // Dual header parsing
+          const subjectColMap: Record<string, { tulisCol: number, lisanCol: number }> = {};
+          
+          // Row 0 has subject names starting at column index 3 (D), then index 5, 7, etc.
+          // Due to cell merges, we scan each cell in the header row for a populated subject name
+          const headerRow0 = rows[0];
+          for (let colIdx = 3; colIdx < headerRow0.length; colIdx++) {
+            const val = String(headerRow0[colIdx] || '').trim();
+            if (val && val !== 'NO' && val !== 'NAMA SANTRI' && val !== 'NIS/NISN') {
+              // The next cell is usually the Lisan, or we can check Row 1 (headerRow1)
+              subjectColMap[val.toUpperCase()] = {
+                tulisCol: colIdx,
+                lisanCol: colIdx + 1
               };
+            }
+          }
+
+          // Row 2 up to rows.length are student rows
+          for (let rIdx = 2; rIdx < rows.length; rIdx++) {
+            const row = rows[rIdx];
+            if (!row || row.length < 2) continue;
+
+            const nameInExcel = row[1] ? String(row[1]).trim() : '';
+            if (!nameInExcel) continue;
+
+            const excelNis = row[2] ? String(row[2]).trim() : '';
+            const studentIdx = updatedStudents.findIndex(s => {
+              const matchByName = String(s.name || '').trim().toUpperCase() === nameInExcel.toUpperCase();
+              const matchByNis = excelNis !== '' && s.nomorInduk && String(s.nomorInduk).trim() === excelNis;
+              return matchByNis || matchByName;
             });
-            
-            updatedStudents[studentIdx] = { ...student, subjects: newSubs, updatedAt: new Date().toISOString() };
+
+            if (studentIdx !== -1) {
+              matchCount++;
+              const student = updatedStudents[studentIdx];
+              const newSubs = student.subjects.map(sub => {
+                const colInfo = subjectColMap[sub.name.toUpperCase()];
+                if (colInfo) {
+                  const tulisVal = row[colInfo.tulisCol];
+                  const lisanVal = row[colInfo.lisanCol];
+                  return {
+                    ...sub,
+                    tulis: typeof tulisVal !== 'undefined' && tulisVal !== '' ? { nilai: parseInt(tulisVal) || 0, huruf: getHuruf(parseInt(tulisVal) || 0) } : sub.tulis,
+                    lisan: typeof lisanVal !== 'undefined' && lisanVal !== '' ? { nilai: parseInt(lisanVal) || 0, huruf: getHuruf(parseInt(lisanVal) || 0) } : sub.lisan,
+                  };
+                }
+                return sub;
+              });
+
+              // Apply custom data syncing to localStorage immediately (Local-Save-First layout)
+              updatedStudents[studentIdx] = { ...student, subjects: newSubs, updatedAt: new Date().toISOString() };
+            }
+          }
+        } else {
+          // Standard JSON array fallback for older sheets
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+          for (const row of jsonData) {
+            const nameInExcel = row['NAMA SANTRI'] ? String(row['NAMA SANTRI']).trim() : '';
+            if (!nameInExcel) continue;
+
+            const excelNis = row['NIS/NISN'] ? String(row['NIS/NISN']).trim() : '';
+            const studentIdx = updatedStudents.findIndex(s => {
+              const matchByName = String(s.name || '').trim().toUpperCase() === nameInExcel.toUpperCase();
+              const matchByNis = excelNis !== '' && s.nomorInduk && String(s.nomorInduk).trim() === excelNis;
+              return matchByNis || matchByName;
+            });
+
+            if (studentIdx !== -1) {
+              matchCount++;
+              const student = updatedStudents[studentIdx];
+              const newSubs = student.subjects.map(sub => {
+                const tulisVal = row[`${sub.name} (TULIS)`];
+                const lisanVal = row[`${sub.name} (LISAN)`];
+                return {
+                  ...sub,
+                  tulis: typeof tulisVal !== 'undefined' ? { nilai: parseInt(tulisVal) || 0, huruf: getHuruf(parseInt(tulisVal) || 0) } : sub.tulis,
+                  lisan: typeof lisanVal !== 'undefined' ? { nilai: parseInt(lisanVal) || 0, huruf: getHuruf(parseInt(lisanVal) || 0) } : sub.lisan,
+                };
+              });
+
+              updatedStudents[studentIdx] = { ...student, subjects: newSubs, updatedAt: new Date().toISOString() };
+            }
           }
         }
-        
+
         setStudentsList(updatedStudents);
 
-        // Bulk network update in a single request instead of sequential setDoc in loop!
+        // Update local storage caches immediately
+        if (selectedClass) {
+          safeLocalStorageSetItem(`raport_students_cache_${selectedClass}`, JSON.stringify(updatedStudents));
+          
+          // Simpan juga ke draft_raport global untuk redundansi ekstra sesuai request user
+          try {
+            const draftCached = localStorage.getItem('draft_raport');
+            const draftData = draftCached ? JSON.parse(draftCached) : {};
+            updatedStudents.forEach(st => {
+              // Extract data patch
+              const dataPatch: any = { subjects: st.subjects };
+              draftData[st.id] = {
+                ...(draftData[st.id] || {}),
+                ...dataPatch,
+                updatedAt: new Date().toISOString()
+              };
+            });
+            localStorage.setItem('draft_raport', JSON.stringify(draftData));
+          } catch(e) {}
+        }
+
+        // Bulk server backup
         if (selectedClass && updatedStudents.length > 0) {
           await fetch('/api/backup', {
             method: 'POST',
@@ -2600,12 +2786,14 @@ export default function App() {
               students: updatedStudents,
               waliKelas: globalWaliKelas || globalWaliKelasPutra || globalWaliKelasPutri 
             })
+          }).catch(err => {
+            console.warn('Backup payload to server failed:', err);
           });
         }
-        
+
         showConfirm({
           title: 'Sukses Impor',
-          message: `Berhasil mencocokkan & mengimpor nilai untuk ${matchCount} dari ${jsonData.length} baris data santri!`,
+          message: `Berhasil mencocokkan & mengimpor nilai untuk ${matchCount} dari ${rows.length - 2} baris data santri!`,
           cancelText: 'Tutup',
           confirmText: 'Selesai',
           onConfirm: () => {
@@ -2616,7 +2804,7 @@ export default function App() {
         console.error('Import error:', excelError);
         showConfirm({
           title: 'Gagal Impor Excel',
-          message: `Gagal memproses file Excel: ${excelError.message || excelError}. Silakan gunakan template ekspor mapel resmi.`,
+          message: `Gagal memproses file Excel: ${excelError.message || excelError}. Silakan gunakan template ekspor resmi yang sesuai denga format.`,
           cancelText: 'Tutup',
           onConfirm: () => {}
         });
