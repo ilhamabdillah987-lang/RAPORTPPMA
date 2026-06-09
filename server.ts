@@ -114,6 +114,14 @@ async function initVercelDb() {
         updated_at VARCHAR(100)
       );
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS "Santri" (
+        id VARCHAR(255) PRIMARY KEY,
+        nama VARCHAR(255),
+        nis VARCHAR(255),
+        nilai JSONB
+      );
+    `;
     console.log("[Server] Vercel Postgres tables verified & initialized successfully.");
   } catch (err) {
     console.error("[Server] Critical failure during Vercel Postgres initialization:", err);
@@ -626,6 +634,8 @@ async function safeWrite(): Promise<void> {
       console.log(`[Prisma Sync] Syncing ${students.length} students for Class: ${className}`);
 
       const results = [];
+      const updatedStudentsFull: any[] = [];
+
       for (const student of students) {
         if (!student || !student.id) continue;
         
@@ -634,6 +644,7 @@ async function safeWrite(): Promise<void> {
         const nis = student.nomorInduk || student.nomorIndukSiswa || student.nis || "";
         const nilai = student; // Store full details in Json property
 
+        // 1. Sync via Prisma
         const saved = await prisma.santri.upsert({
           where: { id },
           update: {
@@ -649,6 +660,84 @@ async function safeWrite(): Promise<void> {
           },
         });
         results.push(saved);
+
+        // Prepare students data for backup/caching
+        const newStudent = {
+          ...student,
+          id,
+          updatedAt: new Date().toISOString()
+        };
+        updatedStudentsFull.push(newStudent);
+
+        // 2. Also update raw students table (if using direct Postgres connection in server.ts)
+        if (isVercelDb) {
+          try {
+            await sql`
+              INSERT INTO students (id, name, class, data, updated_at)
+              VALUES (${id}, ${newStudent.name || ""}, ${newStudent.class || ""}, ${JSON.stringify(newStudent)}, ${newStudent.updatedAt})
+              ON CONFLICT (id) DO UPDATE SET 
+                name = EXCLUDED.name,
+                class = EXCLUDED.class,
+                data = EXCLUDED.data,
+                updated_at = EXCLUDED.updated_at
+            `;
+          } catch (sqlErr) {
+            console.warn("[Prisma SQL Sync Fallback Warning]:", sqlErr);
+          }
+        }
+      }
+
+      // 3. Update the classes_backup table to keep class view synchronized (prevent data loss on refresh/reload)
+      if (className && updatedStudentsFull.length > 0) {
+        if (isVercelDb) {
+          try {
+            const backupRes = await sql`SELECT data FROM classes_backup WHERE class_name = ${className}`;
+            let existingWali = "";
+            if (backupRes.rows.length > 0) {
+              existingWali = backupRes.rows[0].data?.waliKelas || "";
+            }
+            const updatedBackup = {
+              students: updatedStudentsFull,
+              updatedAt: new Date().toISOString(),
+              waliKelas: existingWali
+            };
+            await sql`
+              INSERT INTO classes_backup (class_name, data, updated_at)
+              VALUES (${className}, ${JSON.stringify(updatedBackup)}, ${updatedBackup.updatedAt})
+              ON CONFLICT (class_name) DO UPDATE SET
+                data = EXCLUDED.data,
+                updated_at = EXCLUDED.updated_at
+            `;
+            console.log(`[Prisma Sync] Updated classes_backup table for class: ${className}`);
+          } catch (backupSqlErr) {
+            console.error("[Prisma Sync] Failed to update classes_backup table:", backupSqlErr);
+          }
+        }
+
+        // 4. Update the local LowDB cache fallback so that moving between classes locally has zero data loss
+        try {
+          if (!dbLocal.data) {
+            dbLocal.data = { students: [], classesBackup: {}, configs: {}, teachers: [] };
+          }
+          if (!dbLocal.data.classesBackup) {
+            dbLocal.data.classesBackup = {};
+          }
+          const existingWali = dbLocal.data.classesBackup[className]?.waliKelas || "";
+          dbLocal.data.classesBackup[className] = {
+            students: updatedStudentsFull,
+            updatedAt: new Date().toISOString(),
+            waliKelas: existingWali
+          };
+
+          if (!dbLocal.data.students) dbLocal.data.students = [];
+          dbLocal.data.students = dbLocal.data.students.filter(s => s.class !== className);
+          dbLocal.data.students.push(...updatedStudentsFull);
+
+          await safeWrite();
+          console.log(`[Prisma Sync] Updated local lowdb cache for class: ${className}`);
+        } catch (localErr) {
+          console.warn("[Prisma Sync] Local database cache update warning:", localErr);
+        }
       }
 
       res.json({ success: true, count: results.length, message: `Berhasil menyinkronkan ${results.length} data santri ke Vercel Postgres menggunakan Prisma!` });
