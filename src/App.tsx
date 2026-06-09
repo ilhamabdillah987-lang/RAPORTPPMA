@@ -1090,22 +1090,8 @@ export default function App() {
     handleSelectClass(selectedClassVal);
   };
 
-  const syncToGoogleSheets = async () => {
+  const syncToPostgres = async () => {
     if (!selectedClass) return;
-    
-    const currentSheetsUrl = localStorage.getItem('al_hikmah_google_sheets_url') || googleSheetsUrl;
-    if (!currentSheetsUrl || !currentSheetsUrl.trim().startsWith('http')) {
-      showConfirm({
-        title: 'Konfigurasi Google Sheets Belum Lengkap',
-        message: 'Silakan atur Web App URL Google Apps Script Anda terlebih dahulu di menu "Setting Raport" -> "Integrasi Google Sheets".',
-        cancelText: 'Mengerti',
-        confirmText: 'Buka Settings',
-        onConfirm: () => {
-          setWorkspaceTab('settings');
-        }
-      });
-      return;
-    }
 
     setSyncStatus('syncing');
     try {
@@ -1117,94 +1103,48 @@ export default function App() {
 
       // Ambil data yang ada di localStorage
       const cachedStudentData = localStorage.getItem(`raport_students_cache_${selectedClass}`);
-      const draftRaportData = localStorage.getItem('draft_raport');
       
       const payload = {
         className: selectedClass,
         students: cachedStudentData ? JSON.parse(cachedStudentData) : studentsList,
-        draftRaport: draftRaportData ? JSON.parse(draftRaportData) : {},
-        waliKelas: globalWaliKelas || currentTeacher?.username || '-',
-        namaKelas: globalNamaKelas || '-',
-        tanggalRaport: globalTanggalRaport,
-        kepalaKepasentrenan: globalKepala,
-        tanggalKenaikan: globalTanggalKenaikan,
-        updatedAt: new Date().toISOString()
       };
 
-      console.log('Mengirim data ke Google Sheets...', payload);
+      console.log('Mengirim data ke Vercel Postgres via Prisma...', payload);
 
-      const res = await fetch(currentSheetsUrl.trim(), {
+      const res = await fetch('/api/sync-prisma', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        mode: 'cors'
+        body: JSON.stringify(payload)
       });
 
-      if (res.ok || res.status === 0) {
+      if (res.ok) {
+        const result = await res.json();
         setSyncStatus('success');
         showConfirm({
           title: 'Sinkronisasi Berhasil',
-          message: `Berhasil menyinkronkan data ${payload.students.length} santri Kelas ${selectedClass} ke Google Sheets menggunakan Google Apps Script!`,
-          cancelText: 'Selesai',
+          message: `Berhasil menyinkronkan data ${result.count} santri Kelas ${selectedClass} ke database Vercel Postgres menggunakan Prisma!`,
+          cancelText: 'Lanjut',
           confirmText: 'Sip',
           onConfirm: () => {}
         });
         setTimeout(() => setSyncStatus('idle'), 3000);
       } else {
-        throw new Error(`HTTP status ${res.status}`);
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(errData.error || `HTTP status ${res.status}`);
       }
-    } catch (err) {
-      console.warn('Google Sheets sync standard CORS mode had an issue, attempting fallback:', err);
-      
-      // Fallback: Apps Script Web App can sometimes fail CORS preflight if response headers aren't perfect.
-      // But we can trigger the POST using 'no-cors' which acts as a fire-and-forget submission!
-      try {
-        const cachedStudentData = localStorage.getItem(`raport_students_cache_${selectedClass}`);
-        const draftRaportData = localStorage.getItem('draft_raport');
-        const payloadFallback = {
-          className: selectedClass,
-          students: cachedStudentData ? JSON.parse(cachedStudentData) : studentsList,
-          draftRaport: draftRaportData ? JSON.parse(draftRaportData) : {},
-          waliKelas: globalWaliKelas || currentTeacher?.username || '-',
-          namaKelas: globalNamaKelas || '-',
-          tanggalRaport: globalTanggalRaport,
-          kepalaKepasentrenan: globalKepala,
-          tanggalKenaikan: globalTanggalKenaikan,
-          updatedAt: new Date().toISOString(),
-          fallbackMode: true
-        };
-
-        const currentSheetsUrl = localStorage.getItem('al_hikmah_google_sheets_url') || googleSheetsUrl;
-        await fetch(currentSheetsUrl.trim(), {
-          method: 'POST',
-          mode: 'no-cors', // Opaque request which is highly resilient for Google Apps Script redirects
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payloadFallback)
-        });
-
-        // If fetch didn't throw an exception, it successfully transmitted the POST request!
-        setSyncStatus('success');
-        showConfirm({
-          title: 'Sinkronisasi Berhasil',
-          message: `Berhasil menyinkronkan data ${payloadFallback.students.length} santri Kelas ${selectedClass} ke Google Sheets via secure background transit.`,
-          cancelText: 'Selesai',
-          confirmText: 'Sip',
-          onConfirm: () => {}
-        });
-        setTimeout(() => setSyncStatus('idle'), 3000);
-      } catch (fallbackErr) {
-        setSyncStatus('error');
-        setTimeout(() => setSyncStatus('idle'), 3000);
-        showConfirm({
-          title: 'Sinkronisasi Gagal',
-          message: 'Gagal mengirim data ke Google Sheets. Silakan periksa kembali Web App URL Anda dan pastikan deploy-nya diset ke "Anyone" (Siapa saja).',
-          cancelText: 'Tutup',
-          confirmText: 'Coba Lagi',
-          onConfirm: () => {
-            syncToGoogleSheets();
-          }
-        });
-      }
+    } catch (err: any) {
+      console.warn('Prisma Postgres sync error:', err);
+      setSyncStatus('error');
+      setTimeout(() => setSyncStatus('idle'), 3000);
+      showConfirm({
+        title: 'Sinkronisasi Gagal',
+        message: `Gagal menyinkronkan data ke PostgreSQL: ${err.message || err}`,
+        cancelText: 'Tutup',
+        confirmText: 'Coba Lagi',
+        onConfirm: () => {
+          syncToPostgres();
+        }
+      });
     }
   };
 
@@ -4146,12 +4086,12 @@ export default function App() {
             </button>
 
             <button 
-              onClick={syncToGoogleSheets}
+              onClick={syncToPostgres}
               disabled={filteredStudents.length === 0}
               className={`w-full ${syncStatus === 'syncing' ? 'bg-amber-500' : syncStatus === 'success' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-700 hover:bg-slate-800 shadow-slate-100'} text-white p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg hover:translate-y-[-1px] disabled:opacity-50 cursor-pointer`}
             >
               <Save size={16} className={`${syncStatus === 'syncing' ? 'animate-spin' : ''}`} /> 
-              {syncStatus === 'syncing' ? 'SENGGOL GOOGLE SHEETS...' : syncStatus === 'success' ? 'SINKRONISASI BERHASIL' : 'EKSPOR KE GOOGLE SHEETS'}
+              {syncStatus === 'syncing' ? 'SINKRONISASI POSTGRES...' : syncStatus === 'success' ? 'SINKRONISASI BERHASIL' : 'SINKRONISASI DATABASE'}
             </button>
           </div>
         </div>

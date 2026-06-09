@@ -21,9 +21,34 @@ import {
   query as firestoreQuery, 
   where as firestoreWhere 
 } from "firebase/firestore";
-import { sql } from "@vercel/postgres";
+import pg from "pg";
+import { PrismaClient } from "@prisma/client";
 
 dotenv.config();
+
+if (!process.env.DATABASE_URL && process.env.POSTGRES_URL) {
+  process.env.DATABASE_URL = process.env.POSTGRES_URL;
+}
+if (!process.env.POSTGRES_URL && process.env.DATABASE_URL) {
+  process.env.POSTGRES_URL = process.env.DATABASE_URL;
+}
+
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
+});
+
+const sql = async (strings: TemplateStringsArray, ...values: any[]) => {
+  let queryText = "";
+  for (let i = 0; i < strings.length; i++) {
+    queryText += strings[i];
+    if (i < values.length) {
+      queryText += `$${i + 1}`;
+    }
+  }
+  return pool.query(queryText, values);
+};
+
+const prisma = new PrismaClient();
 
 const PORT = 3000;
 
@@ -48,7 +73,7 @@ app.use((req, res, next) => {
 });
 
 // Setup Vercel Database connection
-const isVercelDb = !!process.env.POSTGRES_URL;
+const isVercelDb = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL);
 
 async function initVercelDb() {
   if (!isVercelDb) {
@@ -587,6 +612,49 @@ async function safeWrite(): Promise<void> {
       res.json({ success: true, key, value });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Vercel Postgres Sync with Prisma client (replacing Google Sheets)
+  app.post("/api/sync-prisma", async (req, res) => {
+    try {
+      const { className, students } = req.body;
+      if (!students || !Array.isArray(students)) {
+        return res.status(400).json({ error: "Data santri tidak valid atau kosong" });
+      }
+
+      console.log(`[Prisma Sync] Syncing ${students.length} students for Class: ${className}`);
+
+      const results = [];
+      for (const student of students) {
+        if (!student || !student.id) continue;
+        
+        const id = String(student.id);
+        const nama = student.name || student.nama || "Tanpa Nama";
+        const nis = student.nomorInduk || student.nomorIndukSiswa || student.nis || "";
+        const nilai = student; // Store full details in Json property
+
+        const saved = await prisma.santri.upsert({
+          where: { id },
+          update: {
+            nama,
+            nis,
+            nilai: JSON.parse(JSON.stringify(nilai)),
+          },
+          create: {
+            id,
+            nama,
+            nis,
+            nilai: JSON.parse(JSON.stringify(nilai)),
+          },
+        });
+        results.push(saved);
+      }
+
+      res.json({ success: true, count: results.length, message: `Berhasil menyinkronkan ${results.length} data santri ke Vercel Postgres menggunakan Prisma!` });
+    } catch (err: any) {
+      console.error("[Prisma Sync Error]:", err);
+      res.status(500).json({ error: err.message || "Gagal sinkron data Prisma" });
     }
   });
 
