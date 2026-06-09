@@ -3871,7 +3871,7 @@ export default function App() {
                         >
                           <div className="flex flex-col gap-0.5">
                             <span>🏫 Kelas {cls}</span>
-                            <span className={`text-[8px] font-extrabold ${hasData ? 'text-emerald-600 hover:text-white/80' : 'text-slate-405'}`}>
+                            <span className={`text-[8px] font-extrabold ${hasData ? 'text-emerald-600 hover:text-white/80' : 'text-slate-400'}`}>
                               {hasData ? `✅ Terisi (${count} Santri)` : '⏳ Belum Diinput'}
                             </span>
                           </div>

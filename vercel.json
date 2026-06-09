@@ -2,7 +2,15 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/status",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api|status).*)",
       "destination": "/index.html"
     }
   ]
