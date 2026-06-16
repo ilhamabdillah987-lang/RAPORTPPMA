@@ -200,7 +200,7 @@ const ReportTemplate = ({
       {/* PAGE 2: IDENTITAS SANTRI */}
       {(!selectedPrintSheets || selectedPrintSheets.identitas) && (
         currentUserEmail ? (
-          <section className="page flex flex-col pt-8 pb-6 px-12 text-[10pt] font-sans font-bold">
+          <section className="page flex flex-col pt-8 pb-6 px-12 text-[10pt] font-sans font-bold gold-outline-page">
             <h1 className="text-center text-[12pt] font-black uppercase mb-8 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
             <div className="flex-1 space-y-0.5">
               <table className="w-full border-collapse">
@@ -282,7 +282,7 @@ const ReportTemplate = ({
 
       {/* PAGE 3: NILAI */}
       {(!selectedPrintSheets || selectedPrintSheets.nilai) && (
-        <section className="page flex flex-col justify-between font-bold">
+        <section className="page flex flex-col justify-between font-bold gold-outline-page">
           <div>
             <Header logoUrl={logoUrl} />
             <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />
@@ -402,7 +402,7 @@ const ReportTemplate = ({
 
       {/* PAGE 4: SIKAP */}
       {(!selectedPrintSheets || selectedPrintSheets.sikap) && (
-        <section className="page flex flex-col justify-between">
+        <section className="page flex flex-col justify-between font-bold gold-outline-page">
           <div>
             <Header logoUrl={logoUrl} />
             <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />
@@ -476,7 +476,7 @@ const ReportTemplate = ({
 
       {/* PAGE 5: EKSTRA & ABSENSI */}
       {(!selectedPrintSheets || selectedPrintSheets.kehadiran) && (
-        <section className="page flex flex-col justify-between">
+        <section className="page flex flex-col justify-between font-bold gold-outline-page">
           <div>
             <Header logoUrl={logoUrl} />
             <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />

@@ -161,6 +161,26 @@
 
 
 /* Custom utilities */
+.gold-outline-page,
+.gold-outline-page *,
+.gold-outline-page p,
+.gold-outline-page span,
+.gold-outline-page td,
+.gold-outline-page th,
+.gold-outline-page h1,
+.gold-outline-page h2,
+.gold-outline-page h3,
+.gold-outline-page h5,
+.gold-outline-page div,
+.gold-outline-page input,
+.gold-outline-page textarea {
+  font-family: var(--font-sans), sans-serif !important;
+  font-weight: 900 !important;
+  color: #000000 !important;
+  -webkit-text-stroke: 0.5px #b8972e !important;
+  text-shadow: none !important;
+}
+
 @utility no-scrollbar {
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
