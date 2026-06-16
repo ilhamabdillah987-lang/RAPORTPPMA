@@ -200,7 +200,7 @@ const ReportTemplate = ({
       {/* PAGE 2: IDENTITAS SANTRI */}
       {(!selectedPrintSheets || selectedPrintSheets.identitas) && (
         currentUserEmail ? (
-          <section className="page flex flex-col pt-8 pb-6 px-12 text-[10pt] font-sans">
+          <section className="page flex flex-col pt-8 pb-6 px-12 text-[10pt] font-sans font-bold">
             <h1 className="text-center text-[12pt] font-black uppercase mb-8 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
             <div className="flex-1 space-y-0.5">
               <table className="w-full border-collapse">
@@ -236,13 +236,13 @@ const ReportTemplate = ({
                   ].map((row, idx) => {
                     if (row.isSpacer) return <tr key={`spacer-${idx}`}><td colSpan={4} className="h-2"></td></tr>;
                     return (
-                      <tr key={idx} className="align-top">
+                      <tr key={idx} className="align-top font-bold">
                         <td className="w-8 py-1 font-bold">{(row as any).id || ''}</td>
-                        <td className={`w-[45%] py-1 ${row.indent ? 'pl-6' : ''} ${row.isHeader ? 'font-black' : 'font-medium'}`}>
+                        <td className={`w-[45%] py-1 ${row.indent ? 'pl-6' : ''} ${row.isHeader ? 'font-black' : 'font-bold'}`}>
                           {row.label}
                         </td>
-                        <td className="w-4 py-1 text-center">:</td>
-                        <td className={`py-1 border-b border-dotted border-slate-300 min-h-[1.5em] ${!row.isHeader ? 'font-black' : ''}`}>
+                        <td className="w-4 py-1 text-center font-bold">:</td>
+                        <td className="py-1 border-b border-dotted border-slate-300 min-h-[1.5em] font-black">
                           {row.value}
                         </td>
                       </tr>
@@ -251,7 +251,7 @@ const ReportTemplate = ({
                 </tbody>
               </table>
             </div>
-            <div className="flex justify-between items-end mt-8 px-12">
+            <div className="flex justify-between items-end mt-8 px-12 font-bold">
               <div className="w-[3cm] h-[4cm] border-2 border-slate-900 flex items-center justify-center text-center text-[7pt] text-slate-400 font-bold bg-slate-50 uppercase tracking-tighter leading-tight shrink-0 overflow-hidden relative group">
                 {student.photoUrl ? (
                   <img src={student.photoUrl} alt="Foto Santri" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -259,8 +259,8 @@ const ReportTemplate = ({
                   <span className="p-3">Pas Foto<br/>3 x 4 cm</span>
                 )}
               </div>
-              <div className="text-center w-80 mb-2">
-                <p className="mb-0 text-[10pt]">Tangerang, {globalTanggalRaport}</p>
+              <div className="text-center w-80 mb-2 font-bold">
+                <p className="mb-0 text-[10pt] font-bold">Tangerang, {globalTanggalRaport}</p>
                 <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
                 <div className="h-20"></div>
                 <p className="font-black text-[10pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
@@ -282,41 +282,41 @@ const ReportTemplate = ({
 
       {/* PAGE 3: NILAI */}
       {(!selectedPrintSheets || selectedPrintSheets.nilai) && (
-        <section className="page flex flex-col justify-between">
+        <section className="page flex flex-col justify-between font-bold">
           <div>
             <Header logoUrl={logoUrl} />
             <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />
-            <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block mt-4">A. NILAI TULIS & LISAN</h3>
-            <table className="table-raport w-full text-center mt-2">
+            <h3 className="font-black mb-3 uppercase text-lg border-b-2 border-black inline-block mt-4">A. NILAI TULIS & LISAN</h3>
+            <table className="table-raport w-full text-center mt-2 font-bold">
               <thead>
-                <tr>
-                  <th rowSpan={2} className="w-[4%]">No</th>
-                  <th rowSpan={2} className="w-[45%]">Mata Pelajaran</th>
-                  <th rowSpan={2} className="w-[7%]">KKM</th>
-                  <th colSpan={2} className="w-[22%]">Nilai Tulis</th>
-                  <th colSpan={2} className="w-[22%]">Nilai Lisan</th>
+                <tr className="font-bold">
+                  <th rowSpan={2} className="w-[4%] font-bold">No</th>
+                  <th rowSpan={2} className="w-[45%] font-bold text-left pl-4">Mata Pelajaran</th>
+                  <th rowSpan={2} className="w-[7%] font-bold">KKM</th>
+                  <th colSpan={2} className="w-[22%] font-bold">Nilai Tulis</th>
+                  <th colSpan={2} className="w-[22%] font-bold">Nilai Lisan</th>
                 </tr>
-                <tr>
-                  <th className="w-[11%] text-[8pt] italic">SKOR</th>
-                  <th className="w-[11%] text-[8pt] italic">HURUF</th>
-                  <th className="w-[11%] text-[8pt] italic">SKOR</th>
-                  <th className="w-[11%] text-[8pt] italic">HURUF</th>
+                <tr className="font-bold">
+                  <th className="w-[11%] text-[8pt] italic font-bold">SKOR</th>
+                  <th className="w-[11%] text-[8pt] italic font-bold">HURUF</th>
+                  <th className="w-[11%] text-[8pt] italic font-bold">SKOR</th>
+                  <th className="w-[11%] text-[8pt] italic font-bold">HURUF</th>
                 </tr>
               </thead>
               <tbody>
                 {(Object.entries(groupedSubjects) as [string, Subject[]][]).map(([category, subs], catIdx) => (
                   <React.Fragment key={category}>
                     <tr className="category-row">
-                      <td colSpan={7} className="font-bold uppercase py-2 bg-slate-50 border-y-2 border-black">
+                      <td colSpan={7} className="font-black uppercase py-2 bg-slate-50 border-y-2 border-black">
                         <span className="ml-2">{catIdx + 1}. {category}</span>
                       </td>
                     </tr>
                     {subs.map((sub, idx) => (
-                      <tr key={idx}>
-                        <td>{idx + 1}</td>
-                        <td className="text-left font-medium">{sub.name}</td>
-                        <td>{sub.kkm}</td>
-                        <td className="p-0">
+                      <tr key={idx} className="font-bold">
+                        <td className="font-bold">{idx + 1}</td>
+                        <td className="text-left font-black pl-4">{sub.name}</td>
+                        <td className="font-bold">{sub.kkm}</td>
+                        <td className="p-0 font-bold">
                           <input 
                             type="number" min="0" max="100" 
                             className="w-full h-full py-2 bg-transparent text-center font-mono font-bold no-print focus:bg-blue-50/50 outline-none transition-all"
@@ -334,10 +334,10 @@ const ReportTemplate = ({
                             }}
                             onBlur={() => autoSaveStudent(student, true)}
                           />
-                          <span className="hidden print:inline">{sub.tulis?.nilai ?? '-'}</span>
+                          <span className="hidden print:inline font-bold">{sub.tulis?.nilai ?? '-'}</span>
                         </td>
-                        <td className="font-bold">{sub.tulis?.huruf ?? '-'}</td>
-                        <td className="p-0">
+                        <td className="font-black">{sub.tulis?.huruf ?? '-'}</td>
+                        <td className="p-0 font-bold">
                           <input 
                             type="number" min="0" max="100" 
                             className="w-full h-full py-2 bg-transparent text-center font-mono font-bold no-print focus:bg-blue-50/50 outline-none transition-all"
@@ -594,37 +594,37 @@ const ReportTemplate = ({
 };
 
 const StudentInfo = ({ student, globalNamaKelas }: { student: Student, globalNamaKelas?: string }) => (
-  <div className="mb-2">
-    <table className="table-header w-full text-[9pt]">
+  <div className="mb-2 font-bold select-none text-black">
+    <table className="table-header w-full text-[9.5pt] font-bold">
       <tbody>
         <tr>
-          <td className="w-[18%]">Nama Santri</td>
-          <td className="w-[2%]">:</td>
-          <td className="w-[40%] font-bold">{student.name}</td>
-          <td className="w-[15%]">Kelas</td>
-          <td className="w-[2%]">:</td>
-          <td className="w-[23%] font-bold">{globalNamaKelas || student.class}</td>
+          <td className="w-[18%] font-bold">Nama Santri</td>
+          <td className="w-[2%] font-bold">:</td>
+          <td className="w-[40%] font-black uppercase">{student.name}</td>
+          <td className="w-[15%] font-bold">Kelas</td>
+          <td className="w-[2%] font-bold">:</td>
+          <td className="w-[23%] font-black uppercase">{globalNamaKelas || student.class}</td>
         </tr>
         <tr>
-          <td>NIS/NISN</td>
-          <td>:</td>
-          <td className="font-bold">{student.nomorInduk}</td>
-          <td>Semester</td>
-          <td>:</td>
-          <td className="relative">
-            <span className="font-bold">{student.semester}</span>
+          <td className="font-bold">NIS/NISN</td>
+          <td className="font-bold">:</td>
+          <td className="font-black">{student.nomorInduk}</td>
+          <td className="font-bold">Semester</td>
+          <td className="font-bold">:</td>
+          <td className="relative font-bold">
+            <span className="font-black">{student.semester}</span>
             {student.semester === "GANJIL" && (
               <div className="absolute -inset-x-2 -inset-y-1 border-2 border-green-700 pointer-events-none opacity-80 rounded-sm"></div>
             )}
           </td>
         </tr>
         <tr>
-          <td>Nomor Urut Absen</td>
-          <td>:</td>
-          <td className="font-bold">{student.noUrut}</td>
-          <td>Tahun Pelajaran</td>
-          <td>:</td>
-          <td className="font-bold">{student.tahunPelajaran}</td>
+          <td className="font-bold">Nomor Urut Absen</td>
+          <td className="font-bold">:</td>
+          <td className="font-black">{student.noUrut}</td>
+          <td className="font-bold">Tahun Pelajaran</td>
+          <td className="font-bold">:</td>
+          <td className="font-black">{student.tahunPelajaran}</td>
         </tr>
       </tbody>
     </table>
