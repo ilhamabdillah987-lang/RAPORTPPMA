@@ -177,11 +177,8 @@
   font-family: var(--font-sans), sans-serif !important;
   font-weight: 950 !important;
   color: #000000 !important;
-  -webkit-text-stroke: 0.6px #ffffff !important;
-  text-shadow: 
-    1px 1px 0px rgba(0, 0, 0, 0.4),
-    2px 2px 0px rgba(0, 0, 0, 0.35),
-    3px 3px 2px rgba(0, 0, 0, 0.3) !important;
+  -webkit-text-stroke: 0.6px #8b0000 !important;
+  text-shadow: none !important;
 }
 
 @utility no-scrollbar {
