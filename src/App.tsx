@@ -200,7 +200,7 @@ const ReportTemplate = ({
       {/* PAGE 2: IDENTITAS SANTRI */}
       {(!selectedPrintSheets || selectedPrintSheets.identitas) && (
         currentUserEmail ? (
-          <section className="page flex flex-col pt-8 pb-6 px-12 text-[10pt] font-sans font-bold gold-outline-page">
+          <section className="page flex flex-col pt-8 pb-6 px-12 text-[12pt] font-sans font-bold gold-outline-page">
             <h1 className="text-center text-[12pt] font-black uppercase mb-8 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
             <div className="flex-1 space-y-0.5">
               <table className="w-full border-collapse">
@@ -260,10 +260,10 @@ const ReportTemplate = ({
                 )}
               </div>
               <div className="text-center w-80 mb-2 font-bold">
-                <p className="mb-0 text-[10pt] font-bold">Tangerang, {globalTanggalRaport}</p>
-                <p className="font-black uppercase text-[10pt]">Kepala Kepesantrenan,</p>
+                <p className="mb-0 text-[12pt] font-bold">Tangerang, {globalTanggalRaport}</p>
+                <p className="font-black uppercase text-[12pt]">Kepala Kepesantrenan,</p>
                 <div className="h-20"></div>
-                <p className="font-black text-[10pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
+                <p className="font-black text-[12pt] border-b-2 border-black inline-block min-w-[200px]">{globalKepala || ''}</p>
               </div>
             </div>
           </section>
@@ -379,7 +379,7 @@ const ReportTemplate = ({
               </tbody>
             </table>
           </div>
-          <div className="signature-section mt-12 text-[10pt] flex justify-between items-end px-4 page-break-inside-avoid">
+          <div className="signature-section mt-12 text-[12pt] flex justify-between items-end px-4 page-break-inside-avoid">
             <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
               <p className="font-medium">Mengetahui,</p>
               <p className="font-bold">Orang Tua/Wali Santri</p>
@@ -407,7 +407,7 @@ const ReportTemplate = ({
             <Header logoUrl={logoUrl} />
             <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />
             <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">B. SIKAP</h3>
-            <table className="table-raport mb-6 text-[10pt] w-full">
+            <table className="table-raport mb-6 text-[12pt] w-full">
               <thead>
                 <tr className="bg-slate-50 h-10">
                   <th className="w-[30%]">ASPEK PENILAIAN</th>
@@ -453,7 +453,7 @@ const ReportTemplate = ({
             </table>
           </div>
 
-          <div className="signature-section mt-auto text-[10pt] flex justify-between items-start px-4 page-break-inside-avoid pb-8">
+          <div className="signature-section mt-auto text-[12pt] flex justify-between items-start px-4 page-break-inside-avoid pb-8">
             <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
               <p className="font-medium">Mengetahui,</p>
               <p className="font-bold">Orang Tua/Wali Santri</p>
@@ -482,7 +482,7 @@ const ReportTemplate = ({
             <StudentInfo student={student} globalNamaKelas={globalNamaKelas} />
             
             <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">C. EKSTRAKURIKULER</h3>
-            <table className="table-raport mb-12 text-[10pt] w-full">
+            <table className="table-raport mb-12 text-[12pt] w-full">
               <thead>
                 <tr className="bg-slate-50 h-10">
                   <th className="w-[40%] text-center">KEGIATAN / PROGRAM</th>
@@ -502,7 +502,7 @@ const ReportTemplate = ({
             </table>
 
             <h3 className="font-bold mb-3 uppercase text-lg border-b-2 border-black inline-block">D. KEHADIRAN</h3>
-            <table className="table-raport mb-6 text-[10pt] w-[300px]">
+            <table className="table-raport mb-6 text-[12pt] w-[300px]">
               <thead>
                 <tr className="bg-slate-50 h-10">
                   <th className="w-[60%]">KETERANGAN</th>
@@ -535,7 +535,7 @@ const ReportTemplate = ({
             </table>
           </div>
     
-          <div className="signature-section mt-12 text-[10pt] flex justify-between items-end px-4 page-break-inside-avoid">
+          <div className="signature-section mt-12 text-[12pt] flex justify-between items-end px-4 page-break-inside-avoid">
             <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
               <p className="font-medium">Mengetahui,</p>
               <p className="font-bold">Orang Tua/Wali Santri</p>

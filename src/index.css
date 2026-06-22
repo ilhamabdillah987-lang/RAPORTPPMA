@@ -83,7 +83,7 @@
   color: black;
   line-height: 1.25;
   font-family: var(--font-serif);
-  font-size: 10pt;
+  font-size: 12pt;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   border: 1px solid #e2e8f0;
 }
@@ -103,7 +103,7 @@
 .table-header {
   width: 100%;
   margin-bottom: 5px;
-  font-size: 10pt;
+  font-size: 12.5pt;
   font-weight: bold;
 }
 
@@ -117,7 +117,7 @@
   width: 100%;
   border-collapse: collapse;
   border: 1.5px solid black;
-  font-size: 9.5pt;
+  font-size: 12pt;
   font-weight: bold;
 }
 
