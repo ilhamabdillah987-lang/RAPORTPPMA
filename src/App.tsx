@@ -158,16 +158,16 @@ const ReportTemplate = ({
     <div className="report-container shadow-2xl rounded-sm print:shadow-none print:bg-white p-10 print:p-0 mb-20 print:mb-0">
       {/* PAGE 1: COVER */}
       {(!selectedPrintSheets || selectedPrintSheets.cover) && (
-        <section className="page flex flex-col items-center justify-start pt-16 text-center">
+        <section className="page flex flex-col items-center justify-start pt-12 text-center">
           {logoUrl ? (
-            <img src={logoUrl} alt="Logo" className="w-72 h-72 object-contain mb-12" referrerPolicy="no-referrer" />
+            <img src={logoUrl} alt="Logo" className="w-56 h-56 object-contain mb-8" referrerPolicy="no-referrer" />
           ) : (
-            <div className="w-72 h-72 border-4 border-dashed border-slate-200 rounded-3xl flex items-center justify-center mb-12 mx-auto">
-              <span className="text-slate-300 font-extrabold text-2xl uppercase tracking-widest px-4">LOGO PESANTREN</span>
+            <div className="w-56 h-56 border-3 border-dashed border-slate-200 rounded-3xl flex items-center justify-center mb-8 mx-auto">
+              <span className="text-slate-300 font-extrabold text-xl uppercase tracking-widest px-4">LOGO PESANTREN</span>
             </div>
           )}
-          <h1 className="text-5xl font-black uppercase mb-3 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
-          <h2 className="text-2xl font-bold uppercase mb-12 text-slate-500 tracking-widest">Pondok Pesantren Modern Al-Hikmah</h2>
+          <h1 className="text-4xl font-black uppercase mb-2 tracking-tighter text-slate-900">Laporan Hasil Belajar</h1>
+          <h2 className="text-xl font-bold uppercase mb-8 text-slate-500 tracking-widest">Pondok Pesantren Modern Al-Hikmah</h2>
           
           <div className="relative w-full max-w-lg py-8 px-6 bg-white/50 backdrop-blur-sm p-8 rounded-3xl border border-slate-200/50 shadow-sm mt-4">
             <div className="relative py-4 space-y-8">
@@ -189,7 +189,7 @@ const ReportTemplate = ({
             </div>
           </div>
 
-          <div className="mt-20 mb-8 space-y-4 break-inside-avoid">
+          <div className="mt-10 mb-6 space-y-4 break-inside-avoid">
             <p className="font-black uppercase text-2xl underline underline-offset-[12px] decoration-[3px] tracking-[0.3em] text-slate-900">SEMESTER {student.semester}</p>
             <div className="h-4"></div>
             <p className="font-extrabold uppercase text-xl tracking-[0.2em] text-slate-500">TAHUN PELAJARAN {student.tahunPelajaran}</p>
@@ -200,8 +200,8 @@ const ReportTemplate = ({
       {/* PAGE 2: IDENTITAS SANTRI */}
       {(!selectedPrintSheets || selectedPrintSheets.identitas) && (
         currentUserEmail ? (
-          <section className="page flex flex-col pt-8 pb-6 px-12 text-[12pt] font-sans font-bold gold-outline-page">
-            <h1 className="text-center text-[12pt] font-black uppercase mb-8 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
+          <section className="page flex flex-col pt-1 text-[12pt] font-sans font-bold gold-outline-page">
+            <h1 className="text-center text-[12.5pt] font-black uppercase mb-4 tracking-wider text-slate-800">KETERANGAN TENTANG DIRI PESERTA DIDIK</h1>
             <div className="flex-1 space-y-0.5">
               <table className="w-full border-collapse">
                 <tbody>
@@ -251,7 +251,7 @@ const ReportTemplate = ({
                 </tbody>
               </table>
             </div>
-            <div className="flex justify-between items-end mt-8 px-12 font-bold">
+            <div className="flex justify-between items-end mt-4 px-12 font-bold">
               <div className="w-[3cm] h-[4cm] border-2 border-slate-900 flex items-center justify-center text-center text-[7pt] text-slate-400 font-bold bg-slate-50 uppercase tracking-tighter leading-tight shrink-0 overflow-hidden relative group">
                 {student.photoUrl ? (
                   <img src={student.photoUrl} alt="Foto Santri" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -379,11 +379,11 @@ const ReportTemplate = ({
               </tbody>
             </table>
           </div>
-          <div className="signature-section mt-12 text-[12pt] flex justify-between items-end px-4 page-break-inside-avoid">
+          <div className="signature-section mt-5 text-[12pt] flex justify-between items-end px-4 page-break-inside-avoid">
             <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
               <p className="font-medium">Mengetahui,</p>
               <p className="font-bold">Orang Tua/Wali Santri</p>
-              <div className="h-28"></div>
+              <div className="h-16"></div>
               <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 whitespace-nowrap text-center">
                 {student.identity?.namaAyah || student.identity?.namaWali || '..........................'}
               </p>
@@ -391,7 +391,7 @@ const ReportTemplate = ({
             <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
               <p className="font-medium text-right w-full pr-10 italic">Tangerang, {globalTanggalRaport}</p>
               <p className="font-bold">Wali Kelas,</p>
-              <div className="h-28"></div>
+              <div className="h-16"></div>
               <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 whitespace-nowrap text-center">
                 {waliKelasToPrint}
               </p>
@@ -453,11 +453,11 @@ const ReportTemplate = ({
             </table>
           </div>
 
-          <div className="signature-section mt-auto text-[12pt] flex justify-between items-start px-4 page-break-inside-avoid pb-8">
+          <div className="signature-section mt-auto text-[12pt] flex justify-between items-start px-4 page-break-inside-avoid pb-4">
             <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
               <p className="font-medium">Mengetahui,</p>
               <p className="font-bold">Orang Tua/Wali Santri</p>
-              <div className="h-28"></div>
+              <div className="h-16"></div>
               <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 whitespace-nowrap text-center">
                 {student.identity?.namaAyah || student.identity?.namaWali || '..........................'}
               </p>
@@ -465,7 +465,7 @@ const ReportTemplate = ({
             <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
               <p className="font-medium text-right w-full pr-10 italic">Tangerang, {globalTanggalRaport}</p>
               <p className="font-bold">Wali Kelas,</p>
-              <div className="h-28"></div>
+              <div className="h-16"></div>
               <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 whitespace-nowrap text-center">
                 {waliKelasToPrint}
               </p>
@@ -535,11 +535,11 @@ const ReportTemplate = ({
             </table>
           </div>
     
-          <div className="signature-section mt-12 text-[12pt] flex justify-between items-end px-4 page-break-inside-avoid">
+          <div className="signature-section mt-5 text-[12pt] flex justify-between items-end px-4 page-break-inside-avoid">
             <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
               <p className="font-medium">Mengetahui,</p>
               <p className="font-bold">Orang Tua/Wali Santri</p>
-              <div className="h-28"></div>
+              <div className="h-16"></div>
               <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-base h-8 whitespace-nowrap">
                 {student.identity?.namaAyah || student.identity?.namaWali || '..........................'}
               </p>
@@ -547,7 +547,7 @@ const ReportTemplate = ({
             <div className="signature-box flex flex-col items-center flex-1 text-center leading-relaxed">
               <p className="font-medium text-right w-full pr-10 pr-0">Tangerang, {globalTanggalRaport}</p>
               <p className="font-bold">Wali Kelas,</p>
-              <div className="h-28"></div>
+              <div className="h-16"></div>
               <p className="font-black border-b-2 border-black inline-block min-w-[200px] text-[11pt] h-8 whitespace-nowrap">
                 {waliKelasToPrint}
               </p>

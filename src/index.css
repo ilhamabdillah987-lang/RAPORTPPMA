@@ -42,7 +42,7 @@
     }
     .page {
       margin: 0 !important;
-      padding: 1.5cm 2cm !important;
+      padding: 0.7cm 1.2cm !important;
       box-shadow: none !important;
       border: none !important;
       width: 210mm !important;
@@ -74,7 +74,7 @@
 .page {
   width: 210mm;
   height: 297mm;
-  padding: 1cm 1.5cm;
+  padding: 0.7cm 1.2cm;
   background: white;
   position: relative;
   box-sizing: border-box;
