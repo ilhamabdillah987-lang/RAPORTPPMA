@@ -797,7 +797,12 @@ const compressImage = (file: File, maxWidth = 300, maxHeight = 400): Promise<str
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
+          const format = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+          if (format === 'image/png') {
+            resolve(canvas.toDataURL('image/png'));
+          } else {
+            resolve(canvas.toDataURL('image/jpeg', 0.8));
+          }
         } else {
           resolve(event.target?.result as string || '');
         }
