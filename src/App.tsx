@@ -111,6 +111,7 @@ interface ReportTemplateProps {
     nilai: boolean;
     sikap: boolean;
     kehadiran: boolean;
+    legger: boolean;
   };
 }
 
@@ -557,38 +558,40 @@ const ReportTemplate = ({
       )}
 
       {/* LEDGER */}
-      <section className="page border-t-2 mt-8 print:hidden">
-        <Header logoUrl={logoUrl} />
-        <div className="text-center mb-10 mt-6">
-          <h1 className="text-2xl font-black uppercase tracking-widest text-slate-800">Ledger Perkembangan Nilai Santri</h1>
-          <h2 className="text-lg font-bold uppercase text-slate-500 mt-1">Kelas {student.class} • TA {student.tahunPelajaran}</h2>
-        </div>
-        
-        <table className="table-raport text-[10pt]">
-          <thead>
-            <tr className="bg-slate-50 h-12">
-              <th className="w-12">No</th>
-              <th>Nama Lengkap Santri</th>
-              <th className="w-24">Skor Rerata</th>
-              <th className="w-24">Ranking</th>
-            </tr>
-          </thead>
-          <tbody>
-            {studentRankings.map((s: any) => (
-              <tr key={s.id} className={s.id === student.id ? 'bg-blue-50/50 font-bold border-x-4 border-blue-600' : 'hover:bg-slate-50/50 transition-colors'}>
-                <td className="text-center font-medium font-mono">{s.rank}</td>
-                <td className="pl-6">{s.name}</td>
-                <td className="text-center font-mono">{s.avg.toFixed(2)}</td>
-                <td className="text-center">
-                  <span className={`inline-block w-8 h-8 leading-8 rounded-full ${s.rank <= 3 ? 'bg-amber-100 text-amber-700 font-black ring-2 ring-amber-200' : 'font-bold text-slate-700'}`}>
-                    {s.rank}
-                  </span>
-                </td>
+      {(!selectedPrintSheets || selectedPrintSheets.legger) && (
+        <section className="page flex flex-col justify-start font-bold gold-outline-page">
+          <Header logoUrl={logoUrl} />
+          <div className="text-center mb-10 mt-6">
+            <h1 className="text-2xl font-black uppercase tracking-widest text-slate-800">Ledger Perkembangan Nilai Santri</h1>
+            <h2 className="text-lg font-bold uppercase text-slate-500 mt-1">Kelas {student.class} • TA {student.tahunPelajaran}</h2>
+          </div>
+          
+          <table className="table-raport text-[12pt] w-full">
+            <thead>
+              <tr className="bg-slate-50 h-12">
+                <th className="w-12">No</th>
+                <th>Nama Lengkap Santri</th>
+                <th className="w-24">Skor Rerata</th>
+                <th className="w-24">Ranking</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+            </thead>
+            <tbody>
+              {studentRankings.map((s: any) => (
+                <tr key={s.id} className={s.id === student.id ? 'bg-blue-50/50 font-bold border-x-4 border-blue-600' : 'hover:bg-slate-50/50 transition-colors'}>
+                  <td className="text-center font-medium font-mono">{s.rank}</td>
+                  <td className="pl-6">{s.name}</td>
+                  <td className="text-center font-mono">{s.avg.toFixed(2)}</td>
+                  <td className="text-center">
+                    <span className={`inline-block w-8 h-8 leading-8 rounded-full ${s.rank <= 3 ? 'bg-amber-100 text-amber-700 font-black ring-2 ring-amber-200' : 'font-bold text-slate-700'}`}>
+                      {s.rank}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
     </div>
   );
 };
@@ -854,7 +857,8 @@ export default function App() {
     identitas: true,
     nilai: true,
     sikap: true,
-    kehadiran: true
+    kehadiran: true,
+    legger: false
   });
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState<string>(() => localStorage.getItem('al_hikmah_google_sheets_url') || '');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
@@ -4154,6 +4158,15 @@ export default function App() {
                   className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
                 />
                 <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Ekstra & Absensi</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input 
+                  type="checkbox" 
+                  checked={selectedPrintSheets.legger} 
+                  onChange={e => setSelectedPrintSheets(prev => ({ ...prev, legger: e.target.checked }))}
+                  className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                />
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Legger Nilai</span>
               </label>
             </div>
           </div>
