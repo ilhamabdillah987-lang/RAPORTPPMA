@@ -76,7 +76,7 @@ const Header = ({ logoUrl }: { logoUrl: string }) => (
     <div className="flex items-center gap-6 py-1">
       <div className="shrink-0">
         {logoUrl ? (
-          <img src={logoUrl} width="95" alt="Logo" className="w-22 h-22 object-contain" referrerPolicy="no-referrer" />
+          <img src={logoUrl} width="95" alt="Logo" className="w-22 h-22 object-contain bg-transparent" referrerPolicy="no-referrer" />
         ) : (
           <div className="w-22 h-22 bg-slate-100 rounded-xl flex items-center justify-center text-[8pt] text-slate-400 font-bold border-2 border-dashed border-slate-200 uppercase">Logo</div>
         )}
@@ -161,7 +161,7 @@ const ReportTemplate = ({
       {(!selectedPrintSheets || selectedPrintSheets.cover) && (
         <section className="page flex flex-col items-center justify-start pt-12 text-center">
           {logoUrl ? (
-            <img src={logoUrl} alt="Logo" className="w-56 h-56 object-contain mb-8" referrerPolicy="no-referrer" />
+            <img src={logoUrl} alt="Logo" className="w-56 h-56 object-contain bg-transparent" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-56 h-56 border-3 border-dashed border-slate-200 rounded-3xl flex items-center justify-center mb-8 mx-auto">
               <span className="text-slate-300 font-extrabold text-xl uppercase tracking-widest px-4">LOGO PESANTREN</span>
