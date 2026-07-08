@@ -805,7 +805,7 @@ const compressImage = (file: File, maxWidth = 300, maxHeight = 400): Promise<str
           if (isPng) {
             resolve(canvas.toDataURL('image/png'));
           } else {
-            resolve(canvas.toDataURL('image/jpeg', 0.8));
+            resolve(canvas.toDataURL('image/png', 0.8));
           }
         } else {
           resolve(event.target?.result as string || '');
