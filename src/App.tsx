@@ -799,14 +799,7 @@ const compressImage = (file: File, maxWidth = 300, maxHeight = 400): Promise<str
           // Clear canvas with transparent color to preserve PNG transparency
           ctx.clearRect(0, 0, width, height);
           ctx.drawImage(img, 0, 0, width, height);
-          const isPng = file.type === 'image/png' || 
-                        file.type === 'image/x-png' || 
-                        (file.name && file.name.toLowerCase().endsWith('.png'));
-          if (isPng) {
-            resolve(canvas.toDataURL('image/png'));
-          } else {
-            resolve(canvas.toDataURL('image/png', 0.8));
-          }
+          resolve(canvas.toDataURL('image/png'));
         } else {
           resolve(event.target?.result as string || '');
         }
